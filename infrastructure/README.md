@@ -54,6 +54,9 @@ infrastructure/
 6. Show state and dependency management.
 7. `terraform destroy` the disposable resources safely.
 
+## Endpoints
+None: this folder creates cloud resources; it runs no service.
+
 ## Acceptance test
 The group creates the dev environment with Terraform, deploys CloudTrain, changes infrastructure
 through Terraform, and safely destroys disposable resources.

@@ -353,7 +353,15 @@ class Tracker:
             "status_field": status["id"],
             "to_do": next(o["id"] for o in status["options"] if o["name"] == BOARD_COLUMNS[0][0]),
             "due_field": next(f["id"] for f in fields if f["name"] == DUE_FIELD),
+            "on_board": self._issues_on_board(number),
         }
+
+    def _issues_on_board(self, number: str) -> set[str]:
+        """Addresses of the issues already on the board, so a re-run does not touch them again."""
+        listed = gh(
+            "project", "item-list", number, "--owner", self.owner, "--format", "json", "--limit", "1000"
+        )
+        return {item.get("content", {}).get("url") for item in json.loads(listed)["items"]}
 
     def _set_columns(self, field_id: str) -> None:
         query = """mutation($field: ID!, $options: [ProjectV2SingleSelectFieldOptionInput!]) {
@@ -408,7 +416,7 @@ class Tracker:
                 url, new = found["url"], False
             else:
                 url, new = self._create(issue), True
-            if board and url:
+            if board and url and url not in board["on_board"]:  # cards already there are left alone
                 self._put_on_board(board, url, issue["due"], new)
 
     def _create(self, issue: dict) -> str:

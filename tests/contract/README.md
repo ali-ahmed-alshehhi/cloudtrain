@@ -11,5 +11,10 @@ It runs inside a small container on the docker-compose network (`docker-compose.
 `tools`), so it reaches every service directly, internal endpoints included, without publishing any
 extra ports. Set `CONTRACT_MAX_EXAMPLES` to send more requests per endpoint (default 30).
 
+Port: — · Endpoints: none of its own; it calls every service directly inside the network.
+
+## Acceptance test
+`make contract` reports "All services keep their contracts."
+
 Note: the generated requests create real records (random projects, datasets, ...) in the running
 system. Use `make reset` to start clean.

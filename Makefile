@@ -30,8 +30,8 @@ test: ## Unit tests for every Python service
 		echo "== $$service"; \
 		PYTHON=$(PYTHON) bash scripts/test_service.sh $$service || exit 1; \
 	done
-	@echo "== scripts (reviewer rules)"
-	@$(MAKE) --silent tools && $(TOOLS)/python -m pytest tests/scripts -q -p no:warnings
+	@echo "== contract files and scripts"
+	@$(MAKE) --silent tools && $(TOOLS)/python -m pytest tests/contracts tests/scripts -q -p no:warnings
 
 # The root tools (ruff, pytest for the integration tests) live in .venv at the repo root.
 $(TOOLS)/.installed: requirements-tools.txt

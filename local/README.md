@@ -8,6 +8,12 @@ creates the same things (Hamda + Fatma).
 | `postgres/init.sh` | the `postgres` container, once, when its volume is empty | one user and one schema per service: `projects`, `datasets`, `jobs`, `scheduler`, `registry`, `mlflow` |
 | `localstack/init.sh` | the `localstack` container, every start | S3 buckets `datasets` and `artifacts`; SQS queues `training-jobs` (with dead-letter redrive), `training-jobs-dlq`, `job-events`, all encrypted |
 
+Port: — · Endpoints: none (start-up scripts only).
+
+## Acceptance test
+After `make reset && make up`, every container is healthy, each service's schema exists, and the
+buckets and queues are listed by `awslocal s3 ls` and `awslocal sqs list-queues`.
+
 Why each service has its own user: a service can only touch its own schema, so nobody reads another
 service's tables by accident (see `docs/database/`). Service users cannot create schemas; this script does.
 

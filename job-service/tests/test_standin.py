@@ -56,7 +56,7 @@ def test_same_idempotency_key_queues_only_once(client, queues):
     assert len(queues.sent["training-jobs"]) == 1
 
 
-def test_happy_path_events_and_cost(client, queues, check):
+def test_happy_path_and_its_events(client, queues, check):
     job_id = submit(client)["job_id"]
 
     assert report(client, job_id, "SCHEDULED", machine_type="local-cpu").status_code == 200

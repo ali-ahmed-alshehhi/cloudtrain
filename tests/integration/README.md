@@ -15,5 +15,7 @@ Run the end-to-end walk-through **through the gateway** against the whole system
 
 Run with `make e2e` (needs `make up` first).
 
+Port: — · Endpoints: none of its own; it calls only the gateway (5810).
+
 ## Acceptance test
 `make e2e` is green from a clean clone after `make reset`.
