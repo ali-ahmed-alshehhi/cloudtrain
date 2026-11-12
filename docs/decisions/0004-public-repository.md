@@ -1,6 +1,7 @@
 # 0004 — Public GitHub repository
 
-- **Status:** proposed — waiting for the instructors (Manzoor, Asif) to confirm a public repo is allowed
+- **Status:** accepted — repository created public on Thu 12 Nov 2026 (instructors Manzoor and Asif to confirm;
+  if they say no, switch to option 2)
 - **Date:** 2026-11-12
 - **Decided by:** Ali
 

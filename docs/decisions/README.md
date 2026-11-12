@@ -11,5 +11,5 @@ or make a choice others must live with. Copy the shape of `0001-microservices-an
 | 0001 | Microservices behind one API gateway | accepted |
 | 0002 | Notifications live in the portal | accepted |
 | 0003 | Node 24 instead of Node 20 | accepted |
-| 0004 | Public GitHub repository | proposed (instructors to confirm) |
+| 0004 | Public GitHub repository | accepted (instructors to confirm) |
 | 0005 | LocalStack S3 instead of MinIO on laptops | accepted |
