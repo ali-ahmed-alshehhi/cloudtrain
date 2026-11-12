@@ -8,5 +8,5 @@ students:
   6:  { names: [Hamda, Fatma],   github: [FILL_ME, FILL_ME], role: "Terraform & cloud infrastructure", folders: [infrastructure, docs/DEPLOYMENT_GUIDE.md, contracts/pricing.yaml] }
   7:  { names: [Maitha],         github: [MaithaAR], role: "Cloud resource scheduling & compute", folders: [scheduler] }
   8:  { names: [Majed],          github: [FILL_ME], role: "Model registry, deployment & inference", folders: [model-registry, inference-service] }
-  9:  { names: [Salem],          github: [FILL_ME], role: "CI/CD, security & DevSecOps", folders: [.github/workflows, security] }
+  9:  { names: [Salem],          github: [Salem2030c-lang], role: "CI/CD, security & DevSecOps", folders: [.github/workflows, security] }
   10: { names: [Hilal, Adel],    github: [FILL_ME, FILL_ME], role: "Web portal, observability & evaluation", folders: [portal, docs/EVALUATION.md] }
