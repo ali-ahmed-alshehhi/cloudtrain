@@ -1,4 +1,4 @@
-repo: "FILL_ME_REPO_URL"
+repo: "https://github.com/ali-ahmed-alshehhi/cloudtrain"
 students:
   1:  { names: [Ali],            github: [ali-ahmed-alshehhi], role: "Architecture, API Gateway & integration", folders: [gateway, project-service, contracts, tests/integration, docker-compose.yml, docs/ARCHITECTURE.md, team.yml] }
   2:  { names: [Faisal],         github: [FILL_ME], role: "Dataset management & cloud storage", folders: [dataset-service] }
