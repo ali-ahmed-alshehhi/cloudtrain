@@ -3,8 +3,8 @@ students:
   1:  { names: [Ali],            github: [ali-ahmed-alshehhi], role: "Architecture, API Gateway & integration", folders: [gateway, project-service, contracts, tests/integration, docker-compose.yml, docs/ARCHITECTURE.md, team.yml] }
   2:  { names: [Faisal],         github: [faisal-alansari], role: "Dataset management & cloud storage", folders: [dataset-service] }
   3:  { names: [Mariam],         github: [FILL_ME], role: "Training job management & workflow", folders: [job-service, contracts/events] }
-  4:  { names: [Abdullah],       github: [FILL_ME], role: "ML training engine & experiment tracking", folders: [training, mlflow] }
-  5:  { names: [Ahmed, Abdulla], github: [FILL_ME, alhashmiuae], role: "Distributed training & parallelism", folders: [training/distributed, docs/BENCHMARKS.md] }
+  4:  { names: [Abdullah],       github: [alhashmiuae], role: "ML training engine & experiment tracking", folders: [training, mlflow] }
+  5:  { names: [Ahmed, Abdulla], github: [FILL_ME, FILL_ME], role: "Distributed training & parallelism", folders: [training/distributed, docs/BENCHMARKS.md] }
   6:  { names: [Hamda, Fatma],   github: [Hamdah219, FILL_ME], role: "Terraform & cloud infrastructure", folders: [infrastructure, docs/DEPLOYMENT_GUIDE.md, contracts/pricing.yaml] }
   7:  { names: [Maitha],         github: [MaithaAR], role: "Cloud resource scheduling & compute", folders: [scheduler] }
   8:  { names: [Majed],          github: [FILL_ME], role: "Model registry, deployment & inference", folders: [model-registry, inference-service] }
