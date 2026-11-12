@@ -108,6 +108,15 @@ def create_app(
         request_id = request.state.request_id
         path = request.url.path
 
+        if path in ("/health", "/metrics"):  # the gateway's own endpoints are GET only
+            return error_response(
+                405,
+                "METHOD_NOT_ALLOWED",
+                f"{request.method} is not allowed on {path}",
+                request_id,
+                headers={"Allow": "GET"},
+            )
+
         if is_forbidden_path(path):
             return error_response(404, "NOT_FOUND", f"No route for {path}", request_id)
 
@@ -117,7 +126,11 @@ def create_app(
         request.state.route_name = route.name
         if not route.allows(request.method, path):
             return error_response(
-                405, "METHOD_NOT_ALLOWED", f"{request.method} is not allowed on {path}", request_id
+                405,
+                "METHOD_NOT_ALLOWED",
+                f"{request.method} is not allowed on {path}",
+                request_id,
+                headers={"Allow": route.allowed_methods(path)},
             )
 
         try:

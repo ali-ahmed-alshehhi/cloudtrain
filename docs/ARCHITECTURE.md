@@ -52,7 +52,7 @@ flowchart LR
   q2 -->|"only reader"| mon["Monitoring<br/>Hilal + Adel"]
 
   pg[("PostgreSQL<br/>one schema per service")]
-  s3[("S3 / MinIO<br/>datasets, artifacts")]
+  s3[("S3 (LocalStack locally)<br/>datasets, artifacts")]
   ds --- s3
   worker --- s3
   mlflow --- pg
@@ -277,9 +277,11 @@ Scheduler reports the machine type and start/end times. Training Jobs computes `
 | schema `scheduler` (workers, capacity, quotas) | same | same | Maitha |
 | schema `mlflow` (MLflow runs and model registry) | same | same | Abdullah |
 | schema `registry` (deployments, live version, rollback history) | same | same | Majed |
-| Bucket `datasets` (one folder per dataset version) | MinIO | S3 | Faisal |
-| Bucket `artifacts` (checkpoints, models) | MinIO | S3 | Abdullah, Majed |
+| Bucket `datasets` (one folder per dataset version) | LocalStack S3 | S3 | Faisal |
+| Bucket `artifacts` (checkpoints, models) | LocalStack S3 | S3 | Abdullah, Majed |
 | Queues `training-jobs`, `training-jobs-dlq`, `job-events` | LocalStack SQS | SQS | see section 8 |
+
+Locally, LocalStack keeps files and queue messages in memory: they are lost when it restarts (`decisions/0005-localstack-for-s3.md`). PostgreSQL data is kept until `make reset`.
 
 ## 15. Cloud mapping
 

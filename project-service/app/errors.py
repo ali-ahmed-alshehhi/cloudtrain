@@ -1,5 +1,7 @@
 """The shared error format (contracts/error-format.json), used for every non-2xx answer."""
 
+import re
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -17,9 +19,28 @@ class ApiError(Exception):
         self.message = message
 
 
-def error_response(status_code: int, code: str, message: str, request_id: str) -> JSONResponse:
+def error_response(
+    status_code: int, code: str, message: str, request_id: str, headers: dict | None = None
+) -> JSONResponse:
     body = {"error": {"code": code, "message": message, "request_id": request_id}}
-    return JSONResponse(status_code=status_code, content=body)
+    return JSONResponse(status_code=status_code, content=body, headers=headers)
+
+
+HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+
+
+def allowed_methods(app, path: str) -> str:
+    """All methods this service documents for `path`, e.g. "GET, POST" (the Allow header of a 405).
+
+    Read from the service's own OpenAPI description (the same one served at /openapi.json).
+    """
+    methods = set()
+    for template, operations in app.openapi()["paths"].items():
+        # "/projects/{project_id}" -> a pattern where {project_id} matches one path segment
+        pattern = re.sub(r"\\\{[^}]*\\\}", "[^/]+", re.escape(template))
+        if re.fullmatch(pattern, path):
+            methods |= {name.upper() for name in operations if name in HTTP_METHODS}
+    return ", ".join(sorted(methods))
 
 
 def request_id_of(request: Request) -> str:
@@ -53,4 +74,9 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, error: StarletteHTTPException) -> JSONResponse:
         code = STATUS_CODES.get(error.status_code, "HTTP_ERROR")
-        return error_response(error.status_code, code, str(error.detail), request_id_of(request))
+        headers = dict(error.headers or {})
+        if error.status_code == 405:  # HTTP requires listing the methods that ARE allowed
+            headers["Allow"] = allowed_methods(request.app, request.url.path)
+        return error_response(
+            error.status_code, code, str(error.detail), request_id_of(request), headers=headers
+        )

@@ -1,0 +1,8 @@
+# Settings for `make contract` (Schemathesis).
+
+[checks.positive_data_acceptance]
+# A request whose SHAPE matches the contract can still break a business rule that a schema cannot
+# express, for example "for ddp, world_size must equal gpu_count" or "a file sent as csv must
+# really be csv". The service then rightly answers 400 or 422; that is not a contract failure.
+# (Schemathesis's default list, plus 400 and 422.)
+expected-statuses = ["2xx", "3xx", "400", "401", "403", "404", "409", "422", "429", "5xx"]

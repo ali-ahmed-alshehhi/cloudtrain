@@ -126,6 +126,14 @@ def test_missing_project_is_404(client, check):
     check(response.json(), "Error")
 
 
+def test_huge_project_number_is_404_not_a_crash(client, check):
+    # Found by `make contract`: a number too big for the database used to cause a 500.
+    response = client.get("/projects/project-925764229842810100478", headers=ALICE)
+
+    assert response.status_code == 404
+    check(response.json(), "Error")
+
+
 def test_badly_formed_project_id_is_422(client, check):
     response = client.get("/projects/dataset-01", headers=ALICE)
 

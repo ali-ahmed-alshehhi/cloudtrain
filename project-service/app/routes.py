@@ -38,9 +38,13 @@ ProjectIdPath = Annotated[str, Path(pattern=PROJECT_ID_PATTERN)]
 IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key", min_length=1, max_length=128)]
 
 
+LARGEST_PROJECT_NUMBER = 2**31 - 1  # the biggest number the database's id column can hold
+
+
 def load_project(session: Session, project_id: str) -> Project:
     number = int(project_id.removeprefix("project-"))
-    project = session.get(Project, number)
+    # A number too big for the id column cannot be a project (and would make the database fail).
+    project = session.get(Project, number) if number <= LARGEST_PROJECT_NUMBER else None
     if project is None:
         raise ApiError(404, "PROJECT_NOT_FOUND", f"Project {project_id} does not exist")
     return project

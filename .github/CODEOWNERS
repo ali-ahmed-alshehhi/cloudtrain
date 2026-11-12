@@ -7,6 +7,9 @@
 /contracts/              @ali-ahmed-alshehhi
 /gateway/                @ali-ahmed-alshehhi
 /docker-compose.yml      @ali-ahmed-alshehhi
+/Makefile                @ali-ahmed-alshehhi
+/local/                  @ali-ahmed-alshehhi
+/tests/contract/         @ali-ahmed-alshehhi
 /tests/integration/      @ali-ahmed-alshehhi
 /docs/ARCHITECTURE.md    @ali-ahmed-alshehhi
 /team.yml                @ali-ahmed-alshehhi

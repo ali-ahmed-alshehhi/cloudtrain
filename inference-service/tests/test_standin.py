@@ -48,6 +48,15 @@ def test_not_an_image_is_400(client, check):
     check(response.json(), "Error")
 
 
+def test_empty_model_id_is_422(client):
+    # Found by `make contract`: an empty model_id used to be treated as "not sent".
+    response = client.post(
+        "/predict", files={"file": ("cat.png", PNG_START)}, data={"model_id": ""}, headers=USER
+    )
+
+    assert response.status_code == 422
+
+
 def test_without_login_is_401(client):
     assert client.post("/predict", files={"file": ("cat.png", PNG_START)}).status_code == 401
 

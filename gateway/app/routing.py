@@ -28,6 +28,13 @@ class Route:
             return True
         return method == "POST" and self.post_suffix is not None and path.endswith(self.post_suffix)
 
+    def allowed_methods(self, path: str) -> str:
+        """For the Allow header of a 405 answer, e.g. "GET, POST"."""
+        if self.methods is None:
+            return "DELETE, GET, PATCH, POST, PUT"
+        extra = {"POST"} if self.post_suffix and path.endswith(self.post_suffix) else set()
+        return ", ".join(sorted(self.methods | extra))
+
     def upstream_url(self, path: str, query: str) -> str:
         """The full address to forward to, e.g. /api/v1/jobs/job-1 -> http://job-service:8003/jobs/job-1."""
         new_path = self.rewrite_to + path[len(self.rewrite_from) :]

@@ -3,7 +3,7 @@
 What this stand-in does: keeps datasets IN MEMORY (lost on restart), checks the file format,
 computes the SHA-256 checksum and numbers the versions, exactly as
 contracts/openapi/dataset-service.yaml says.
-What it does NOT do (the real service must): store files in S3/MinIO, use PostgreSQL, check project
+What it does NOT do (the real service must): store files in S3 (LocalStack locally), use PostgreSQL, check project
 membership, record lineage and audit, return a real time-limited S3 link.
 """
 
@@ -193,7 +193,7 @@ def create_app() -> FastAPI:
     def download_url(dataset_id: DatasetIdPath, version: VersionPath) -> dict:
         dataset, found = find_version(dataset_id, version)
         # STAND-IN: not a working link. Faisal's service returns a real presigned S3 URL here.
-        bucket_url = os.environ.get("S3_ENDPOINT", "http://minio:9000")
+        bucket_url = os.environ.get("S3_ENDPOINT", "http://localstack:4566")
         return {
             "url": f"{bucket_url}/datasets/{dataset.dataset_id}/v{found.number}/data",
             "expires_at": iso(now_utc() + timedelta(minutes=15)),

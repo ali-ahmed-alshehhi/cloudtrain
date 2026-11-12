@@ -8,7 +8,7 @@
 |---|---|---|---|
 | Lint | Code style and simple mistakes | every Python folder | `make lint` |
 | Unit tests | One service's logic, without the others | `<service>/tests/` | `make test` |
-| Contract tests | Each running service answers exactly as its file in `contracts/` says (Schemathesis) | `contracts/openapi/` | `make contract` |
+| Contract tests | Each running service answers exactly as its file in `contracts/` says (Schemathesis, ~3,000 generated requests) | `tests/contract/`, `contracts/openapi/` | `make contract` |
 | End-to-end | The demo walk-through through the gateway, all services running | `tests/integration/` | `make e2e` |
 | Failure recovery | A worker dies mid-job; the job fails on the missing heartbeat, is retried and finishes | `tests/integration/test_failure_recovery.py` | `make e2e` |
 | UI end-to-end | The whole flow in the browser | `portal/` | _(Hilal + Adel)_ |

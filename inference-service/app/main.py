@@ -8,7 +8,7 @@ model from S3, and run it on the image.
 
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, File, Form, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 
 from app.common import ApiError, current_user, iso, now_utc, setup_service
 
@@ -30,10 +30,15 @@ def create_app() -> FastAPI:
 
     @app.post("/predict")
     async def predict(
+        request: Request,
         file: Annotated[UploadFile, File()],
         user_id: Annotated[str, Depends(current_user)],
         model_id: Annotated[str | None, Form(pattern=r"^model-[0-9]+$")] = None,
     ) -> dict:
+        # The framework turns an empty form field into "not sent"; the contract says it must match
+        # the pattern when it is sent, so look at the raw form too.
+        if "model_id" in (await request.form()) and model_id is None:
+            raise ApiError(422, "VALIDATION_FAILED", "model_id: must look like model-01")
         image = await file.read()
         if not image.startswith((PNG_START, JPEG_START)):
             raise ApiError(400, "INVALID_IMAGE", "Send a PNG or JPEG image")

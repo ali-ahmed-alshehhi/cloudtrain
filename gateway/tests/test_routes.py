@@ -57,8 +57,17 @@ def test_experiments_are_read_only(client, services, error_schema, method, path)
 
     assert response.status_code == 405
     assert response.json()["error"]["code"] == "METHOD_NOT_ALLOWED"
+    assert response.headers["allow"] in ("GET", "GET, POST")  # HTTP: say what IS allowed
     jsonschema.validate(response.json(), error_schema)
     assert services.received == []  # MLflow was never called
+
+
+@pytest.mark.parametrize("path", ["/health", "/metrics"])
+def test_gateway_own_endpoints_are_get_only(client, path):
+    response = client.put(path)
+
+    assert response.status_code == 405
+    assert response.headers["allow"] == "GET"
 
 
 def test_mlflow_errors_are_translated_to_the_shared_format(client, error_schema):

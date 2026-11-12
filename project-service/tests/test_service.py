@@ -39,6 +39,15 @@ def test_errors_carry_the_request_id(client):
     assert response.json()["error"]["request_id"] == "req-777"
 
 
+def test_405_lists_every_allowed_method(client, check):
+    # /projects has GET and POST; HTTP requires both in the Allow header of a 405.
+    response = client.put("/projects", headers=ALICE)
+
+    assert response.status_code == 405
+    assert response.headers["allow"] == "GET, POST"
+    check(response.json(), "Error")
+
+
 def test_unknown_path_uses_the_error_format(client, check):
     response = client.get("/nothing-here", headers=ALICE)
 

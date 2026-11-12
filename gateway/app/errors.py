@@ -6,9 +6,11 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
-def error_response(status_code: int, code: str, message: str, request_id: str) -> JSONResponse:
+def error_response(
+    status_code: int, code: str, message: str, request_id: str, headers: dict | None = None
+) -> JSONResponse:
     body = {"error": {"code": code, "message": message, "request_id": request_id}}
-    return JSONResponse(status_code=status_code, content=body)
+    return JSONResponse(status_code=status_code, content=body, headers=headers)
 
 
 def request_id_of(request: Request) -> str:
@@ -35,7 +37,10 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, error: StarletteHTTPException) -> JSONResponse:
         code = STATUS_CODES.get(error.status_code, "HTTP_ERROR")
-        return error_response(error.status_code, code, str(error.detail), request_id_of(request))
+        # keep FastAPI's headers, e.g. "Allow: GET" on 405 (required by HTTP)
+        return error_response(
+            error.status_code, code, str(error.detail), request_id_of(request), headers=error.headers
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError) -> JSONResponse:

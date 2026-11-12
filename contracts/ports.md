@@ -17,8 +17,7 @@ Changing a port is a contract change.
 | `training-worker` | `training/` | Abdullah | 8010 | no | scheduler (local development only) |
 | `mlflow` | `mlflow/` | Abdullah | 5000 | no | gateway (read only), workers, model registry |
 | `postgres` | — | Ali (compose) | 5432 | no | services, each with its own schema and user |
-| `minio` | — | Ali (compose) | 9000 | no | dataset service, workers, MLflow, registry |
-| `localstack` | — | Ali (compose) | 4566 | no | job service, scheduler (SQS) |
+| `localstack` | — | Ali (compose) | 4566 | no | SQS: job service, scheduler · S3: dataset service, workers, MLflow, registry |
 
 Inside the Docker network a service is called by `http://<container name>:<port>`, e.g.
 `http://dataset-service:8002`. The addresses are set as environment variables (`DATASET_SERVICE_URL`, ...),
