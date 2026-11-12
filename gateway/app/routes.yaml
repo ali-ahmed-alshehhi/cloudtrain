@@ -1,0 +1,51 @@
+# Gateway route table — which public path goes to which service.
+# Changing this file is a contract change (Ali + the affected owners). It must match the
+# "Gateway routes" table in docs/ARCHITECTURE.md.
+#
+# Fields:
+#   name     short name, used in logs and metrics
+#   match    public path prefixes; a path matches if it equals a prefix or starts with "<prefix>/"
+#   target   the ENVIRONMENT VARIABLE that holds the service address (nothing is hard-coded)
+#   rewrite  replace the start of the path: "from" becomes "to"
+#   methods  "all", or a list of allowed HTTP methods
+#   post_allowed_when_path_ends_with   extra rule: POST is allowed only on paths ending like this
+#   errors_from  "mlflow" = translate MLflow's error answers into our shared error format
+
+routes:
+  - name: projects
+    match: [/api/v1/projects, /api/v1/users/me]
+    target: PROJECT_SERVICE_URL
+    rewrite: { from: /api/v1, to: "" }
+    methods: all
+
+  - name: datasets
+    match: [/api/v1/datasets]
+    target: DATASET_SERVICE_URL
+    rewrite: { from: /api/v1, to: "" }
+    methods: all
+
+  - name: jobs
+    match: [/api/v1/jobs]
+    target: JOB_SERVICE_URL
+    rewrite: { from: /api/v1, to: "" }
+    methods: all
+
+  - name: experiments
+    match: [/api/v1/experiments]
+    target: MLFLOW_URL
+    rewrite: { from: /api/v1/experiments, to: /api/2.0/mlflow }
+    methods: [GET]
+    post_allowed_when_path_ends_with: /search
+    errors_from: mlflow
+
+  - name: models
+    match: [/api/v1/models]
+    target: MODEL_REGISTRY_URL
+    rewrite: { from: /api/v1, to: "" }
+    methods: all
+
+  - name: predict
+    match: [/api/v1/predict]
+    target: INFERENCE_SERVICE_URL
+    rewrite: { from: /api/v1, to: "" }
+    methods: all

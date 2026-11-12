@@ -34,6 +34,26 @@ On every request it:
 ## Reads and writes
 No database, no queue. Reads only its route table and environment variables.
 
+## Files
+
+| File | What it does |
+|---|---|
+| `app/main.py` | Builds the app; the step-by-step handling of every request |
+| `app/routes.yaml` | The route table (a contract: change it only through a Contract change issue) |
+| `app/routing.py` | Reads `routes.yaml`, finds the route, rewrites the path, blocks `/internal/` |
+| `app/auth.py` | `verify_token()` — the one login check (dev token locally, real JWT in the cloud) |
+| `app/proxy.py` | Forwards the request (streamed) and turns "service down / too slow" into 503 |
+| `app/errors.py` | The shared error format |
+| `app/logs.py`, `app/metrics.py` | JSON log lines and Prometheus metrics |
+| `app/config.py` | Settings from environment variables; refuses the dev token outside a laptop |
+
+## Run the tests
+```bash
+cd gateway
+python3.11 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest
+```
+
 ## Acceptance test
 A logged-in user creates a project through the gateway, uploads a dataset (Faisal) and submits a
 training job (Mariam). Unit tests cover: every route, the MLflow rewrite, POST blocked on experiments

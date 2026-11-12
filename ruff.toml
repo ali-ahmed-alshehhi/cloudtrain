@@ -1,0 +1,12 @@
+# Code style rules for all Python in the repo (`make lint`).
+target-version = "py311"
+line-length = 110
+
+[lint]
+# E/W: style, F: mistakes (unused imports, undefined names), I: import order,
+# B: likely bugs, UP: modern Python syntax
+select = ["E", "W", "F", "I", "B", "UP"]
+
+[lint.isort]
+# Every service keeps its code in `app/` and its tests in `tests/`.
+known-first-party = ["app", "tests"]
