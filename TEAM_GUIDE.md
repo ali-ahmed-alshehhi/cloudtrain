@@ -491,7 +491,7 @@ The brief's 8 logical services: Identity & Project → Projects + login at the g
 Training Job → Training Jobs; Training Scheduler → Scheduler; Experiment Tracking → MLflow behind a gateway
 adapter; Model Registry → Model Registry; Inference → Inference; Notification → job events shown in the
 portal's alert feed and the monitoring stack (no separate container; alerts in the portal only, not by
-e-mail; a `job-events` consumer can be added later — `docs/decisions/0002`).
+e-mail; a `job-events` consumer can be added later — `docs/decisions/0002-notifications-in-portal.md`).
 
 ### 4. Gateway routes (`gateway/app/routes.yaml`)
 
@@ -592,7 +592,7 @@ prices). The Scheduler reports machine type and start/end times; Training Jobs c
 Each service has its own database user that can touch only its own schema (created by `local/postgres/init.sh`
 locally, by the infrastructure setup in the cloud; service users cannot create schemas). Locally LocalStack
 keeps files and queue messages in memory: they are lost when it restarts (MinIO, the plan's original choice,
-no longer publishes Docker images — `docs/decisions/0005`). PostgreSQL data stays until `make reset`.
+no longer publishes Docker images — `docs/decisions/0005-localstack-for-s3.md`). PostgreSQL data stays until `make reset`.
 
 ### 12. Training and parallelism
 
