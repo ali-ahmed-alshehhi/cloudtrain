@@ -88,7 +88,7 @@ services:
     environment:
       DATABASE_URL: ${JOBS_DATABASE_URL}
     volumes:
-      - ./contracts:/contracts:ro # reads contracts/pricing.yaml for the cost
+      - ./contracts:/contracts:ro # contracts/pricing.yaml, for the cost of each job (PRICING_FILE)
     depends_on:
       localstack: { condition: service_healthy }
       project-service: { condition: service_healthy }

@@ -5,22 +5,22 @@ What this stand-in already does, as contracts/openapi/job-service.yaml and contr
   the full form on the `training-jobs` queue
 - follows the status steps reported by the Scheduler and the worker; anything else gets 409
 - stores every change as an event (served by the alert feed) and sends it to the `job-events` queue
-- a watchdog marks a RUNNING job FAILED after HEARTBEAT_TIMEOUT_SECONDS of silence or after its
-  max_runtime_minutes, then retries it while retry_limit allows
-What it does NOT do (the real service must): use PostgreSQL (everything here is lost on restart),
-check project membership, read training-jobs-dlq.
+- cancel, and the heartbeat answer (which tells a worker its job's status)
+What it does NOT do — Mariam's real service must:
+- use PostgreSQL (everything here is lost on restart) and check project membership
+- detect a dead worker (no heartbeat for HEARTBEAT_TIMEOUT_SECONDS) and the max_runtime_minutes limit,
+  so a job can never stay RUNNING forever
+- retry FAILED jobs while retry_limit allows (event job.retrying), then report to training-jobs-dlq
+- compute gpu_hours and estimated_cost_usd from contracts/pricing.yaml (always 0 here)
 """
 
 import os
 import threading
-from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 from typing import Annotated
 
 import httpx
-import yaml
 from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi import Path as PathParam
 from fastapi.responses import JSONResponse
@@ -53,9 +53,6 @@ class Job:
     updated_at: datetime = field(default_factory=now_utc)
     started_at: datetime | None = None
     finished_at: datetime | None = None
-    last_heartbeat: datetime | None = None
-    gpu_hours: float = 0.0
-    estimated_cost_usd: float = 0.0
     history: list[dict] = field(default_factory=list)
 
     @property
@@ -79,25 +76,15 @@ def job_json(job: Job) -> dict:
         "updated_at": iso(job.updated_at),
         "started_at": iso(job.started_at) if job.started_at else None,
         "finished_at": iso(job.finished_at) if job.finished_at else None,
-        "gpu_hours": job.gpu_hours,
-        "estimated_cost_usd": job.estimated_cost_usd,
+        "gpu_hours": 0.0,  # STAND-IN: Mariam computes these from the machine type and contracts/pricing.yaml
+        "estimated_cost_usd": 0.0,
         "history": job.history,
     }
-
-
-def hourly_price(machine_type: str | None) -> float:
-    """Price per hour from contracts/pricing.yaml (0 if the file or the machine type is unknown)."""
-    pricing_file = Path(os.environ.get("PRICING_FILE", "/contracts/pricing.yaml"))
-    if not machine_type or not pricing_file.exists():
-        return 0.0
-    machine = yaml.safe_load(pricing_file.read_text()).get("machine_types", {}).get(machine_type, {})
-    return float(machine.get("hourly_usd", 0.0))
 
 
 def create_app(
     queues: Queues | None = None,
     transport: httpx.BaseTransport | None = None,
-    start_watchdog: bool = True,
 ) -> FastAPI:
     """`queues` and `transport` let the tests replace SQS and the Datasets service with fakes."""
     queues = queues or Queues()
@@ -106,31 +93,13 @@ def create_app(
         transport=transport,
         timeout=10,
     )
-    heartbeat_timeout = timedelta(seconds=float(os.environ.get("HEARTBEAT_TIMEOUT_SECONDS", "120")))
-
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        """Run the heartbeat watchdog while the service runs."""
-        stop = threading.Event()
-
-        def watchdog() -> None:
-            # Checks this service's own records; it never polls another service.
-            interval = min(5.0, heartbeat_timeout.total_seconds() / 4)
-            while not stop.wait(interval):
-                app.state.check_running_jobs(now_utc())
-
-        if start_watchdog:
-            threading.Thread(target=watchdog, daemon=True, name="heartbeat-watchdog").start()
-        yield
-        stop.set()
-
-    app = FastAPI(title="CloudTrain Training Jobs service (stand-in)", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="CloudTrain Training Jobs service (stand-in)", version="1.0.0")
     logger = setup_service(app, SERVICE_NAME, is_ready=queues.ready)
 
     jobs: dict[int, Job] = {}
     events: list[dict] = []
     saved_answers: dict[tuple[str, str], dict] = {}
-    lock = threading.Lock()  # web requests and the watchdog change the same jobs
+    lock = threading.Lock()  # several requests may change the same job at once
 
     def find(job_id: str) -> Job:
         job = jobs.get(int(job_id.removeprefix("job-")))
@@ -159,54 +128,12 @@ def create_app(
         except QUEUE_ERRORS:
             logger.exception("could not publish event", extra={"job_id": job.job_id})
 
-    def change_status(job: Job, new_status: str, reason: str | None = None, event_type: str | None = None):
+    def change_status(job: Job, new_status: str, reason: str | None = None) -> None:
         previous = job.status
         job.status = new_status
         job.updated_at = now_utc()
         job.history.append({"status": new_status, "at": iso(job.updated_at), "reason": reason})
-        record_event(job, event_type or f"job.{new_status.lower()}", previous, reason)
-
-    def finish(job: Job, new_status: str, finished_at: datetime, reason: str | None) -> None:
-        job.finished_at = finished_at
-        if job.started_at:
-            hours = (finished_at - job.started_at).total_seconds() / 3600
-            job.gpu_hours = round(job.spec["resources"]["gpu_count"] * hours, 6)
-            job.estimated_cost_usd = round(hourly_price(job.machine_type) * hours, 6)
-        change_status(job, new_status, reason)
-        if new_status == "FAILED" and job.attempt <= job.spec["execution"]["retry_limit"]:
-            # Retry: back to the queue as a new attempt (event job.retrying).
-            job.attempt += 1
-            job.machine_type, job.started_at, job.finished_at, job.last_heartbeat = None, None, None, None
-            change_status(
-                job,
-                "QUEUED",
-                f"retry {job.attempt - 1} of {job.spec['execution']['retry_limit']}",
-                event_type="job.retrying",
-            )
-            try:
-                queues.send("training-jobs", job.form())
-            except QUEUE_ERRORS:
-                logger.exception("could not queue the retry", extra={"job_id": job.job_id})
-
-    def check_running_jobs(now: datetime) -> None:
-        """The watchdog's work: a job can never stay RUNNING forever."""
-        with lock:
-            for job in list(jobs.values()):
-                if job.status != "RUNNING":
-                    continue
-                last_sign_of_life = job.last_heartbeat or job.started_at or job.updated_at
-                runtime_limit = timedelta(minutes=job.spec["execution"]["max_runtime_minutes"])
-                if now - last_sign_of_life > heartbeat_timeout:
-                    finish(
-                        job,
-                        "FAILED",
-                        now,
-                        f"no heartbeat for {int(heartbeat_timeout.total_seconds())} seconds",
-                    )
-                elif job.started_at and now - job.started_at > runtime_limit:
-                    finish(job, "FAILED", now, "max_runtime_minutes passed")
-
-    app.state.check_running_jobs = check_running_jobs  # the tests call it directly
+        record_event(job, f"job.{new_status.lower()}", previous, reason)
 
     # ---------- public ----------
 
@@ -309,19 +236,15 @@ def create_app(
                 job.machine_type = report.machine_type
             if report.status == "RUNNING":
                 job.started_at = report.started_at or now_utc()
-                job.last_heartbeat = now_utc()
             if report.status in ("SUCCEEDED", "FAILED"):
-                finish(job, report.status, report.finished_at or now_utc(), report.reason)
-            else:
-                change_status(job, report.status, report.reason)
+                job.finished_at = report.finished_at or now_utc()
+            change_status(job, report.status, report.reason)
             return job_json(job)
 
     @app.post("/internal/jobs/{job_id}/heartbeat")
     def heartbeat(job_id: JobIdPath, beat: Heartbeat) -> dict:
-        with lock:
-            job = find(job_id)
-            if job.status == "RUNNING":
-                job.last_heartbeat = now_utc()
-            return {"job_id": job.job_id, "status": job.status}  # CANCELLED tells the worker to stop
+        # STAND-IN: the beat is not recorded (Mariam's service uses it to detect a dead worker).
+        job = find(job_id)
+        return {"job_id": job.job_id, "status": job.status}  # CANCELLED tells the worker to stop
 
     return app

@@ -53,7 +53,7 @@ def queues() -> FakeQueues:
 
 @pytest.fixture
 def client(queues):
-    app = create_app(queues=queues, transport=httpx.MockTransport(fake_datasets), start_watchdog=False)
+    app = create_app(queues=queues, transport=httpx.MockTransport(fake_datasets))
     with TestClient(app) as test_client:
         yield test_client
 
