@@ -1,0 +1,43 @@
+# Ask the right teammate to review each pull request (rules in scripts/pick_reviewers.py and
+# docs/TEAM_WORKFLOW.md). Ali is notified of every pull request anyway, by watching the repo, and
+# is added automatically by CODEOWNERS when shared files change.
+name: Assign reviewers
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+# Least privilege: read the code, and only add reviewers to pull requests.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  assign:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Get the code of main (the trusted rules, not the pull request's copy)
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Install Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Pick and request reviewers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          pip install --quiet pyyaml==6.0.3
+          mapfile -t files < <(gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only)
+          reviewers=$(python scripts/pick_reviewers.py "$AUTHOR" "${files[@]}")
+          echo "Changed files: ${#files[@]}. Reviewers: ${reviewers:-none found}"
+          if [ -n "$reviewers" ]; then
+            gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --add-reviewer "$reviewers"
+          fi

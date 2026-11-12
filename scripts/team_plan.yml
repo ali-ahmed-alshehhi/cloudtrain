@@ -1,0 +1,130 @@
+# Everyone's dated plan and the hand-offs, as data. scripts/create_tasks.py turns each row into a
+# GitHub issue. Source: the "Schedule" section of the master plan (also shown in TEAM_GUIDE.md).
+# Owner: Ali. Students are referred to by their number in team.yml.
+
+milestones: # GitHub milestones; an issue goes to the first one due on or after its own due date
+  - { title: "Checkpoint 1", due: 2026-11-15, description: "Every service starts and answers /health" }
+  - { title: "Checkpoint 2", due: 2026-11-20, description: "Project -> dataset -> job through the gateway; first cloud GPU run; real login" }
+  - { title: "Checkpoint 3", due: 2026-11-24, description: "On AWS; DDP benchmark; inference with rollback; failure recovery; full flow in the portal" }
+  - { title: "Ready", due: 2026-11-27, description: "Tests, docs, benchmarks, evaluation and final report; submitted" }
+
+phases: # label for an issue, from its due date (the brief's phases, compressed)
+  - { label: foundation, until: 2026-11-15 }
+  - { label: core, until: 2026-11-20 }
+  - { label: integration, until: 2026-11-24 }
+  - { label: finish, until: 2026-11-28 }
+
+# Folders and contract files to link from each student's issues.
+links:
+  1: { folders: [gateway, project-service, tests/integration], contracts: [contracts/openapi/gateway.yaml, contracts/openapi/project-service.yaml] }
+  2: { folders: [dataset-service], contracts: [contracts/openapi/dataset-service.yaml] }
+  3: { folders: [job-service], contracts: [contracts/openapi/job-service.yaml, contracts/training-job.schema.json, contracts/job-states.md, contracts/events/job-event.schema.json] }
+  4: { folders: [training, mlflow], contracts: [contracts/openapi/training-worker.yaml, contracts/training-job.schema.json] }
+  5: { folders: [training/distributed], contracts: [contracts/training-job.schema.json] }
+  6: { folders: [infrastructure], contracts: [contracts/pricing.yaml, contracts/ports.md] }
+  7: { folders: [scheduler], contracts: [contracts/openapi/scheduler.yaml, contracts/training-job.schema.json, contracts/job-states.md] }
+  8: { folders: [model-registry, inference-service], contracts: [contracts/openapi/model-registry.yaml, contracts/openapi/inference-service.yaml] }
+  9: { folders: [security, .github/workflows], contracts: [contracts/error-format.json] }
+  10: { folders: [portal], contracts: [contracts/events/job-event.schema.json] }
+
+tasks:
+  # ---- Student 1 — Ali ----
+  - { student: 1, dates: "Thu 12 Nov", due: 2026-11-12, task: "Run the master prompt phases 0 to 3: repo, contracts, front door, Projects service. Collect everyone's GitHub username.", waiting_on: "Everyone: send Ali your GitHub username today" }
+  - { student: 1, dates: "Fri 13 Nov", due: 2026-11-13, task: "Phases 4 to 9: stand-ins, one-command setup, CI, tasks on GitHub, TEAM_GUIDE.md. Share the repo and this map with the class.", waiting_on: "—" }
+  - { student: 1, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "Help everyone start. Review the first pull requests. Checkpoint 1: every service starts and answers /health.", waiting_on: "—" }
+  - { student: 1, dates: "Mon 16 – Tue 17 Nov", due: 2026-11-17, task: "Swap the stand-ins for Faisal's and Mariam's real services. Create project, upload data, submit job pass for real.", waiting_on: "Faisal (2) and Mariam (3): first real versions" }
+  - { student: 1, dates: "Wed 18 – Fri 20 Nov", due: 2026-11-20, task: "Plug in Salem's real login. MLflow route working. Contract tests in CI. Checkpoint 2.", waiting_on: "Salem (9): real login by Fri 20" }
+  - { student: 1, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Join everything on AWS with Hamda and Fatma. Failure-recovery test with Mariam and Maitha. Turn on the remaining demo steps. Checkpoint 3.", waiting_on: "Hamda + Fatma (6): services on AWS by Sun 22" }
+  - { student: 1, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Full end-to-end test passes. Architecture and deployment diagrams. Put the final report together. Lead the rehearsal on Thu 26. Submit Fri 27.", waiting_on: "—" }
+
+  # ---- Student 2 — Faisal ----
+  - { student: 2, dates: "Thu 12 – Fri 13 Nov", due: 2026-11-13, task: "Install the tools, send Ali your GitHub username, read this plan and the architecture doc.", waiting_on: "—" }
+  - { student: 2, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "Replace the stand-in with your own FastAPI service. /health works, addresses match the contract.", waiting_on: "Ali (1): repo ready Fri 13" }
+  - { student: 2, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Upload with format checks, save to S3 (LocalStack locally) with a checksum, versions, and the download link for workers. Give Mariam the version check by Tue 17 and Abdullah the download link by Wed 18.", waiting_on: "—" }
+  - { student: 2, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "Only project members can see a dataset. Record lineage: which job used which version. Checkpoint 2.", waiting_on: "Ali (1): membership check" }
+  - { student: 2, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Switch to real S3 and the cloud database. Audit records of uploads and downloads. Checkpoint 3.", waiting_on: "Hamda + Fatma (6): bucket and database by Wed 18" }
+  - { student: 2, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Tests complete. One page describing your tables. Rehearsal Thu 26.", waiting_on: "—" }
+
+  # ---- Student 3 — Mariam ----
+  - { student: 3, dates: "Thu 12 – Fri 13 Nov", due: 2026-11-13, task: "Install the tools, send Ali your GitHub username, read this plan and the architecture doc.", waiting_on: "—" }
+  - { student: 3, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "Replace the stand-in with your own FastAPI service. /health works, addresses match the contract.", waiting_on: "Ali (1): repo ready Fri 13" }
+  - { student: 3, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Accept a job: check the form, ask Faisal if the dataset version exists, save it as Queued, put it in the queue, answer 202. Show status. Jobs in the queue for Maitha by Wed 18.", waiting_on: "Faisal (2): version check by Tue 17 (use the stand-in until then)" }
+  - { student: 3, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "Status updates from Maitha, history, the alert feed for the website, GPU-hours and cost. Alert feed to Hilal and Adel by Fri 20. Checkpoint 2.", waiting_on: "Maitha (7): status updates" }
+  - { student: 3, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Cancel, retries, time limit, dead machine detected by missing heartbeats, dead-letter queue. Failure test with Maitha and Ali. Checkpoint 3.", waiting_on: "Abdullah (4): heartbeats from the worker" }
+  - { student: 3, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Tests and docs complete. Rehearse the failure-recovery demo Thu 26.", waiting_on: "—" }
+
+  # ---- Student 4 — Abdullah ----
+  - { student: 4, dates: "Thu 12 – Fri 13 Nov", due: 2026-11-13, task: "Install the tools and PyTorch. Run a tiny CIFAR-10 + ResNet-18 training on your laptop CPU, logged to MLflow.", waiting_on: "—" }
+  - { student: 4, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "Replace the worker stand-in with your training code. MLflow runs in Docker.", waiting_on: "Ali (1): repo ready Fri 13" }
+  - { student: 4, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Training image. Read data through Faisal's link, save the model to S3 (LocalStack locally), send heartbeats and status to Mariam. Give Ahmed and Abdulla your runtime by Wed 18.", waiting_on: "Faisal (2): download link by Wed 18" }
+  - { student: 4, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "First real training run on a cloud GPU. Give Majed the first real model by Fri 20. Checkpoint 2.", waiting_on: "Hamda + Fatma (6): GPU machine by Thu 19" }
+  - { student: 4, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Second use case (tabular). Checkpoints and resume. Same results when re-run (fixed seeds). Checkpoint 3.", waiting_on: "—" }
+  - { student: 4, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Evaluation scripts and docs. Rehearsal Thu 26.", waiting_on: "—" }
+
+  # ---- Student 5 — Ahmed + Abdulla ----
+  - { student: 5, dates: "Thu 12 – Fri 13 Nov", due: 2026-11-13, task: "Install the tools and PyTorch. Run a tiny two-process DDP test on CPU to learn the setup.", waiting_on: "—" }
+  - { student: 5, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "Write the benchmark plan and scripts: time, speed-up, efficiency, GPU-hours, cost.", waiting_on: "—" }
+  - { student: 5, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Plug DDP into Abdullah's training code and test it locally.", waiting_on: "Abdullah (4): runtime by Wed 18" }
+  - { student: 5, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "Write the parallelism selector rules (single, DDP or parallel trials). Checkpoint 2.", waiting_on: "—" }
+  - { student: 5, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Real 2-GPU run in the cloud. Benchmark 1 GPU vs 2 GPUs. Tune data-loader workers. Results to Hilal and Adel by Tue 24. Checkpoint 3.", waiting_on: "Hamda + Fatma (6): 2-GPU machine · Maitha (7): multi-GPU placement by Sat 21" }
+  - { student: 5, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Write docs/BENCHMARKS.md. Numbers for the demo. Rehearsal Thu 26.", waiting_on: "—" }
+
+  # ---- Student 6 — Hamda + Fatma ----
+  - { student: 6, dates: "Thu 12 Nov", due: 2026-11-12, task: "Confirm the AWS account with the instructors. Request GPU quota today: approval can take days.", waiting_on: "Instructors: AWS account" }
+  - { student: 6, dates: "Fri 13 – Sun 15 Nov", due: 2026-11-15, task: "Remote state in S3 with locking. Folder layout from the brief. Network module. Checkpoint 1.", waiting_on: "—" }
+  - { student: 6, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Dev environment: S3 buckets, database, queues, image registry. Show plan and apply. Ready for Faisal, Mariam, Maitha and Salem by Wed 18.", waiting_on: "—" }
+  - { student: 6, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "GPU machine for Abdullah and Maitha by Thu 19. Permissions with Salem. Prices in pricing.yaml. Checkpoint 2.", waiting_on: "AWS: GPU quota approved" }
+  - { student: 6, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Services on ECS Fargate by Sun 22. 2-GPU machine for Ahmed and Abdulla. Change worker capacity through Terraform. Monitoring resources. Checkpoint 3.", waiting_on: "—" }
+  - { student: 6, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Deployment guide. Rehearse destroy on a copy. Run terraform destroy after we submit.", waiting_on: "—" }
+
+  # ---- Student 7 — Maitha ----
+  - { student: 7, dates: "Thu 12 – Fri 13 Nov", due: 2026-11-13, task: "Install the tools, send Ali your GitHub username, read this plan and the architecture doc.", waiting_on: "—" }
+  - { student: 7, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "Replace the stand-in with your own service. Read from the local queue.", waiting_on: "Ali (1): repo ready Fri 13" }
+  - { student: 7, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Read jobs from the queue (you are the only reader), hand each to the local worker, report Scheduled and Running to Mariam.", waiting_on: "Mariam (3): jobs in the queue by Wed 18" }
+  - { student: 7, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "Choose CPU or GPU per job. Start a cloud worker. Release the machine after. Checkpoint 2.", waiting_on: "Hamda + Fatma (6): GPU machine by Thu 19" }
+  - { student: 7, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Multi-GPU placement for Ahmed and Abdulla by Sat 21. Capacity limits, waiting when full, heartbeat watch and recovery with Mariam. Checkpoint 3.", waiting_on: "—" }
+  - { student: 7, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Tests and docs. Rehearse the failure demo Thu 26.", waiting_on: "—" }
+
+  # ---- Student 8 — Majed ----
+  - { student: 8, dates: "Thu 12 – Fri 13 Nov", due: 2026-11-13, task: "Install the tools, send Ali your GitHub username, read this plan and the architecture doc.", waiting_on: "—" }
+  - { student: 8, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "Replace both stand-ins with your own services. /health works.", waiting_on: "Ali (1): repo ready Fri 13" }
+  - { student: 8, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Register a model from an MLflow run (use a small test run until Abdullah's real model arrives).", waiting_on: "—" }
+  - { student: 8, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "Promote a version. Inference loads the live version and answers /predict. Checkpoint 2.", waiting_on: "Abdullah (4): real model by Fri 20" }
+  - { student: 8, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "New version must pass /health before taking traffic. Rollback. Running on AWS. Prediction API to Hilal and Adel by Tue 24. Checkpoint 3.", waiting_on: "Hamda + Fatma (6): ECS by Sun 22 · Salem (9): deploy pipeline" }
+  - { student: 8, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Tests and docs. Rehearsal Thu 26.", waiting_on: "—" }
+
+  # ---- Student 9 — Salem ----
+  - { student: 9, dates: "Thu 12 – Fri 13 Nov", due: 2026-11-13, task: "Review Ali's starter CI and branch rules. Plan secrets and login.", waiting_on: "Ali (1): repo ready Fri 13" }
+  - { student: 9, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "CI for every service: lint, tests, builds. Checkpoint 1.", waiting_on: "—" }
+  - { student: 9, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Push images to ECR. Dependency checks. Set up the login provider (Cognito or another).", waiting_on: "Hamda + Fatma (6): image registry by Wed 18" }
+  - { student: 9, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "Real login inside the front door, with Ali, by Fri 20. Image scanning. Checkpoint 2.", waiting_on: "—" }
+  - { student: 9, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Deploy to staging, approval to promote, rollback, least-privilege permissions, security tests. Checkpoint 3.", waiting_on: "—" }
+  - { student: 9, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. Docs. Show the pipeline at the rehearsal Thu 26.", waiting_on: "—" }
+
+  # ---- Student 10 — Hilal + Adel ----
+  - { student: 10, dates: "Thu 12 – Fri 13 Nov", due: 2026-11-13, task: "Install the tools. Choose React or Next.js. Sketch the pages.", waiting_on: "—" }
+  - { student: 10, dates: "Sat 14 – Sun 15 Nov", due: 2026-11-15, task: "Replace the portal stand-in. Health and projects page through the front door.", waiting_on: "Ali (1): repo ready Fri 13" }
+  - { student: 10, dates: "Mon 16 – Wed 18 Nov", due: 2026-11-18, task: "Dataset upload page and submit-job page.", waiting_on: "Faisal (2) and Mariam (3): first real versions" }
+  - { student: 10, dates: "Thu 19 – Fri 20 Nov", due: 2026-11-20, task: "Job page with live status and alerts. MLflow results. Checkpoint 2.", waiting_on: "Mariam (3): alert feed by Fri 20" }
+  - { student: 10, dates: "Sat 21 – Tue 24 Nov", due: 2026-11-24, task: "Comparison page (1 GPU vs 2 GPUs), models and prediction page, cost page, dashboards. Checkpoint 3.", waiting_on: "Ahmed + Abdulla (5): results · Majed (8): prediction API, both by Tue 24" }
+  - { student: 10, dates: "Wed 25 – Fri 27 Nov", due: 2026-11-27, task: "Feature freeze. End-to-end website test. Evaluation report. Demo dashboard for the rehearsal Thu 26.", waiting_on: "—" }
+
+# Hand-offs: if one is late, the receiver keeps working with the stand-in and the giver tells the
+# group the same day. "from: everyone" = every student; "from: instructors" = not on GitHub.
+handoffs:
+  - { date: "Thu 12 Nov", due: 2026-11-12, from: everyone, to: [1], what: "GitHub usernames" }
+  - { date: "Thu 12 Nov", due: 2026-11-12, from: instructors, to: [6], what: "AWS account (GPU quota requested today)" }
+  - { date: "Fri 13 Nov", due: 2026-11-13, from: [1], to: everyone, what: "Repo, contracts, stand-ins, tasks, this map" }
+  - { date: "Tue 17 Nov", due: 2026-11-17, from: [2], to: [3], what: "Dataset version check" }
+  - { date: "Wed 18 Nov", due: 2026-11-18, from: [6], to: [2, 3, 7, 9], what: "Buckets, database, queues, image registry" }
+  - { date: "Wed 18 Nov", due: 2026-11-18, from: [2], to: [4], what: "Download link for training data" }
+  - { date: "Wed 18 Nov", due: 2026-11-18, from: [3], to: [7], what: "Jobs in the queue" }
+  - { date: "Wed 18 Nov", due: 2026-11-18, from: [4], to: [5], what: "Training runtime for DDP" }
+  - { date: "Thu 19 Nov", due: 2026-11-19, from: [6], to: [4, 7], what: "First GPU machine" }
+  - { date: "Fri 20 Nov", due: 2026-11-20, from: [4], to: [8], what: "First real trained model" }
+  - { date: "Fri 20 Nov", due: 2026-11-20, from: [3], to: [10], what: "Alert feed" }
+  - { date: "Fri 20 Nov", due: 2026-11-20, from: [9], to: [1], what: "Real login in the front door" }
+  - { date: "Sat 21 Nov", due: 2026-11-21, from: [7], to: [5], what: "Multi-GPU placement" }
+  - { date: "Sun 22 Nov", due: 2026-11-22, from: [6], to: everyone, what: "Services running on AWS" }
+  - { date: "Tue 24 Nov", due: 2026-11-24, from: [5], to: [10], what: "Benchmark results" }
+  - { date: "Tue 24 Nov", due: 2026-11-24, from: [8], to: [10], what: "Prediction API on AWS" }
