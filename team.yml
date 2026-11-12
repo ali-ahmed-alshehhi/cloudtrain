@@ -5,7 +5,7 @@ students:
   3:  { names: [Mariam],         github: [FILL_ME], role: "Training job management & workflow", folders: [job-service, contracts/events] }
   4:  { names: [Abdullah],       github: [FILL_ME], role: "ML training engine & experiment tracking", folders: [training, mlflow] }
   5:  { names: [Ahmed, Abdulla], github: [FILL_ME, alhashmiuae], role: "Distributed training & parallelism", folders: [training/distributed, docs/BENCHMARKS.md] }
-  6:  { names: [Hamda, Fatma],   github: [FILL_ME, FILL_ME], role: "Terraform & cloud infrastructure", folders: [infrastructure, docs/DEPLOYMENT_GUIDE.md, contracts/pricing.yaml] }
+  6:  { names: [Hamda, Fatma],   github: [Hamdah219, FILL_ME], role: "Terraform & cloud infrastructure", folders: [infrastructure, docs/DEPLOYMENT_GUIDE.md, contracts/pricing.yaml] }
   7:  { names: [Maitha],         github: [MaithaAR], role: "Cloud resource scheduling & compute", folders: [scheduler] }
   8:  { names: [Majed],          github: [FILL_ME], role: "Model registry, deployment & inference", folders: [model-registry, inference-service] }
   9:  { names: [Salem],          github: [Salem2030c-lang], role: "CI/CD, security & DevSecOps", folders: [.github/workflows, security] }
