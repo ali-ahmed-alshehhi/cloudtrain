@@ -3,8 +3,8 @@
 What this stand-in does: keeps datasets IN MEMORY (lost on restart), checks the file format,
 computes the SHA-256 checksum and numbers the versions, exactly as
 contracts/openapi/dataset-service.yaml says.
-What it does NOT do (the real service must): store files in S3 (LocalStack locally), use PostgreSQL, check project
-membership, record lineage and audit, return a real time-limited S3 link.
+What it does NOT do (the real service must): store files in S3 (LocalStack locally), use PostgreSQL,
+check project membership, record lineage and audit, return a real time-limited S3 link.
 """
 
 import hashlib
