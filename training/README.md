@@ -1,5 +1,9 @@
 # Training runtime / worker — `training/`
 
+> **Stand-in.** Abdullah: Replace this stand-in with your real service. Keep the contract. Run `make check` before opening a PR.
+>
+> What the stand-in already does, and what it does not, is written at the top of `app/main.py`. Its tests in `tests/` show the contract in action: keep them passing (or replace them with better ones).
+
 | Owner | Port | Contract |
 |---|---|---|
 | Abdullah (Student 4) | 8010 (internal, local development only) | `contracts/openapi/training-worker.yaml`, `contracts/training-job.schema.json` |

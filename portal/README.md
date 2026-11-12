@@ -1,5 +1,9 @@
 # Web Portal — `portal/`
 
+> **Stand-in.** Hilal + Adel: Replace this stand-in with your real service. Keep the contract. Run `make check` before opening a PR.
+>
+> What the stand-in already does, and what it does not, is written at `app/page.js`. It shows the gateway's `/health`, your project list and the job alert feed.
+
 | Owners (partners) | Port | Contracts |
 |---|---|---|
 | Hilal + Adel (Student 10) | **3000 (published)** | all public APIs through the gateway; `contracts/events/job-event.schema.json` |
