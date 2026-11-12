@@ -1,0 +1,26 @@
+# Hourly price per machine type, used by Training Jobs to compute estimated_cost_usd.
+#
+#   >>> PLACEHOLDER PRICES — to be filled by Hamda + Fatma from real AWS on-demand prices <<<
+#   >>> for our region. Do not quote these numbers in the report until they are replaced. <<<
+#
+# Cost of a job = hourly_usd x hours the machine ran (start to end reported by the Scheduler).
+# gpu_hours of a job = gpu_count x hours.
+# Adding a machine type is a contract change only if the Scheduler or Training Jobs must handle it differently.
+
+currency: USD
+region: FILL_ME            # e.g. us-east-1, set by Hamda + Fatma
+last_updated: null         # date the prices were copied from AWS
+
+machine_types:
+  local-cpu:               # the local Docker worker; free
+    gpu_count: 0
+    hourly_usd: 0.0
+  c6i.2xlarge:             # CPU: 8 vCPU, 16 GB
+    gpu_count: 0
+    hourly_usd: 0.34       # placeholder
+  g4dn.xlarge:             # 1x NVIDIA T4
+    gpu_count: 1
+    hourly_usd: 0.53       # placeholder
+  g4dn.12xlarge:           # 4x NVIDIA T4
+    gpu_count: 4
+    hourly_usd: 3.91       # placeholder

@@ -1,0 +1,36 @@
+name: Contract change
+description: Change anything in contracts/, ports, gateway routes, queue readers, shared rules or docker-compose.yml. Needs Ali plus the affected owners.
+labels: [contract-change]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Process:** agree here first → change `contracts/` in its own pull request → then the code → record it in `docs/decisions/`.
+        Tag Ali and every affected owner (see the table in `contracts/README.md`).
+  - type: input
+    id: files
+    attributes:
+      label: Which contract file(s)
+      placeholder: e.g. contracts/openapi/job-service.yaml
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: The change
+      description: Exactly what is added, removed or renamed. Show before and after.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+    validations:
+      required: true
+  - type: textarea
+    id: affected
+    attributes:
+      label: Who is affected
+      description: Mention each affected owner. Each one must comment "agreed" before the change is made.
+    validations:
+      required: true

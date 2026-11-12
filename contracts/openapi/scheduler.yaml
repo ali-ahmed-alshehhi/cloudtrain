@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: CloudTrain Scheduler
+  version: 1.0.0
+  description: |
+    Owner: Maitha (Student 7). Port 8004, internal only (never through the gateway).
+    The Scheduler has no business endpoints: its work is driven by the queue.
+
+    - It is the ONLY reader of the `training-jobs` queue.
+    - For each job: choose CPU or GPU and a machine type, hand the job to one worker
+      (`POST training-worker:8010/internal/run` locally; start an EC2 instance in the cloud),
+      then delete the queue message. After that the job is protected by the heartbeat lease.
+    - Reports SCHEDULED and RUNNING (with machine_type and started_at) to
+      `POST job-service:8003/internal/jobs/{id}/status`. A 409 answer means the job was
+      cancelled: stop the worker and release the machine.
+servers:
+  - url: http://scheduler:8004
+
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: 200 when ready (queue reachable).
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /metrics:
+    get:
+      operationId: metrics
+      summary: Prometheus metrics (e.g. jobs placed, workers busy, queue wait time).
+      responses:
+        "200":
+          description: Prometheus text format.
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status: { type: string, enum: [ok] }
+        service: { type: string }
+    Error:
+      description: Shared error format (contracts/error-format.json).
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code: { type: string, pattern: "^[A-Z][A-Z0-9_]*$" }
+            message: { type: string }
+            request_id: { type: string }
+  responses:
+    ServiceUnavailable:
+      description: Not ready (e.g. the queue is unreachable).
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

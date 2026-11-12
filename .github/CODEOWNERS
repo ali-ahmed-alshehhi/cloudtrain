@@ -1,0 +1,16 @@
+# CODEOWNERS lists ONLY the shared files. Changing any of them needs Ali's approval.
+#
+# Everyone's own folders are deliberately NOT listed here: work there needs one approval
+# from any teammate other than the author (partners review each other) plus green CI.
+# Folder owners are listed in team.yml and in each folder's README.
+
+/contracts/              @ali-ahmed-alshehhi
+/gateway/                @ali-ahmed-alshehhi
+/docker-compose.yml      @ali-ahmed-alshehhi
+/tests/integration/      @ali-ahmed-alshehhi
+/docs/ARCHITECTURE.md    @ali-ahmed-alshehhi
+/team.yml                @ali-ahmed-alshehhi
+
+# All of .github/ is shared. Salem (Student 9) owns .github/workflows/ and may change it,
+# with Ali's approval.
+/.github/                @ali-ahmed-alshehhi

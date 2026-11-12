@@ -1,0 +1,32 @@
+name: Task
+description: A piece of work from someone's dated plan.
+labels: []
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      description: What must be built or done.
+    validations:
+      required: true
+  - type: input
+    id: waiting_on
+    attributes:
+      label: Waiting on
+      description: The hand-off this task needs (who, what, by when), or "—".
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      description: A checklist. The task is done only when every box is ticked.
+      value: |
+        - [ ] Works and matches the contract in contracts/
+        - [ ] Tests added and `make check` passes
+        - [ ] README updated
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Links
+      description: Your folder README and the contract file(s) involved.

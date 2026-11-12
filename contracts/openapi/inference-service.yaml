@@ -1,0 +1,154 @@
+openapi: 3.1.0
+info:
+  title: CloudTrain Inference service
+  version: 1.0.0
+  description: |
+    Owner: Majed (Student 8). Port 8007. Serves predictions from the live model version.
+    Public through the gateway at /api/v1/predict/* (the gateway strips /api/v1).
+    Asks the Model Registry `GET /models/{model_id}/production` which version to load.
+servers:
+  - url: http://inference-service:8007
+
+paths:
+  /predict:
+    post:
+      operationId: predict
+      summary: Send an image, get a prediction from the live model.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/PredictRequest" }
+      responses:
+        "200":
+          description: The prediction.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Prediction" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /model-info:
+    get:
+      operationId: modelInfo
+      summary: Which model version is loaded right now.
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The loaded model.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModelInfo" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /health:
+    get:
+      operationId: health
+      summary: 200 when ready to serve.
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /metrics:
+    get:
+      operationId: metrics
+      summary: Prometheus metrics.
+      responses:
+        "200":
+          description: Prometheus text format.
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  parameters:
+    UserId:
+      name: X-User-Id
+      in: header
+      required: true
+      description: Set by the gateway after it verifies the login token.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema: { type: string, maxLength: 128 }
+
+  schemas:
+    PredictRequest:
+      type: object
+      required: [file]
+      properties:
+        file: { type: string, format: binary, description: An image (PNG or JPEG). }
+        model_id:
+          type: string
+          pattern: "^model-[0-9]+$"
+          description: "Which model to use (default: the service's configured model)."
+    Prediction:
+      type: object
+      required: [model_id, version, predictions]
+      properties:
+        model_id: { type: string, pattern: "^model-[0-9]+$" }
+        version: { type: integer, minimum: 1 }
+        predictions:
+          type: array
+          description: Most likely labels first.
+          items:
+            type: object
+            required: [label, score]
+            properties:
+              label: { type: string }
+              score: { type: number, minimum: 0, maximum: 1 }
+    ModelInfo:
+      type: object
+      required: [model_id, name, version, artifact_uri, loaded_at]
+      properties:
+        model_id: { type: string, pattern: "^model-[0-9]+$" }
+        name: { type: string }
+        version: { type: integer, minimum: 1 }
+        artifact_uri: { type: string }
+        loaded_at: { type: string, format: date-time }
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status: { type: string, enum: [ok] }
+        service: { type: string }
+    Error:
+      description: Shared error format (contracts/error-format.json).
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code: { type: string, pattern: "^[A-Z][A-Z0-9_]*$" }
+            message: { type: string }
+            request_id: { type: string }
+
+  responses:
+    BadRequest:
+      description: Not a readable image.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Not logged in.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ValidationFailed:
+      description: The request does not match the contract.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ServiceUnavailable:
+      description: No model loaded yet, or the registry is down.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

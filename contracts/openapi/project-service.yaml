@@ -1,0 +1,259 @@
+openapi: 3.1.0
+info:
+  title: CloudTrain Projects service
+  version: 1.0.0
+  description: |
+    Owner: Ali (Student 1). Port 8001. Identity and projects.
+    Public through the gateway at /api/v1/projects/* and /api/v1/users/me (the gateway strips /api/v1).
+
+    **Membership check for other services:** call `GET /projects/{project_id}` with the user's
+    `X-User-Id`. 200 = member, 403 = not a member, 404 = no such project.
+servers:
+  - url: http://project-service:8001
+
+paths:
+  /projects:
+    post:
+      operationId: createProject
+      summary: Create a project. The caller becomes its owner.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectCreate" }
+      responses:
+        "201":
+          description: Created. The same Idempotency-Key returns this same project again.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    get:
+      operationId: listProjects
+      summary: List the projects the caller is a member of.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The caller's projects.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /projects/{project_id}:
+    get:
+      operationId: getProject
+      summary: Read one project. Members only (also used by other services as the membership check).
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The project.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /projects/{project_id}/members:
+    post:
+      operationId: addProjectMember
+      summary: Add a member. Only the project's owners may do this.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemberAdd" }
+      responses:
+        "201":
+          description: Member added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Member" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /users/me:
+    get:
+      operationId: getCurrentUser
+      summary: Who is logged in, and which projects they belong to.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The current user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /health:
+    get:
+      operationId: health
+      summary: 200 when ready to serve.
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /metrics:
+    get:
+      operationId: metrics
+      summary: Prometheus metrics.
+      responses:
+        "200":
+          description: Prometheus text format.
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  parameters:
+    UserId:
+      name: X-User-Id
+      in: header
+      required: true
+      description: Set by the gateway after it verifies the login token. Services trust only this header.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: Set by the gateway. Copied into every log line and error.
+      schema: { type: string, maxLength: 128 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Sending the same key again returns the first result instead of creating a duplicate.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema: { type: string, pattern: "^project-[0-9]+$" }
+
+  schemas:
+    ProjectCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, "null"], maxLength: 1000 }
+      examples:
+        - { name: Image Classification, description: CIFAR-10 with ResNet-18 }
+    Project:
+      type: object
+      required: [project_id, name, description, owner_id, created_at, members]
+      properties:
+        project_id: { type: string, pattern: "^project-[0-9]+$" }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        owner_id: { type: string }
+        created_at: { type: string, format: date-time }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/Member" }
+    ProjectList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Project" }
+    MemberAdd:
+      type: object
+      additionalProperties: false
+      required: [user_id]
+      properties:
+        user_id: { type: string, minLength: 1, maxLength: 128 }
+        role: { type: string, enum: [owner, member], default: member }
+    Member:
+      type: object
+      required: [project_id, user_id, role, added_at]
+      properties:
+        project_id: { type: string, pattern: "^project-[0-9]+$" }
+        user_id: { type: string }
+        role: { type: string, enum: [owner, member] }
+        added_at: { type: string, format: date-time }
+    User:
+      type: object
+      required: [user_id, project_ids]
+      properties:
+        user_id: { type: string }
+        project_ids:
+          type: array
+          items: { type: string, pattern: "^project-[0-9]+$" }
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status: { type: string, enum: [ok] }
+        service: { type: string }
+    Error:
+      description: Shared error format (contracts/error-format.json).
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code: { type: string, pattern: "^[A-Z][A-Z0-9_]*$" }
+            message: { type: string }
+            request_id: { type: string }
+
+  responses:
+    BadRequest:
+      description: Bad input.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Not logged in (no X-User-Id from the gateway).
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Logged in, but not allowed (e.g. not a member).
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: Not found.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Conflict:
+      description: Conflict or duplicate.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ValidationFailed:
+      description: The request does not match the contract.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ServiceUnavailable:
+      description: Not ready, or a dependency is down.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

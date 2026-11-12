@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudtrain.local/contracts/error-format.json",
+  "title": "Shared error format",
+  "description": "Every non-2xx response from every CloudTrain service, including the gateway, has exactly this shape. 'code' is UPPER_SNAKE_CASE and stable (clients may rely on it); 'message' is for humans; 'request_id' is the X-Request-Id of the request, so logs can be matched.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error"],
+  "properties": {
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "request_id"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "message": { "type": "string" },
+        "request_id": { "type": "string" }
+      }
+    }
+  },
+  "examples": [
+    { "error": { "code": "DATASET_NOT_FOUND", "message": "Dataset dataset-07 does not exist", "request_id": "req-8f2a" } },
+    { "error": { "code": "NOT_AUTHENTICATED", "message": "Missing or invalid login token", "request_id": "req-1c3d" } },
+    { "error": { "code": "SERVICE_UNAVAILABLE", "message": "job-service did not answer in time", "request_id": "req-77b0" } }
+  ]
+}

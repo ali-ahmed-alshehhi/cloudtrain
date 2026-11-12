@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: CloudTrain API Gateway
+  version: 1.0.0
+  description: |
+    Owner: Ali (Student 1). Port 5810, published. The ONE front door for all API traffic.
+
+    The gateway's own endpoints are /health and /metrics. Everything else is forwarded,
+    as listed in gateway/app/routes.yaml:
+
+    | Public path | Forwards to | Methods |
+    |---|---|---|
+    | /api/v1/users/me, /api/v1/projects/* | project-service:8001 (strip /api/v1) | all |
+    | /api/v1/datasets/* | dataset-service:8002 (strip /api/v1) | all |
+    | /api/v1/jobs/* | job-service:8003 (strip /api/v1) | all |
+    | /api/v1/experiments/* | mlflow:5000/api/2.0/mlflow/* (rewrite) | GET, POST on .../search only |
+    | /api/v1/models/* | model-registry:8006 (strip /api/v1) | all |
+    | /api/v1/predict/* | inference-service:8007 (strip /api/v1) | all |
+
+    So the public contract of each forwarded path is "/api/v1" + the path in that service's contract.
+
+    On every forwarded request the gateway: checks the login token (401 if missing or invalid),
+    adds X-User-Id and X-Request-Id, and waits at most 10 seconds (300 for uploads).
+    A service that is down or slow gives 503 SERVICE_UNAVAILABLE. Any path containing /internal/
+    gives 404. Unknown paths give 404. A method not allowed on a route gives 405.
+servers:
+  - url: http://localhost:5810
+
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: 200 when the gateway is up.
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /metrics:
+    get:
+      operationId: metrics
+      summary: Prometheus metrics (requests per route, status and duration).
+      responses:
+        "200":
+          description: Prometheus text format.
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status: { type: string, enum: [ok] }
+        service: { type: string }
+    Error:
+      description: Shared error format (contracts/error-format.json).
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code: { type: string, pattern: "^[A-Z][A-Z0-9_]*$" }
+            message: { type: string }
+            request_id: { type: string }

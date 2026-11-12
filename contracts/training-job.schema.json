@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudtrain.local/contracts/training-job.schema.json",
+  "title": "Training job form",
+  "description": "The full training job form. Validated by Training Jobs (Mariam), put on the training-jobs queue, read by the Scheduler (Maitha) and run by the worker (Abdullah; Ahmed + Abdulla for DDP). POST /jobs takes the same form WITHOUT job_id (the service assigns it). Rules JSON Schema cannot express, checked in code by Training Jobs: for strategy 'ddp', world_size must equal resources.gpu_count. Changing this file needs agreement from Mariam, Maitha, Abdullah, Ahmed/Abdulla and Ali.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "project_id", "dataset_id", "dataset_version", "model", "hyperparameters", "resources", "parallelism", "execution"],
+  "properties": {
+    "job_id": { "type": "string", "pattern": "^job-[0-9]+$" },
+    "project_id": { "type": "string", "pattern": "^project-[0-9]+$" },
+    "dataset_id": { "type": "string", "pattern": "^dataset-[0-9]+$" },
+    "dataset_version": { "type": "integer", "minimum": 1, "description": "Our addition to the brief: a job always trains on one fixed dataset version." },
+    "model": { "type": "string", "pattern": "^[a-z0-9_]+$", "minLength": 1, "maxLength": 64, "description": "Model name known to the training runtime, e.g. resnet18." },
+    "hyperparameters": {
+      "type": "object",
+      "required": ["epochs", "batch_size", "learning_rate"],
+      "properties": {
+        "epochs": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "batch_size": { "type": "integer", "minimum": 1, "maximum": 4096 },
+        "learning_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 10 }
+      },
+      "additionalProperties": { "type": ["number", "integer", "string", "boolean"] }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gpu_count", "cpu_cores", "memory_gb"],
+      "properties": {
+        "gpu_count": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "cpu_cores": { "type": "integer", "minimum": 1, "maximum": 96 },
+        "memory_gb": { "type": "integer", "minimum": 1, "maximum": 768 }
+      }
+    },
+    "parallelism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "world_size"],
+      "properties": {
+        "strategy": { "type": "string", "enum": ["single", "ddp"], "description": "Later: hparam_search (recommended), tensor and pipeline (advanced, real multi-GPU hardware only)." },
+        "world_size": { "type": "integer", "minimum": 1, "maximum": 8 }
+      },
+      "allOf": [
+        { "if": { "properties": { "strategy": { "const": "single" } } }, "then": { "properties": { "world_size": { "const": 1 } } } },
+        { "if": { "properties": { "strategy": { "const": "ddp" } } }, "then": { "properties": { "world_size": { "minimum": 2 } } } }
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_runtime_minutes", "retry_limit"],
+      "properties": {
+        "max_runtime_minutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
+        "retry_limit": { "type": "integer", "minimum": 0, "maximum": 5 }
+      }
+    }
+  },
+  "examples": [
+    {
+      "job_id": "job-104",
+      "project_id": "project-01",
+      "dataset_id": "dataset-07",
+      "dataset_version": 2,
+      "model": "resnet18",
+      "hyperparameters": { "epochs": 10, "batch_size": 32, "learning_rate": 0.001 },
+      "resources": { "gpu_count": 2, "cpu_cores": 8, "memory_gb": 32 },
+      "parallelism": { "strategy": "ddp", "world_size": 2 },
+      "execution": { "max_runtime_minutes": 120, "retry_limit": 2 }
+    }
+  ]
+}

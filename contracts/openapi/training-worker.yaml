@@ -1,0 +1,154 @@
+openapi: 3.1.0
+info:
+  title: CloudTrain Training worker
+  version: 1.0.0
+  description: |
+    Owner: Abdullah (Student 4); DDP by Ahmed + Abdulla (Student 5). Port 8010, internal, local development only.
+    The Scheduler hands ONE job to ONE worker with `POST /internal/run`. In the cloud, the Scheduler
+    starts an EC2 instance with the job form instead, so this HTTP endpoint is not used there.
+
+    While training, the worker:
+    - gets the data link from `GET dataset-service:8002/internal/datasets/{id}/versions/{v}/download-url`
+    - sends `POST job-service:8003/internal/jobs/{id}/heartbeat` every HEARTBEAT_INTERVAL_SECONDS
+      (stops if the answer says CANCELLED)
+    - logs parameters, metrics and the model to MLflow (mlflow:5000)
+    - reports SUCCEEDED or FAILED with `POST job-service:8003/internal/jobs/{id}/status`
+servers:
+  - url: http://training-worker:8010
+
+paths:
+  /internal/run:
+    post:
+      operationId: runJob
+      summary: INTERNAL (Scheduler only). Start one training job in the background.
+      parameters:
+        - name: X-Request-Id
+          in: header
+          required: false
+          schema: { type: string, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              description: The full training job form, exactly as contracts/training-job.schema.json.
+              type: object
+              additionalProperties: false
+              required: [job_id, project_id, dataset_id, dataset_version, model, hyperparameters, resources, parallelism, execution]
+              properties:
+                job_id: { type: string, pattern: "^job-[0-9]+$" }
+                project_id: { type: string, pattern: "^project-[0-9]+$" }
+                dataset_id: { type: string, pattern: "^dataset-[0-9]+$" }
+                dataset_version: { type: integer, minimum: 1 }
+                model: { type: string, pattern: "^[a-z0-9_]+$", minLength: 1, maxLength: 64 }
+                hyperparameters:
+                  type: object
+                  required: [epochs, batch_size, learning_rate]
+                  properties:
+                    epochs: { type: integer, minimum: 1, maximum: 1000 }
+                    batch_size: { type: integer, minimum: 1, maximum: 4096 }
+                    learning_rate: { type: number, exclusiveMinimum: 0, maximum: 10 }
+                  additionalProperties: { type: [number, integer, string, boolean] }
+                resources:
+                  type: object
+                  additionalProperties: false
+                  required: [gpu_count, cpu_cores, memory_gb]
+                  properties:
+                    gpu_count: { type: integer, minimum: 0, maximum: 8 }
+                    cpu_cores: { type: integer, minimum: 1, maximum: 96 }
+                    memory_gb: { type: integer, minimum: 1, maximum: 768 }
+                parallelism:
+                  type: object
+                  additionalProperties: false
+                  required: [strategy, world_size]
+                  properties:
+                    strategy: { type: string, enum: [single, ddp] }
+                    world_size: { type: integer, minimum: 1, maximum: 8 }
+                  allOf:
+                    - if: { properties: { strategy: { const: single } } }
+                      then: { properties: { world_size: { const: 1 } } }
+                    - if: { properties: { strategy: { const: ddp } } }
+                      then: { properties: { world_size: { minimum: 2 } } }
+                execution:
+                  type: object
+                  additionalProperties: false
+                  required: [max_runtime_minutes, retry_limit]
+                  properties:
+                    max_runtime_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                    retry_limit: { type: integer, minimum: 0, maximum: 5 }
+      responses:
+        "202":
+          description: Accepted; training runs in the background.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RunAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /health:
+    get:
+      operationId: health
+      summary: 200 when ready to accept a job.
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /metrics:
+    get:
+      operationId: metrics
+      summary: Prometheus metrics.
+      responses:
+        "200":
+          description: Prometheus text format.
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  schemas:
+    RunAccepted:
+      type: object
+      required: [job_id, worker_id, accepted_at]
+      properties:
+        job_id: { type: string, pattern: "^job-[0-9]+$" }
+        worker_id: { type: string }
+        accepted_at: { type: string, format: date-time }
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status: { type: string, enum: [ok] }
+        service: { type: string }
+    Error:
+      description: Shared error format (contracts/error-format.json).
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code: { type: string, pattern: "^[A-Z][A-Z0-9_]*$" }
+            message: { type: string }
+            request_id: { type: string }
+
+  responses:
+    BadRequest:
+      description: Bad input.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Conflict:
+      description: The worker is already running a job (WORKER_BUSY).
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ValidationFailed:
+      description: The form does not match the contract.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ServiceUnavailable:
+      description: Not ready.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

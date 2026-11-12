@@ -1,0 +1,322 @@
+openapi: 3.1.0
+info:
+  title: CloudTrain Datasets service
+  version: 1.0.0
+  description: |
+    Owner: Faisal (Student 2). Port 8002. Upload, version and download datasets.
+    Public through the gateway at /api/v1/datasets/* (the gateway strips /api/v1; uploads get a 300-second timeout).
+    Files live in the `datasets` bucket, one folder per version: `s3://datasets/<dataset_id>/v<version>/`.
+
+    Internal (never through the gateway):
+    - Training Jobs calls `GET /datasets/{dataset_id}/versions/{version}` to confirm a version exists.
+    - The training worker calls `GET /internal/datasets/{dataset_id}/versions/{version}/download-url`.
+servers:
+  - url: http://dataset-service:8002
+
+paths:
+  /datasets:
+    post:
+      operationId: createDataset
+      summary: Upload a new dataset (becomes version 1). Checks the format and stores a SHA-256 checksum.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/DatasetUpload" }
+      responses:
+        "201":
+          description: Created as version 1.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dataset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    get:
+      operationId: listDatasets
+      summary: List the datasets of one project.
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          schema: { type: string, pattern: "^project-[0-9]+$" }
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The project's datasets.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DatasetList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /datasets/{dataset_id}:
+    get:
+      operationId: getDataset
+      summary: Read one dataset.
+      parameters:
+        - $ref: "#/components/parameters/DatasetId"
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The dataset.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dataset" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /datasets/{dataset_id}/versions:
+    post:
+      operationId: createDatasetVersion
+      summary: Upload a new version of an existing dataset.
+      parameters:
+        - $ref: "#/components/parameters/DatasetId"
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/VersionUpload" }
+      responses:
+        "201":
+          description: The new version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DatasetVersion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /datasets/{dataset_id}/versions/{version}:
+    get:
+      operationId: getDatasetVersion
+      summary: Read one version (also the existence check used by Training Jobs).
+      parameters:
+        - $ref: "#/components/parameters/DatasetId"
+        - $ref: "#/components/parameters/Version"
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DatasetVersion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /datasets/{dataset_id}/versions/{version}/download:
+    get:
+      operationId: downloadDatasetVersion
+      summary: Download the files of one version.
+      parameters:
+        - $ref: "#/components/parameters/DatasetId"
+        - $ref: "#/components/parameters/Version"
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The file.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /internal/datasets/{dataset_id}/versions/{version}/download-url:
+    get:
+      operationId: getDownloadUrl
+      summary: INTERNAL (training worker). A time-limited S3 link to the version's files.
+      parameters:
+        - $ref: "#/components/parameters/DatasetId"
+        - $ref: "#/components/parameters/Version"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The link.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DownloadUrl" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /health:
+    get:
+      operationId: health
+      summary: 200 when ready to serve.
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /metrics:
+    get:
+      operationId: metrics
+      summary: Prometheus metrics.
+      responses:
+        "200":
+          description: Prometheus text format.
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  parameters:
+    UserId:
+      name: X-User-Id
+      in: header
+      required: true
+      description: Set by the gateway after it verifies the login token.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema: { type: string, maxLength: 128 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    DatasetId:
+      name: dataset_id
+      in: path
+      required: true
+      schema: { type: string, pattern: "^dataset-[0-9]+$" }
+    Version:
+      name: version
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+
+  schemas:
+    DatasetUpload:
+      type: object
+      required: [project_id, name, format, file]
+      properties:
+        project_id: { type: string, pattern: "^project-[0-9]+$" }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 1000 }
+        format:
+          type: string
+          enum: [csv, zip, tar_gz]
+          description: csv for tabular data; zip or tar_gz for image folders (e.g. CIFAR-10).
+        file: { type: string, format: binary }
+    VersionUpload:
+      type: object
+      required: [file]
+      properties:
+        note: { type: string, maxLength: 1000 }
+        file: { type: string, format: binary }
+    Dataset:
+      type: object
+      required: [dataset_id, project_id, name, description, format, latest_version, created_by, created_at]
+      properties:
+        dataset_id: { type: string, pattern: "^dataset-[0-9]+$" }
+        project_id: { type: string, pattern: "^project-[0-9]+$" }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        format: { type: string, enum: [csv, zip, tar_gz] }
+        latest_version: { type: integer, minimum: 1 }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+    DatasetList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Dataset" }
+    DatasetVersion:
+      type: object
+      required: [dataset_id, version, checksum_sha256, size_bytes, storage_uri, created_by, created_at]
+      properties:
+        dataset_id: { type: string, pattern: "^dataset-[0-9]+$" }
+        version: { type: integer, minimum: 1 }
+        checksum_sha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        size_bytes: { type: integer, minimum: 0 }
+        storage_uri: { type: string, description: "e.g. s3://datasets/dataset-07/v1/" }
+        note: { type: [string, "null"] }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+    DownloadUrl:
+      type: object
+      required: [url, expires_at, checksum_sha256]
+      properties:
+        url: { type: string }
+        expires_at: { type: string, format: date-time }
+        checksum_sha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status: { type: string, enum: [ok] }
+        service: { type: string }
+    Error:
+      description: Shared error format (contracts/error-format.json).
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code: { type: string, pattern: "^[A-Z][A-Z0-9_]*$" }
+            message: { type: string }
+            request_id: { type: string }
+
+  responses:
+    BadRequest:
+      description: Bad input (e.g. the file does not match the declared format).
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Not logged in.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Not a member of the project.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: Not found.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Conflict:
+      description: Conflict or duplicate.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ValidationFailed:
+      description: The request does not match the contract.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ServiceUnavailable:
+      description: Not ready, or a dependency is down.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudtrain.local/contracts/events/job-event.schema.json",
+  "title": "Job event",
+  "description": "Published by Training Jobs (Mariam) to the job-events queue on every status change, and stored in the jobs database to serve the alert feed (GET /jobs/events). Consumers must ignore an event_id they have already handled.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "event_type", "job_id", "project_id", "occurred_at", "data"],
+  "properties": {
+    "event_id": { "type": "string", "pattern": "^event-[0-9]+$" },
+    "event_type": {
+      "type": "string",
+      "enum": ["job.queued", "job.scheduled", "job.running", "job.succeeded", "job.failed", "job.cancelled", "job.retrying"]
+    },
+    "job_id": { "type": "string", "pattern": "^job-[0-9]+$" },
+    "project_id": { "type": "string", "pattern": "^project-[0-9]+$" },
+    "occurred_at": { "type": "string", "format": "date-time", "description": "ISO 8601 UTC, e.g. 2026-11-20T09:15:00Z" },
+    "data": {
+      "type": "object",
+      "description": "Details of the change. Known fields are listed; owners may add more.",
+      "properties": {
+        "status": { "type": "string", "enum": ["QUEUED", "SCHEDULED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"] },
+        "previous_status": { "type": ["string", "null"], "enum": ["QUEUED", "SCHEDULED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", null] },
+        "reason": { "type": ["string", "null"], "description": "Why it happened, e.g. 'no heartbeat for 120 seconds'" },
+        "machine_type": { "type": ["string", "null"] },
+        "attempt": { "type": "integer", "minimum": 1, "description": "1 for the first run, 2 after the first retry, ..." }
+      },
+      "required": ["status"]
+    }
+  },
+  "examples": [
+    {
+      "event_id": "event-1001",
+      "event_type": "job.running",
+      "job_id": "job-104",
+      "project_id": "project-01",
+      "occurred_at": "2026-11-20T09:15:00Z",
+      "data": { "status": "RUNNING", "previous_status": "SCHEDULED", "reason": null, "machine_type": "g4dn.12xlarge", "attempt": 1 }
+    }
+  ]
+}
