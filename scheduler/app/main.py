@@ -22,7 +22,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI
 
 from app.common import iso, now_utc, setup_service
-from app.machines import LOCAL_MACHINE, pick_machine
+from app.machines import LOCAL_MACHINE
 
 SERVICE_NAME = "scheduler"
 QUEUE_ERRORS = (BotoCoreError, ClientError)
