@@ -1,0 +1,186 @@
+{
+ "experiment": "scaling",
+ "machine_type": null,
+ "results": [
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 5,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 4,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 4.433523382000033,
+     "images": 49920,
+     "data_wait_seconds": 1.214019901001052
+    },
+    {
+     "seconds": 1.9533258360000332,
+     "images": 49920,
+     "data_wait_seconds": 0.07791865299947176
+    },
+    {
+     "seconds": 1.9213543320000213,
+     "images": 49920,
+     "data_wait_seconds": 0.07516245499914476
+    },
+    {
+     "seconds": 1.9612119529999745,
+     "images": 49920,
+     "data_wait_seconds": 0.07987609999980805
+    },
+    {
+     "seconds": 1.894939963000013,
+     "images": 49920,
+     "data_wait_seconds": 0.07494620799957374
+    }
+   ],
+   "accuracy": 0.7588,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 17.80722150500003
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 5,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 4,
+   "device": "auto",
+   "seed": 1,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 3.7065150579999795,
+     "images": 49920,
+     "data_wait_seconds": 1.0490929169989158
+    },
+    {
+     "seconds": 1.871142037000027,
+     "images": 49920,
+     "data_wait_seconds": 0.07690543000035177
+    },
+    {
+     "seconds": 1.920420957000033,
+     "images": 49920,
+     "data_wait_seconds": 0.0838967180002328
+    },
+    {
+     "seconds": 1.9599564160000114,
+     "images": 49920,
+     "data_wait_seconds": 0.08153099700012945
+    },
+    {
+     "seconds": 1.997116455999958,
+     "images": 49920,
+     "data_wait_seconds": 0.08230744199994433
+    }
+   ],
+   "accuracy": 0.7451,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 16.166158252999992
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 5,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 4,
+   "device": "auto",
+   "seed": 2,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 3.864653144999977,
+     "images": 49920,
+     "data_wait_seconds": 1.140114596999581
+    },
+    {
+     "seconds": 2.0589145710000025,
+     "images": 49920,
+     "data_wait_seconds": 0.08008540899987793
+    },
+    {
+     "seconds": 2.044543548999968,
+     "images": 49920,
+     "data_wait_seconds": 0.08529700500019999
+    },
+    {
+     "seconds": 2.0132975360000387,
+     "images": 49920,
+     "data_wait_seconds": 0.07478110300013441
+    },
+    {
+     "seconds": 1.9269033360000094,
+     "images": 49920,
+     "data_wait_seconds": 0.07464541300026895
+    }
+   ],
+   "accuracy": 0.7831,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 16.36361044199998
+  }
+ ]
+}
