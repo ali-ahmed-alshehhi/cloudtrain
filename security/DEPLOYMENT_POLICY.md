@@ -29,6 +29,9 @@ and ECS ready (Wed 18 and Sun 22 Nov). Changes to this file: pull request review
 ## Rollback
 - **Automatic:** ECS rolls back a service by itself if the new version fails its `/health` check
   (deployment circuit breaker, set in Terraform).
+- **Old images must still exist.** ECR keeps every image under its commit tag. Its cleanup rule
+  (lifecycle policy, in Terraform by Hamda + Fatma) keeps the **last 20 images of each service** and
+  deletes only older ones, so there is always something to roll back to.
 - **Manual (one click):** GitHub → Actions → *Deploy* → *Run workflow* → choose the environment and
   the last good commit. The pipeline redeploys those images; nothing is rebuilt.
 - **Models** are separate: Majed's model registry keeps the previous live version and switches back
