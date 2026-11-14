@@ -21,6 +21,9 @@ A change to a shared file (`contracts/`, `local/`, `scripts/`, `tests/`, `docker
 `Makefile`, `.env.example`) checks and builds everything. Each run writes a short summary table on
 its GitHub Actions page.
 
+- `security.yml` — Salem's security checks, next to CI: secrets (Gitleaks), libraries (pip-audit,
+  npm audit), Docker images (Trivy) and Terraform (Checkov). Also every Monday and on demand. What
+  each one blocks and how to fix a failure: [`security/SECURITY_CHECKS.md`](../../security/SECURITY_CHECKS.md).
 - `assign-reviewers.yml` — requests the right reviewer on each pull request (from `team.yml`).
 
 Port: — · Endpoints: none (these run on GitHub, not in docker-compose).

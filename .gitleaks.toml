@@ -1,0 +1,11 @@
+# Gitleaks settings (owner: Salem). Used by .github/workflows/security.yml.
+# All of Gitleaks' normal rules stay on. The only exception: the fake local values in .env.example,
+# which all end in "-local-only" and are not secrets (see the top of .env.example).
+# Never add a real key here to silence a finding: remove the key and rotate it (security/SECURITY_CHECKS.md).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake local values: every one ends in -local-only"
+regexes = ['''[A-Za-z0-9_-]*-local-only''']
