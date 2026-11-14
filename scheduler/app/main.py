@@ -22,10 +22,10 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI
 
 from app.common import iso, now_utc, setup_service
+from app.machines import LOCAL_MACHINE, pick_machine
 
 SERVICE_NAME = "scheduler"
 QUEUE_ERRORS = (BotoCoreError, ClientError)
-LOCAL_MACHINE = "local-cpu"  # the only machine type a laptop has (see contracts/pricing.yaml)
 BUSY_RETRY_SECONDS = 5
 
 
