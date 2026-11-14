@@ -1,0 +1,112 @@
+# Security checks — owner: Salem (Student 9). Rules: security/SECURITY_CHECKS.md
+#
+# Runs next to ci.yml (in parallel, so CI does not get slower) on every pull request, on every push
+# to main, and every Monday (new vulnerabilities are published all the time, even when our code
+# does not change). Four jobs:
+#   1. secrets       — Gitleaks: a password or key in the code or the Git history  (blocks)
+#   2. dependencies  — pip-audit (Python) and npm audit (portal): libraries with known holes  (blocks)
+#   3. images        — Trivy: known holes inside every Docker image  (blocks on CRITICAL with a fix)
+#   4. terraform     — Checkov: risky cloud settings, e.g. a public bucket  (blocks)
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1" # Mondays 05:17 UTC (09:17 in Abu Dhabi)
+  workflow_dispatch: # "Run workflow" button, for the demo
+
+# Least privilege: these checks only read the code.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: 1. Secrets (Gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the whole history: a key deleted later is still leaked
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false # read-only token: report on the run page instead
+
+  dependencies:
+    name: 2. Dependencies (pip-audit, npm audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Python libraries of every service
+        run: |
+          python -m pip install --quiet "pip-audit>=2.9,<3"
+          failed=""
+          for req in */requirements.txt; do
+            echo "::group::${req%/requirements.txt}"
+            pip-audit --requirement "$req" --progress-spinner off --desc || failed="$failed ${req%/requirements.txt}"
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::Libraries with known vulnerabilities in:$failed — upgrade them (pip-audit shows the fixed version)"
+            exit 1
+          fi
+      - name: Portal libraries
+        working-directory: portal
+        # --package-lock-only reads package-lock.json, nothing is installed. High and critical only.
+        run: npm audit --package-lock-only --omit=dev --audit-level=high
+
+  images:
+    name: 3. Docker images (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build every image
+        run: |
+          cp .env.example .env
+          docker compose build
+      - name: Scan every image
+        run: |
+          mkdir -p trivy-cache
+          failed=""
+          for image in $(docker compose config --images | sort -u); do
+            # Only images we build ourselves (postgres and localstack are not shipped to the cloud)
+            case "$image" in postgres*|localstack*) continue ;; esac
+            echo "::group::$image"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/trivy-cache:/root/.cache" \
+              aquasec/trivy:0.76.2 image --quiet --severity HIGH,CRITICAL --ignore-unfixed "$image"
+            # The gate: a CRITICAL hole that already has a fix fails the run
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/trivy-cache:/root/.cache" \
+              aquasec/trivy:0.76.2 image --quiet --severity CRITICAL --ignore-unfixed --exit-code 1 "$image" \
+              > /dev/null || failed="$failed $image"
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::CRITICAL vulnerabilities with a fix in:$failed — update the base image or library"
+            exit 1
+          fi
+
+  terraform:
+    name: 4. Terraform (Checkov)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Scan infrastructure/
+        run: |
+          python -m pip install --quiet "checkov>=3,<4"
+          checkov --directory infrastructure --framework terraform --compact --quiet

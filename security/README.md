@@ -15,6 +15,13 @@ Salem also owns `.github/workflows/` (CI/CD).
 - Environment deployment rules, approval and rollback procedures.
 - Security testing across services (e.g. unauthorised access is rejected).
 
+## Documents in this folder
+- [`SECURITY_CHECKS.md`](SECURITY_CHECKS.md) — the four automatic checks, what to do when one fails,
+  exceptions, and the security tests.
+- [`DEPLOYMENT_POLICY.md`](DEPLOYMENT_POLICY.md) — environments, approval, rollback, secrets and
+  least privilege.
+- Login provider: Amazon Cognito ([`docs/decisions/0006`](../docs/decisions/0006-login-provider-cognito.md)).
+
 ## Endpoints
 None of its own. Real login lives in the gateway behind `AUTH_MODE=jwt`.
 
