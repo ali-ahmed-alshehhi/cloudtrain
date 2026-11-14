@@ -1,0 +1,60 @@
+{
+ "experiment": "workers",
+ "machine_type": null,
+ "results": [
+  {
+   "strategy": "ddp",
+   "world_size": 2,
+   "model": "tiny",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 3,
+   "batch_size": 32,
+   "learning_rate": 0.05,
+   "num_workers": 0,
+   "device": "cpu",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 50,
+   "gpus": 0,
+   "backend": "gloo",
+   "train_images": 50000,
+   "steps_per_epoch": 781,
+   "epochs_detail": [
+    {
+     "seconds": 4.7143195269999865,
+     "images": 49984,
+     "data_wait_seconds": 0.5232224469997391
+    },
+    {
+     "seconds": 4.2797868830000425,
+     "images": 49984,
+     "data_wait_seconds": 0.4952692929990121
+    },
+    {
+     "seconds": 4.366810332999989,
+     "images": 49984,
+     "data_wait_seconds": 0.4910580360004815
+    }
+   ],
+   "accuracy": 0.5889,
+   "sync_probe": {
+    "steps": 50,
+    "step_seconds": 0.005431487119999474,
+    "step_seconds_without_sync": 0.0012861550599996008
+   },
+   "environment": {
+    "gpu": null,
+    "gpus_on_machine": 0,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": null,
+    "nccl": null
+   },
+   "total_seconds": 16.377850260000002
+  }
+ ]
+}
