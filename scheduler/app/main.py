@@ -60,14 +60,16 @@ class Scheduler:
             return False
         return True
 
-    def report(self, job_id: str, status: str, **details) -> httpx.Response:
-        body = {"status": status, "reported_by": "scheduler", "machine_type": LOCAL_MACHINE, **details}
+    def report(self, job_id: str, status: str, machine_type: str = LOCAL_MACHINE, **details) -> httpx.Response:
+        body = {"status": status, "reported_by": "scheduler", "machine_type": machine_type, **details}
         return self.http.post(f"{self.job_service}/internal/jobs/{job_id}/status", json=body)
 
     def handle_job(self, form: dict) -> bool:
         """Place one job. Returns True when the queue message can be deleted."""
         job_id = form["job_id"]
-        scheduled = self.report(job_id, "SCHEDULED")
+        gpu_count = form.get("resources", {}).get("gpu_count", 0)
+        machine = pick_machine(gpu_count)
+        scheduled = self.report(job_id, "SCHEDULED", machine_type=machine)
         if scheduled.status_code == 409:
             self.logger.info("job cancelled or already scheduled; dropping message", extra={"job_id": job_id})
             return True
@@ -85,7 +87,7 @@ class Scheduler:
             time.sleep(BUSY_RETRY_SECONDS)
             waited += BUSY_RETRY_SECONDS
 
-        running = self.report(job_id, "RUNNING", started_at=iso(now_utc()))
+        running = self.report(job_id, "RUNNING", machine_type=machine, started_at=iso(now_utc()))
         if running.status_code == 409:
             self.logger.info("job was cancelled while starting", extra={"job_id": job_id})
         return True
