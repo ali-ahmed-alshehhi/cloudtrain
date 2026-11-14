@@ -274,7 +274,7 @@ When DDP is worth it, and when it is not. **So far, from the local runs only:**
 1. **Tune data loading first.** With no DataLoader workers, training on real CIFAR-10 ran 3.3 times slower:
    72% of every epoch was spent waiting for images. Four workers removed the wait. A GPU that waits for
    data stays slow under DDP too, and a second GPU only adds a second GPU that waits.
-2. **Short jobs are mostly fixed costs.** In the 25-second run on CIFAR-10, 3.6 seconds went to starting up
+2. **Fixed costs weigh most on short jobs.** In the 25-second run on CIFAR-10, 3.6 seconds went to starting up
    and evaluating, and the first epoch took 1.5 times as long as a later one. DDP adds its own start-up on
    top, which is why the selector keeps short jobs on one GPU. The cloud run must confirm this rule.
 3. **Total time needs its own check.** Before the fix in section 3, the same run took 56 seconds, and more
