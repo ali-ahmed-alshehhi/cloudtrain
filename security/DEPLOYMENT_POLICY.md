@@ -39,9 +39,11 @@ and ECS ready (Wed 18 and Sun 22 Nov). Changes to this file: pull request review
 - After any rollback: open a `bug` issue with what failed and link the run.
 
 ## Secrets
-- Real secrets (database passwords, Cognito settings, API keys) live **only in AWS Secrets Manager**
+- Real secrets (database passwords, API keys) live **only in AWS Secrets Manager**
   and reach the services as ECS environment secrets. Never in Git, `.env`, Terraform variables,
   `.tfvars`, logs, issues or chat.
+- **Not secrets:** the Cognito user pool ID, app client ID, issuer and keys URL are public by design
+  (the portal's browser sees them; `docs/decisions/0006`). They come from Terraform outputs, not the code.
 - `.env.example` contains only fake values ending in `-local-only`. `.env` and Terraform state are in
   `.gitignore`.
 - A leaked secret is rotated first, then removed (see `SECURITY_CHECKS.md`). Gitleaks checks every

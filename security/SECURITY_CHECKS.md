@@ -10,7 +10,7 @@ They run on every pull request, on every push to `main`, every Monday morning, a
 | 1 | Secrets | Gitleaks | A password, token or key in the code or anywhere in Git history | any finding |
 | 2 | Dependencies | pip-audit, npm audit | A Python or portal library with a published vulnerability | any Python finding; a portal finding rated high or critical |
 | 3 | Docker images | Trivy | Vulnerabilities in the operating system and libraries inside each image we build | a CRITICAL vulnerability that already has a fix (HIGH ones are listed, not blocking) |
-| 4 | Terraform | Checkov | Risky cloud settings: public buckets, missing encryption, open security groups | any failed check |
+| 4 | Terraform | Checkov | Risky cloud settings: public buckets, missing encryption, open security groups | any failed check (the skip list is agreed with Hamda + Fatma before this check becomes required) |
 
 ## When a check fails on your pull request
 1. Open the failed job on the pull request's **Checks** tab. The log says what was found and where.
@@ -27,7 +27,7 @@ They run on every pull request, on every push to `main`, every Monday morning, a
 ## Exceptions
 | Check | Finding | Reason | Until | Agreed by |
 |---|---|---|---|---|
-| Gitleaks | values ending in `-local-only` in `.env.example` | fake local values, not secrets (`.gitleaks.toml`) | permanent | Salem |
+| — | none yet | | | |
 
 ## Security tests (unauthorised access is rejected)
 | Test | Expected | Where | Status |
