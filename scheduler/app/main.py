@@ -60,7 +60,9 @@ class Scheduler:
             return False
         return True
 
-    def report(self, job_id: str, status: str, machine_type: str = LOCAL_MACHINE, **details) -> httpx.Response:
+    def report(
+        self, job_id: str, status: str, machine_type: str = LOCAL_MACHINE, **details,
+    ) -> httpx.Response:
         body = {"status": status, "reported_by": "scheduler", "machine_type": machine_type, **details}
         return self.http.post(f"{self.job_service}/internal/jobs/{job_id}/status", json=body)
 
