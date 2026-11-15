@@ -10,7 +10,6 @@ import httpx
 import mlflow.pytorch
 import numpy as np
 import pytest
-import torch
 import torchvision
 import yaml
 from fastapi.testclient import TestClient
@@ -44,8 +43,7 @@ def models(tmp_path_factory) -> dict[str, str]:
         signature=signature,
         input_example=np.zeros((1, 3, 32, 32), dtype=np.float32),
     )
-    wrong = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(3 * 32 * 32, 4))  # 4 scores, 10 labels
-    mlflow.pytorch.save_model(wrong, paths["wrong_shape"], serialization_format="pickle")
+    mlflow.pytorch.save_model(fixture_model.broken(), paths["wrong_shape"], serialization_format="pickle")
     paths["missing"] = str(folder / "nothing-here")
     return paths
 

@@ -91,11 +91,16 @@ def save(path: str, steps: int = 150) -> dict:
     return metrics
 
 
-def log_run(tags: dict, steps: int = 150) -> str:
+def broken() -> nn.Module:
+    """A model that loads but answers 4 scores for 10 labels: it must fail the health check."""
+    return nn.Sequential(nn.Flatten(), nn.Linear(3 * IMAGE_SIZE * IMAGE_SIZE, 4))
+
+
+def log_run(tags: dict, steps: int = 150, faulty: bool = False) -> str:
     """Train, log an MLflow run with the model (as the training worker does) and return its run ID."""
     mlflow.set_experiment("cloudtrain-test-models")
     with mlflow.start_run(tags=tags) as run:
-        model, metrics = train(steps)
+        model, metrics = (broken(), {"accuracy": 0.0}) if faulty else train(steps)
         mlflow.log_params({"model": "tiny", "steps": steps, "dataset": "synthetic"})
         mlflow.log_metrics(metrics)
         mlflow.pytorch.log_model(model, name="model", serialization_format="pickle", metadata=METADATA)
@@ -109,6 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset-id", required=True)
     parser.add_argument("--dataset-version", required=True)
     parser.add_argument("--steps", type=int, default=150)
+    parser.add_argument("--broken", action="store_true", help="log a model that fails the health check")
     args = parser.parse_args()
     run_tags = {
         "project_id": args.project_id,
@@ -116,4 +122,4 @@ if __name__ == "__main__":
         "dataset_id": args.dataset_id,
         "dataset_version": args.dataset_version,
     }
-    print(log_run(run_tags, args.steps))
+    print(log_run(run_tags, args.steps, faulty=args.broken))
