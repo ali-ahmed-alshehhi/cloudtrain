@@ -11,7 +11,23 @@ request logs remain enabled.
 | Abdullah (Student 4) | 8010 (internal, local development only) | `contracts/openapi/training-worker.yaml`, `contracts/training-job.schema.json` |
 
 Distributed building blocks remain in `training/distributed/` (Ahmed +
-Abdulla). The worker calls `ddp.launch`, uses a module-level spawn target,
+Abdulla).
+
+## Laptop / LocalStack delivery target
+
+For this course delivery, **AWS is simulated on a laptop**: LocalStack stands
+in for S3, Compose runs MLflow and the worker on CPU, and no cloud GPU is
+required for Student 4 acceptance. Real AWS S3 remains compatible by clearing
+`S3_ENDPOINT` and using IAM/env credentials. Use `tabular_mlp` with a small CSV
+for the fastest end-to-end laptop path; CIFAR-10/ResNet-18 still works when the
+archive contains `cifar-10-batches-py`.
+
+```bash
+# from training/, after dependencies are installed
+python -m scripts.smoke_local
+python -m scripts.evaluate_bundle --bundle /tmp/model-bundle.pt
+```
+ The worker calls `ddp.launch`, uses a module-level spawn target,
 `make_loader`, `set_epoch`, `wrap`, and `unwrap`. Only rank 0 produces
 checkpoints, final bundles, and parent-process MLflow records.
 
@@ -105,5 +121,6 @@ live MLflow server. The tiny CSV fixture keeps the tabular path fast. CPU DDP
 checks use Gloo where the installed PyTorch/platform supports process spawning.
 Production dependencies pin PyTorch/torchvision 2.9.1/0.24.1 and MLflow 3.18.0.
 
-No cloud, LocalStack container, CUDA, multi-GPU, or cross-hardware
-reproducibility proof is claimed by the unit suite.
+The unit suite uses injectable fakes. Laptop acceptance is `scripts.smoke_local`
+plus Compose/LocalStack (`make up` then `make e2e`). CUDA, multi-GPU, and
+cross-hardware bitwise reproducibility are out of scope for Student 4.

@@ -94,7 +94,19 @@ class DatasetClient:
             elif tarfile.is_tarfile(archive):
                 self._extract_tar(archive, destination)
             else:
-                raise DatasetError("dataset archive is neither a supported zip nor tar archive")
+                # CSV uploads arrive as a single file, not an archive.
+                target = destination / "dataset.csv"
+                shutil.copyfile(archive, target)
+                try:
+                    sample = target.read_text(encoding="utf-8-sig")
+                except UnicodeDecodeError as error:
+                    raise DatasetError(
+                        "single-file dataset must be a UTF-8 CSV or a zip/tar archive"
+                    ) from error
+                if "," not in sample.splitlines()[0]:
+                    raise DatasetError("single-file dataset is not a CSV header row")
+        except DatasetError:
+            raise
         except (OSError, tarfile.TarError, zipfile.BadZipFile) as error:
             raise DatasetError(f"dataset archive could not be extracted: {error}") from error
 
