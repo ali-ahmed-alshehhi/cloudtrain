@@ -6,9 +6,9 @@ environment = "dev"
 owner       = "hamda-fatma"
 aws_region  = "us-east-1" # confirm with instructors (OPEN_DECISIONS #1)
 
-use_localstack             = false
-enable_networking          = true
-enable_container_registry  = true
+use_emulator              = false
+enable_networking         = true
+enable_container_registry = true
 
 # S3 names must be globally unique on real AWS.
 datasets_bucket_name  = "cloudtrain-dev-datasets-CHANGE-ME"

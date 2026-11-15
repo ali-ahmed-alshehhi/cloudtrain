@@ -1,11 +1,14 @@
 # Environment: dev
 
-Owners: Hamda + Fatma. Uses the modules in `../../modules/` with dev-sized values.
-State on real AWS: S3 key `cloudtrain/dev/terraform.tfstate`.
+Owners: Hamda + Fatma.
 
 | File | Purpose |
 |---|---|
+| `emulator.tfvars.example` | Official AWS Emulator practice (Student 6 fake account) |
 | `terraform.tfvars.example` | Real AWS values (copy to git-ignored `terraform.tfvars`) |
-| `localstack.tfvars.example` | Local practice against `docker-compose.localstack.yml` |
 
-Disposable: `terraform destroy` after each test session.
+```bash
+./scripts/emulator-up.sh
+source ./scripts/emulator-env.sh
+terraform apply -var-file=environments/dev/emulator.tfvars.example
+```

@@ -28,16 +28,16 @@ variable "aws_region" {
   type        = string
 }
 
-variable "use_localstack" {
-  description = "Point the AWS provider at LocalStack (local practice, no cloud bill)."
+variable "use_emulator" {
+  description = "Point Terraform at the official AWS Emulator (Student 6 practice account)."
   type        = bool
   default     = false
 }
 
-variable "localstack_endpoint" {
-  description = "LocalStack edge URL when use_localstack=true (host port from docker compose)."
+variable "emulator_endpoint" {
+  description = "AWS Emulator HTTPS endpoint when use_emulator=true."
   type        = string
-  default     = "http://localhost:4568"
+  default     = "https://127.0.0.1:9297"
 }
 
 variable "datasets_bucket_name" {
@@ -61,13 +61,13 @@ variable "sqs_max_receive_count" {
 }
 
 variable "enable_networking" {
-  description = "Create VPC/subnets. Off when targeting LocalStack with only s3,sqs enabled."
+  description = "Create VPC/subnets. Start false on the emulator until EC2 fidelity is confirmed."
   type        = bool
   default     = true
 }
 
 variable "enable_container_registry" {
-  description = "Create ECR repositories. Off for LocalStack until ECR is enabled there."
+  description = "Create ECR repositories. Start false on the emulator until ECR fidelity is confirmed."
   type        = bool
   default     = true
 }
