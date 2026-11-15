@@ -16,7 +16,7 @@ Enable versioning and block public access. Locking uses S3-native `use_lockfile`
 
 Until the AWS account exists, practice with **LocalStack** (same tool as the app —
 decisions [0005](decisions/0005-localstack-for-s3.md) /
-[0007](decisions/0007-terraform-local-uses-localstack.md)) — local state in `backend.tf`.
+[0009](decisions/0009-terraform-local-uses-localstack.md)) — local state in `backend.tf`.
 
 ## 3. Create an environment (`dev`, `staging`)
 

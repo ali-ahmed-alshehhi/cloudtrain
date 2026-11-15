@@ -1,4 +1,4 @@
-# 0007 — Terraform local practice uses LocalStack (not AWS Emulator)
+# 0009 — Terraform local practice uses LocalStack (not AWS Emulator)
 
 - **Status:** accepted
 - **Date:** 2026-11-15

@@ -13,7 +13,7 @@ visibility. Deploy and clean-up docs in `docs/DEPLOYMENT_GUIDE.md`. Prices in `c
 ## Practice on LocalStack (Student 6)
 
 Terraform practice uses **LocalStack** — the same tool as the app (`docker-compose.yml`, decision
-[0005](../docs/decisions/0005-localstack-for-s3.md) / [0007](../docs/decisions/0007-terraform-local-uses-localstack.md)).
+[0005](../docs/decisions/0005-localstack-for-s3.md) / [0009](../docs/decisions/0009-terraform-local-uses-localstack.md)).
 We do **not** run a second AWS emulator.
 
 ```bash
