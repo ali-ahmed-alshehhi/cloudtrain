@@ -4,7 +4,6 @@ import threading
 
 from app.machines import CLOUD_MACHINES
 
-
 # Default: 1 local worker, configurable via environment in main.py
 DEFAULT_MAX_WORKERS = 1
 

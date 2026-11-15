@@ -26,10 +26,7 @@ class FakeSqs:
     """One message waiting on training-jobs."""
 
     def __init__(self, messages: list[dict]) -> None:
-        self.messages = [
-            {"Body": json.dumps(m), "ReceiptHandle": f"r{i}"}
-            for i, m in enumerate(messages)
-        ]
+        self.messages = [{"Body": json.dumps(m), "ReceiptHandle": f"r{i}"} for i, m in enumerate(messages)]
         self.deleted: list[str] = []
 
     def get_queue_url(self, QueueName):
