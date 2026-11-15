@@ -1,26 +1,36 @@
 """Request bodies and answers, exactly as in contracts/openapi/project-service.yaml."""
 
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from app.db import Member, Project
 
 PROJECT_ID_PATTERN = r"^project-[0-9]+$"
 
 
+def _no_nul(value: str | None) -> str | None:
+    """PostgreSQL text cannot hold the NUL character: refuse it here (422), not in the database (500)."""
+    if value is not None and "\x00" in value:
+        raise ValueError("must not contain the NUL character (\\u0000)")
+    return value
+
+
+NoNul = AfterValidator(_no_nul)
+
+
 class ProjectCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")  # unknown fields are refused, as the contract says
 
-    name: str = Field(min_length=1, max_length=100)
-    description: str | None = Field(default=None, max_length=1000)
+    name: Annotated[str, Field(min_length=1, max_length=100), NoNul]
+    description: Annotated[str | None, Field(max_length=1000), NoNul] = None
 
 
 class MemberAdd(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    user_id: str = Field(min_length=1, max_length=128)
+    user_id: Annotated[str, Field(min_length=1, max_length=128), NoNul]
     role: Literal["owner", "member"] = "member"
 
 
