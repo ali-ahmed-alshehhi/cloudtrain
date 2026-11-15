@@ -1,22 +1,12 @@
-"""The Datasets stand-in answers as the contract says. Keep these tests passing when you replace it."""
+"""Datasets service answers as the contract says, with files in object storage."""
 
 import hashlib
 import io
 import zipfile
 
-import pytest
-from fastapi.testclient import TestClient
-
-from app.main import create_app
 from tests.conftest import USER
 
 CSV = b"age,income,label\n31,42000,1\n"
-
-
-@pytest.fixture
-def client():
-    with TestClient(create_app()) as test_client:
-        yield test_client
 
 
 def upload(client, data=CSV, file_format="csv", headers=USER):
@@ -32,7 +22,7 @@ def test_health(client):
     assert client.get("/health").json() == {"status": "ok", "service": "dataset-service"}
 
 
-def test_upload_creates_version_1_with_a_checksum(client, check):
+def test_upload_creates_version_1_with_a_checksum(client, check, storage):
     response = upload(client)
 
     assert response.status_code == 201
@@ -41,16 +31,19 @@ def test_upload_creates_version_1_with_a_checksum(client, check):
     version = client.get(f"/datasets/{dataset_id}/versions/1", headers=USER).json()
     check(version, "DatasetVersion")
     assert version["checksum_sha256"] == hashlib.sha256(CSV).hexdigest()
+    assert version["storage_uri"] == f"s3://datasets/{dataset_id}/v1/"
+    assert storage.get(f"{dataset_id}/v1/data") == CSV
 
 
 def test_zip_upload_and_new_version(client, check):
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, "w") as zipped:
         zipped.writestr("cat/1.png", b"fake image")
-    dataset_id = upload(client, archive.getvalue(), "zip").json()["dataset_id"]
+    payload = archive.getvalue()
+    dataset_id = upload(client, payload, "zip").json()["dataset_id"]
 
     response = client.post(
-        f"/datasets/{dataset_id}/versions", files={"file": ("v2.zip", archive.getvalue())}, headers=USER
+        f"/datasets/{dataset_id}/versions", files={"file": ("v2.zip", payload)}, headers=USER
     )
 
     assert response.status_code == 201
@@ -92,4 +85,17 @@ def test_internal_download_url(client, check):
     response = client.get(f"/internal/datasets/{dataset_id}/versions/1/download-url")
 
     assert response.status_code == 200
-    check(response.json(), "DownloadUrl")
+    body = response.json()
+    check(body, "DownloadUrl")
+    assert body["url"].startswith("memory://")
+    assert body["checksum_sha256"] == hashlib.sha256(CSV).hexdigest()
+
+
+def test_idempotent_upload(client):
+    headers = {**USER, "Idempotency-Key": "upload-1"}
+    first = upload(client, headers=headers)
+    second = upload(client, headers=headers)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json() == second.json()
