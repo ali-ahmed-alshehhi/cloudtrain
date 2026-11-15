@@ -1,4 +1,4 @@
-# 0007 — Wisconsin Breast Cancer as the tabular use case
+# 0008 — Wisconsin Breast Cancer as the tabular use case
 
 - **Status:** accepted
 - **Date:** 2026-11-15

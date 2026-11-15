@@ -93,6 +93,3 @@ def test_internal_download_url(client, check):
 
     assert response.status_code == 200
     check(response.json(), "DownloadUrl")
-    body = response.json()
-    assert body["url"].endswith(f"/internal/datasets/{dataset_id}/versions/1/content")
-    assert client.get(body["url"]).content == CSV

@@ -4,8 +4,7 @@ What this stand-in does: keeps datasets IN MEMORY (lost on restart), checks the 
 computes the SHA-256 checksum and numbers the versions, exactly as
 contracts/openapi/dataset-service.yaml says.
 What it does NOT do (the real service must): store files in S3 (LocalStack locally), use PostgreSQL,
-check project membership, record lineage and audit, return a real time-limited S3/LocalStack link.
-Locally the stand-in still returns a working download URL that serves the uploaded bytes.
+check project membership, record lineage and audit, return a real time-limited S3 link.
 """
 
 import hashlib
@@ -190,20 +189,13 @@ def create_app() -> FastAPI:
         _, found = find_version(dataset_id, version)
         return Response(content=found.data, media_type="application/octet-stream")
 
-    @app.get("/internal/datasets/{dataset_id}/versions/{version}/content")
-    def download_content(dataset_id: DatasetIdPath, version: VersionPath) -> Response:
-        """STAND-IN helper: serve the bytes that a LocalStack/S3 URL will provide later."""
-        _, found = find_version(dataset_id, version)
-        return Response(content=found.data, media_type="application/octet-stream")
-
     @app.get("/internal/datasets/{dataset_id}/versions/{version}/download-url")
     def download_url(dataset_id: DatasetIdPath, version: VersionPath) -> dict:
         dataset, found = find_version(dataset_id, version)
-        # STAND-IN: return a working local URL so laptop/LocalStack demos can train.
-        # Faisal's real service replaces this with a time-limited S3 (or LocalStack) URL.
-        base = os.environ.get("DATASET_SERVICE_URL", "http://dataset-service:8002").rstrip("/")
+        # STAND-IN: not a working link. Faisal's service returns a real presigned S3 URL here.
+        bucket_url = os.environ.get("S3_ENDPOINT", "http://localstack:4566")
         return {
-            "url": f"{base}/internal/datasets/{dataset.dataset_id}/versions/{found.number}/content",
+            "url": f"{bucket_url}/datasets/{dataset.dataset_id}/v{found.number}/data",
             "expires_at": iso(now_utc() + timedelta(minutes=15)),
             "checksum_sha256": found.checksum,
         }
