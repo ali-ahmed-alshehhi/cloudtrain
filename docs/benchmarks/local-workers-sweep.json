@@ -1,0 +1,306 @@
+{
+ "experiment": "workers",
+ "machine_type": null,
+ "results": [
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 3,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 0,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 3.7679591239999866,
+     "images": 49920,
+     "data_wait_seconds": 0.8602959579999094
+    },
+    {
+     "seconds": 2.3993786139999997,
+     "images": 49920,
+     "data_wait_seconds": 0.8409021039998379
+    },
+    {
+     "seconds": 2.5970264819999898,
+     "images": 49920,
+     "data_wait_seconds": 0.9102439850001929
+    }
+   ],
+   "accuracy": 0.6826,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 12.918024274000004
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 3,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 1,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 3.8455638529999874,
+     "images": 49920,
+     "data_wait_seconds": 1.1542908090000594
+    },
+    {
+     "seconds": 1.9083973779999894,
+     "images": 49920,
+     "data_wait_seconds": 0.18611447999936104
+    },
+    {
+     "seconds": 1.8803632279999931,
+     "images": 49920,
+     "data_wait_seconds": 0.1587269450001827
+    }
+   ],
+   "accuracy": 0.6923,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 11.929023466999979
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 3,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 2,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 3.759542252999978,
+     "images": 49920,
+     "data_wait_seconds": 1.0440639039997563
+    },
+    {
+     "seconds": 1.89253884499999,
+     "images": 49920,
+     "data_wait_seconds": 0.07011438100039413
+    },
+    {
+     "seconds": 1.9014990179999813,
+     "images": 49920,
+     "data_wait_seconds": 0.06986300200026108
+    }
+   ],
+   "accuracy": 0.7364,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 11.850960798999978
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 3,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 4,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 3.7740297080000005,
+     "images": 49920,
+     "data_wait_seconds": 1.0492759449997209
+    },
+    {
+     "seconds": 1.8639792029999853,
+     "images": 49920,
+     "data_wait_seconds": 0.07743825100013169
+    },
+    {
+     "seconds": 1.860453762999981,
+     "images": 49920,
+     "data_wait_seconds": 0.07523176399988074
+    }
+   ],
+   "accuracy": 0.746,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 12.009935186000007
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 3,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 8,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 4.02699077699998,
+     "images": 49920,
+     "data_wait_seconds": 1.2340963559997533
+    },
+    {
+     "seconds": 1.9113525049999964,
+     "images": 49920,
+     "data_wait_seconds": 0.09599630000013804
+    },
+    {
+     "seconds": 1.9026168849999863,
+     "images": 49920,
+     "data_wait_seconds": 0.07755823899998404
+    }
+   ],
+   "accuracy": 0.6838,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 12.652815836000002
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "synthetic",
+   "data_dir": null,
+   "epochs": 3,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 16,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 4.447575451999967,
+     "images": 49920,
+     "data_wait_seconds": 1.643722248000529
+    },
+    {
+     "seconds": 1.9929621289999773,
+     "images": 49920,
+     "data_wait_seconds": 0.09222118700046167
+    },
+    {
+     "seconds": 2.0125524489999975,
+     "images": 49920,
+     "data_wait_seconds": 0.1077006809993577
+    }
+   ],
+   "accuracy": 0.6963,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 14.134485029000018
+  }
+ ]
+}
