@@ -2,7 +2,7 @@
 
 import threading
 
-from app.machines import CLOUD_MACHINES, LOCAL_MACHINE
+from app.machines import CLOUD_MACHINES
 
 
 # Default: 1 local worker, configurable via environment in main.py
