@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from app import fixture_model
-from app.model import PNG_START, Deployment, ModelProblem, fetch_files, load
+from app.model import PNG_START, Deployment, ModelProblem, fetch_files, load, read_image
 from tests.conftest import USER, candidate
 
 
@@ -67,7 +67,7 @@ def test_resnet18_as_the_training_worker_saves_it(client, registry, models, chec
 def test_resnet18_in_mlflow_pt2_format(models):
     loaded = load(Deployment("model-02", "resnet", 1, "run-1", models["resnet18_pt2"]), s3_client=None)
 
-    assert len(loaded.predict(fixture_model.class_image("cat"), 3)) == 3
+    assert len(loaded.predict(read_image(fixture_model.class_image("cat")), 3)) == 3
 
 
 def test_model_info_shows_the_loaded_version(client, registry, models, check):
@@ -153,9 +153,7 @@ def test_registry_down_and_nothing_loaded_is_503(client, registry):
     assert predict(client, fixture_model.class_image("cat")).status_code == 503
 
 
-def test_not_an_image_is_400(client, registry, models, check):
-    registry.promote("model-01", 1, models["tiny"])
-
+def test_not_an_image_is_400_even_before_a_model_is_live(client, check):
     response = client.post("/predict", files={"file": ("notes.txt", b"hello")}, headers=USER)
     broken = predict(client, PNG_START + b"not really a png")
 
@@ -210,7 +208,7 @@ def test_model_files_are_read_from_s3(models, tmp_path):
         s3_client=lambda: FakeS3(files),
     )
 
-    assert loaded.predict(fixture_model.class_image("cat"), 1)[0]["label"] == "cat"
+    assert loaded.predict(read_image(fixture_model.class_image("cat")), 1)[0]["label"] == "cat"
     with pytest.raises(ModelProblem):
         fetch_files("s3://artifacts/nothing/here", tmp_path, lambda: FakeS3(files))
     with pytest.raises(ModelProblem):

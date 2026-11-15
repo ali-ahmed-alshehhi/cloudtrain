@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from app.common import ApiError, current_user, iso, setup_service
-from app.model import Deployment, InvalidImage, LoadedModel, ModelProblem, load
+from app.model import Deployment, InvalidImage, LoadedModel, ModelProblem, load, read_image
 from app.store import ModelStore, NoModel, Registry, UnknownModel
 
 SERVICE_NAME = "inference-service"
@@ -97,15 +97,16 @@ def create_app(transport: httpx.BaseTransport | None = None, loader=None) -> Fas
         if len(image) > max_image_bytes:
             raise ApiError(400, "IMAGE_TOO_LARGE", f"Send an image of at most {max_image_bytes} bytes")
         try:
+            picture = await run_in_threadpool(read_image, image)
+        except InvalidImage as reason:
+            raise ApiError(400, "INVALID_IMAGE", str(reason)) from None
+        try:
             loaded = await run_in_threadpool(store.current, model_id or default_model)
         except UnknownModel as reason:
             raise ApiError(400, "UNKNOWN_MODEL", str(reason)) from None
         except NoModel as reason:
             raise ApiError(503, "NO_MODEL_LOADED", str(reason)) from None
-        try:
-            predictions = await run_in_threadpool(loaded.predict, image, top_k)
-        except InvalidImage as reason:
-            raise ApiError(400, "INVALID_IMAGE", str(reason)) from None
+        predictions = await run_in_threadpool(loaded.predict, picture, top_k)
         return {
             "model_id": loaded.deployment.model_id,
             "version": loaded.deployment.version,

@@ -82,8 +82,8 @@ class LoadedModel:
             raise ModelProblem("the model answered scores that are not numbers")
         return probabilities
 
-    def predict(self, image: bytes, top_k: int) -> list[dict]:
-        probabilities = self.scores(read_image(image, self.image_size))
+    def predict(self, image: Image.Image, top_k: int) -> list[dict]:
+        probabilities = self.scores(to_pixels(image, self.image_size))
         best = torch.topk(probabilities, k=min(top_k, len(self.labels)))
         return [
             {"label": self.labels[index], "score": round(min(max(score, 0.0), 1.0), 6)}
@@ -105,16 +105,20 @@ class LoadedModel:
             raise ModelProblem("the model's scores do not add up")
 
 
-def read_image(data: bytes, size: int) -> torch.Tensor:
-    """PNG or JPEG bytes -> a (1, 3, size, size) tensor of pixels between 0 and 1."""
+def read_image(data: bytes) -> Image.Image:
+    """PNG or JPEG bytes -> an RGB image. Raises InvalidImage."""
     if not data.startswith((PNG_START, JPEG_START)):
         raise InvalidImage("Send a PNG or JPEG image")
     try:
         with Image.open(io.BytesIO(data)) as image:
-            image = image.convert("RGB").resize((size, size), Image.Resampling.BILINEAR)
-            pixels = np.asarray(image, dtype=np.float32) / 255.0
+            return image.convert("RGB")
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise InvalidImage("The image could not be read (broken or too large)") from None
+
+
+def to_pixels(image: Image.Image, size: int) -> torch.Tensor:
+    """An RGB image -> a (1, 3, size, size) tensor of pixels between 0 and 1."""
+    pixels = np.asarray(image.resize((size, size), Image.Resampling.BILINEAR), dtype=np.float32) / 255.0
     return torch.from_numpy(pixels).permute(2, 0, 1).unsqueeze(0).contiguous()
 
 
