@@ -14,20 +14,21 @@ On **real AWS**, create a dedicated S3 bucket for Terraform state (once per acco
 Enable versioning and block public access. Locking uses S3-native `use_lockfile`
 (see `infrastructure/backends/s3.backend.tf.example`).
 
-Until the AWS account exists, practice with the **official AWS Emulator**
-([aws/aws-emulator](https://github.com/aws/aws-emulator)) — local state in `backend.tf`.
+Until the AWS account exists, practice with **LocalStack** (same tool as the app —
+decisions [0005](decisions/0005-localstack-for-s3.md) /
+[0007](decisions/0007-terraform-local-uses-localstack.md)) — local state in `backend.tf`.
 
 ## 3. Create an environment (`dev`, `staging`)
 
-### 3a. AWS Emulator practice (Student 6 — today)
+### 3a. LocalStack practice (Student 6 — today)
 
 ```bash
 cd infrastructure
-./scripts/emulator-up.sh
-source ./scripts/emulator-env.sh
+docker compose -f docker-compose.localstack.yml up -d
+export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
 terraform init
-terraform plan  -var-file=environments/dev/emulator.tfvars.example
-terraform apply -var-file=environments/dev/emulator.tfvars.example
+terraform plan  -var-file=environments/dev/localstack.tfvars.example
+terraform apply -var-file=environments/dev/localstack.tfvars.example
 terraform output
 ```
 
@@ -36,12 +37,13 @@ Creates: S3 `datasets` + `artifacts`, SQS `training-jobs` (+ DLQ) + `job-events`
 Stop when done:
 
 ```bash
-terraform destroy -var-file=environments/dev/emulator.tfvars.example
-./scripts/emulator-down.sh
+terraform destroy -var-file=environments/dev/localstack.tfvars.example
+docker compose -f docker-compose.localstack.yml down
 ```
 
-> Note: the root app still uses LocalStack for `make up` (Ali). The emulator is only
-> Student 6’s Terraform practice “AWS account.”
+> Same LocalStack product/image as root `docker-compose.yml` (`localstack/localstack:4.14`).
+> The infra compose file only publishes host port `4568` for Terraform. RDS/ECS/GPU still need
+> real AWS (see decision 0007).
 
 ### 3b. Real AWS
 
@@ -74,9 +76,9 @@ Example: change `sqs_visibility_timeout_seconds` in tfvars → `terraform plan` 
 ## 7. Destroy
 
 ```bash
-# Emulator
-terraform destroy -var-file=environments/dev/emulator.tfvars.example
-./scripts/emulator-down.sh
+# LocalStack
+terraform destroy -var-file=environments/dev/localstack.tfvars.example
+docker compose -f docker-compose.localstack.yml down
 
 # Real AWS
 terraform destroy -var-file=environments/dev/terraform.tfvars
@@ -86,7 +88,7 @@ Keep the **state bucket** on real AWS. Destroy disposable `dev` resources after 
 
 ## 8. Cost notes
 - NAT Gateway and idle GPU instances cost money on real AWS.
-- AWS Emulator practice costs $0 (no AWS account required).
+- LocalStack practice costs $0 (no AWS account required).
 - Tag every resource with `Project`, `Environment`, `Owner`.
 
 ## Hand-off values (after apply)

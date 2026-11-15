@@ -58,7 +58,7 @@ resource "aws_subnet" "private" {
   }
 }
 
-# NAT is for real AWS (private subnets reach the internet). Off for emulator practice.
+# NAT is for real AWS (private subnets reach the internet). Off for LocalStack practice.
 resource "aws_eip" "nat" {
   count  = var.enable_nat ? 1 : 0
   domain = "vpc"

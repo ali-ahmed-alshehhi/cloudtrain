@@ -6,7 +6,7 @@ environment = "dev"
 owner       = "hamda-fatma"
 aws_region  = "us-east-1" # confirm with instructors (OPEN_DECISIONS #1)
 
-use_emulator              = false
+use_localstack            = false
 enable_networking         = true
 enable_container_registry = true
 

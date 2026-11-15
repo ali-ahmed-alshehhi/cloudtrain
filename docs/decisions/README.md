@@ -14,3 +14,4 @@ or make a choice others must live with. Copy the shape of `0001-microservices-an
 | 0004 | Public GitHub repository | accepted (instructors to confirm) |
 | 0005 | LocalStack S3 instead of MinIO on laptops | accepted |
 | 0006 | Amazon Cognito as the login provider | accepted |
+| 0007 | Terraform local practice uses LocalStack (not AWS Emulator) | accepted |
