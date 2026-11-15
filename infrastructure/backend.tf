@@ -1,14 +1,13 @@
-# Remote state: stored in S3, with locking, never in Git.
+# State backend.
 # Owners: Hamda + Fatma.
 #
-# The bucket name and region are passed at init time, so no account details are committed:
-#   terraform init -backend-config="bucket=<state bucket>" -backend-config="region=<region>" \
-#                  -backend-config="key=cloudtrain/<environment>/terraform.tfstate"
-# The state bucket itself is created once (bootstrap) and documented in docs/DEPLOYMENT_GUIDE.md.
+# Default = local file (safe for LocalStack practice, no AWS account needed).
+# For real AWS, replace this block with the S3 backend in
+# backends/s3.backend.tf.example and run:
+#   terraform init -migrate-state -backend-config=backends/dev.s3.backend.hcl
 
 terraform {
-  backend "s3" {
-    encrypt      = true
-    use_lockfile = true # S3-native state locking
+  backend "local" {
+    path = "terraform.tfstate"
   }
 }
