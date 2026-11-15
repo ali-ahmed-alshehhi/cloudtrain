@@ -42,6 +42,12 @@ resource "aws_db_parameter_group" "postgres" {
     value = "1000"
   }
 
+  parameter {
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot"
+  }
+
   tags = {
     Name = "${var.environment}-cloudtrain-postgres17"
   }
