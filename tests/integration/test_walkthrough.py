@@ -141,8 +141,11 @@ def test_step_11_predict(gateway):
     """POST /api/v1/predict with an image -> 200 and a prediction from the live model version."""
 
 
-@pytest.mark.skip(
-    reason="Mariam: GPU-hours and cost per job (Fri 20 Nov); Hilal + Adel: cost page (Tue 24 Nov)"
-)
 def test_step_12_compute_usage_and_cost(gateway, finished_job):
-    """The finished job reports gpu_hours and estimated_cost_usd from contracts/pricing.yaml."""
+    """The finished job reports gpu_hours and estimated_cost_usd from contracts/pricing.yaml.
+    API part: Mariam (on). The cost page in the portal: Hilal + Adel (Tue 24 Nov)."""
+    assert finished_job["started_at"] and finished_job["finished_at"], "cost needs both times"
+    # The walk-through job asks for 0 GPUs and runs on the free local-cpu machine (pricing.yaml),
+    # so both are 0 on a laptop; in the cloud the same fields carry the real machine's numbers.
+    assert finished_job["gpu_hours"] == 0
+    assert finished_job["estimated_cost_usd"] == 0

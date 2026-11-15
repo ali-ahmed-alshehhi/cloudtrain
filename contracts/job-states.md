@@ -9,6 +9,7 @@ Changing this file is a contract change (see `contracts/README.md`).
 stateDiagram-v2
     [*] --> QUEUED: POST /jobs (202)
     QUEUED --> SCHEDULED: Scheduler placed it on a machine
+    SCHEDULED --> SCHEDULED: Scheduler places the same attempt again (200, no event)
     SCHEDULED --> RUNNING: worker started training
     RUNNING --> SUCCEEDED: worker reports success
     RUNNING --> FAILED: error, time limit, or no heartbeat
@@ -25,6 +26,7 @@ stateDiagram-v2
 |---|---|---|---|
 | (new) | `QUEUED` | Training Jobs, on `POST /jobs` | `job.queued` |
 | `QUEUED` | `SCHEDULED` | Scheduler: `POST /internal/jobs/{id}/status` with the machine type | `job.scheduled` |
+| `SCHEDULED` | `SCHEDULED` (repeat) | Scheduler places the **same attempt** again (its queue message came back because no worker took the job): answer **200**, nothing changes but the machine type | — |
 | `SCHEDULED` | `RUNNING` | Scheduler (or worker) reports it started, with `started_at` | `job.running` |
 | `RUNNING` | `SUCCEEDED` | Worker reports success, with `finished_at` | `job.succeeded` |
 | `RUNNING` | `FAILED` | Worker reports an error or crash | `job.failed` |
@@ -43,6 +45,8 @@ stateDiagram-v2
    worker learn a job was cancelled: they stop the work and the Scheduler releases the machine.
    The heartbeat answer also carries the current status, so a running worker sees `CANCELLED` within
    one heartbeat interval.
+   One exception: a repeated `SCHEDULED` report for a job that is already `SCHEDULED` (the same attempt,
+   placed again) answers 200 and adds no event; a cancelled job still answers 409 (agreed in #89).
 4. `SUCCEEDED`, `CANCELLED` and `FAILED` (with retries used up) are final.
 
 ## Heartbeat settings (settings, not contract rules)
