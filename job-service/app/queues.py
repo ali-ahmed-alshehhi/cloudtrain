@@ -1,4 +1,8 @@
-"""Sending messages to the SQS queues (LocalStack on a laptop, AWS SQS in the cloud)."""
+"""The SQS queues (LocalStack on a laptop, AWS SQS in the cloud).
+
+This service WRITES `training-jobs` (the job form) and `job-events` (every status change), and
+READS `training-jobs-dlq` (contracts: one reader per queue). Tests replace this class with a fake.
+"""
 
 import json
 import os
@@ -19,6 +23,7 @@ class Queues:
         self.names = {
             "training-jobs": os.environ.get("TRAINING_JOBS_QUEUE", "training-jobs"),
             "job-events": os.environ.get("JOB_EVENTS_QUEUE", "job-events"),
+            "training-jobs-dlq": os.environ.get("TRAINING_JOBS_DLQ", "training-jobs-dlq"),
         }
         self._urls: dict[str, str] = {}
 
@@ -29,6 +34,29 @@ class Queues:
 
     def send(self, queue: str, body: dict) -> None:
         self.client.send_message(QueueUrl=self.url(queue), MessageBody=json.dumps(body))
+
+    def receive(self, queue: str, wait_seconds: int) -> list[dict]:
+        """Up to 10 messages: [{"body": {...}, "receipt": "..."}]. Waits up to wait_seconds."""
+        answer = self.client.receive_message(
+            QueueUrl=self.url(queue), MaxNumberOfMessages=10, WaitTimeSeconds=wait_seconds
+        )
+        found = []
+        for message in answer.get("Messages", []):
+            try:
+                body = json.loads(message["Body"])
+            except ValueError:
+                body = {"unreadable": message["Body"][:200]}
+            found.append({"body": body, "receipt": message["ReceiptHandle"]})
+        return found
+
+    def delete(self, queue: str, receipt: str) -> None:
+        self.client.delete_message(QueueUrl=self.url(queue), ReceiptHandle=receipt)
+
+    def hide(self, queue: str, receipt: str, seconds: int) -> None:
+        """Leave a message on the queue but do not show it to us again for `seconds`."""
+        self.client.change_message_visibility(
+            QueueUrl=self.url(queue), ReceiptHandle=receipt, VisibilityTimeout=seconds
+        )
 
     def ready(self) -> bool:
         try:
