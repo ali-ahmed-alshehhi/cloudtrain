@@ -66,6 +66,9 @@ def launch(fn: Callable, world_size: int, args: tuple = (), device: str = "auto"
 
 def _process(rank: int, fn: Callable, world_size: int, port: int, use_gpu: bool, args: tuple) -> None:
     device = torch.device("cuda", rank) if use_gpu else torch.device("cpu")
+    if use_gpu:
+        # Without this, every process also opens GPU 0: that wastes its memory and can hang NCCL.
+        torch.cuda.set_device(device)
     backend = None
     if world_size > 1:
         backend = "nccl" if use_gpu and dist.is_nccl_available() else "gloo"

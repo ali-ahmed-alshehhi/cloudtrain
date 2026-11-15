@@ -112,6 +112,19 @@ def test_config_that_breaks_the_job_form_rules_is_refused(bad):
         train.TrainConfig(**bad)
 
 
+def test_gpu_process_selects_its_own_gpu_before_the_group_starts(monkeypatch):
+    calls = []
+    monkeypatch.setattr(torch.cuda, "set_device", lambda device: calls.append(("set_device", str(device))))
+    monkeypatch.setattr(
+        ddp.dist, "init_process_group", lambda *_, **named: calls.append(("init", named["rank"]))
+    )
+    monkeypatch.setattr(ddp.dist, "destroy_process_group", lambda: None)
+
+    ddp._process(1, lambda ctx: calls.append(("train", str(ctx.device))), 2, 0, True, ())  # rank 1 of 2
+
+    assert calls == [("set_device", "cuda:1"), ("init", 1), ("train", "cuda:1")]
+
+
 def test_job_that_needs_more_gpus_than_the_machine_has_is_refused():
     with pytest.raises(RuntimeError, match="needs 99 GPU"):
         ddp.launch(_fail, 99, device="cuda")
