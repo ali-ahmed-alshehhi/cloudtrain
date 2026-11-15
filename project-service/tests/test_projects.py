@@ -47,6 +47,16 @@ def test_create_with_bad_body_is_422(client, check, body):
     check(response.json(), "Error")
 
 
+@pytest.mark.parametrize("body", [{"name": "a\x00b"}, {"name": "ok", "description": "has \x00 inside"}])
+def test_create_with_nul_character_is_422_not_500(client, check, body):
+    # PostgreSQL cannot store NUL; the contract test found it answering 500 (pull request #81)
+    response = client.post("/projects", json=body, headers=ALICE)
+
+    assert response.status_code == 422
+    check(response.json(), "Error")
+    assert response.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
 def test_create_with_broken_json_is_422(client, check):
     response = client.post(
         "/projects", content=b"{not json", headers={**ALICE, "Content-Type": "application/json"}
@@ -180,6 +190,15 @@ def test_adding_an_existing_member_is_409(client, check):
     response = client.post(f"/projects/{project_id}/members", json={"user_id": "user-bob"}, headers=ALICE)
 
     assert response.status_code == 409
+    check(response.json(), "Error")
+
+
+def test_adding_a_member_with_nul_character_is_422(client, check):
+    project_id = create(client)["project_id"]
+
+    response = client.post(f"/projects/{project_id}/members", json={"user_id": "user\x00bob"}, headers=ALICE)
+
+    assert response.status_code == 422
     check(response.json(), "Error")
 
 
