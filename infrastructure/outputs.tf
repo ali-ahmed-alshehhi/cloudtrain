@@ -48,3 +48,17 @@ output "alb_security_group_id" {
 output "services_security_group_id" {
   value = try(module.security[0].services_security_group_id, null)
 }
+
+output "database_security_group_id" {
+  value = try(module.security[0].database_security_group_id, null)
+}
+
+output "db_endpoint" {
+  description = "RDS endpoint for service DATABASE_URLs (after enable_database=true)."
+  value       = try(module.database[0].db_endpoint, null)
+}
+
+output "db_master_secret_arn" {
+  description = "Secrets Manager ARN for the RDS master user (Fatma/Hamda + services)."
+  value       = try(module.database[0].master_secret_arn, null)
+}

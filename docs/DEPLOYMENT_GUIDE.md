@@ -59,9 +59,20 @@ terraform plan  -var-file=environments/dev/terraform.tfvars
 terraform apply -var-file=environments/dev/terraform.tfvars
 ```
 
+## 3c. Database schemas (after first RDS apply)
+
+```bash
+# Requires network path to private RDS + aws CLI + psql + jq
+ENVIRONMENT=dev ./scripts/bootstrap-schemas.sh
+```
+
+Creates roles/schemas: `projects`, `datasets`, `jobs`, `scheduler`, `registry`, `mlflow`
+(same as local `make up`). Store each service password in Secrets Manager for deploy.
+
 ## 4. Deploy the services
 Images → ECR, services → ECS Fargate: Salem's pipeline. Hamda + Fatma provide ECR URLs and
 network/security group IDs via `terraform output`.
+
 
 ## 5. Change something through Terraform
 Example: change `sqs_visibility_timeout_seconds` in tfvars → `terraform plan` → `terraform apply`.

@@ -58,7 +58,22 @@ Docs: [Getting started with Docker](https://docs.aws.amazon.com/emulator/latest/
 | `object-storage` | S3 `datasets` + `artifacts` |
 | `message-queue` | SQS `training-jobs` + DLQ + `job-events` |
 | `container-registry` | ECR repos per service |
-| `database` / `iam` / `application-services` / `training-compute` / `monitoring` | stubs — next |
+| `database` | RDS Postgres + Secrets Manager (enable on real AWS) |
+| `iam` / `application-services` / `training-compute` / `monitoring` | stubs — next |
+
+### Next-week apply (real AWS, Wed 18 hand-off)
+
+```bash
+# In terraform.tfvars (not committed):
+enable_networking         = true
+enable_container_registry = true
+enable_database           = true
+
+terraform apply -var-file=environments/dev/terraform.tfvars
+./scripts/bootstrap-schemas.sh   # one-time schemas for Faisal/Mariam/…
+terraform output                 # share db_endpoint + buckets + queues + ecr
+```
+
 
 ## Real AWS (after instructors give the account)
 

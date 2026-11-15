@@ -18,6 +18,8 @@ emulator_endpoint = "https://127.0.0.1:9297"
 # checking Emulator fidelity for EC2/ECR.
 enable_networking         = false
 enable_container_registry = false
+enable_database           = false
+
 
 datasets_bucket_name  = "datasets"
 artifacts_bucket_name = "artifacts"

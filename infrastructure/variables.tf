@@ -72,6 +72,27 @@ variable "enable_container_registry" {
   default     = true
 }
 
+variable "enable_database" {
+  description = "Create RDS PostgreSQL. Requires networking. Off on emulator practice."
+  type        = bool
+  default     = false
+}
+
+variable "db_instance_class" {
+  type    = string
+  default = "db.t4g.micro"
+}
+
+variable "db_multi_az" {
+  type    = bool
+  default = false
+}
+
+variable "db_deletion_protection" {
+  type    = bool
+  default = false
+}
+
 variable "availability_zones" {
   type    = list(string)
   default = ["us-east-1a", "us-east-1b"]
