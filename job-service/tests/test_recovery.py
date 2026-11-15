@@ -58,6 +58,27 @@ def test_retried_job_finishes_on_its_second_attempt(client, clock):
     ]
 
 
+def test_the_scheduler_can_place_the_same_attempt_again(client, queues):
+    """Found in the live failure-recovery run: the retry was SCHEDULED while the only worker was
+    down; the queue message came back 5 minutes later and a 409 made the Scheduler drop it."""
+    job_id = submit(client)["job_id"]
+    report(client, job_id, "SCHEDULED", machine_type="local-cpu")
+    events_before = len(queues.sent["job-events"])
+
+    again = report(client, job_id, "SCHEDULED", machine_type="local-cpu")
+
+    assert again.status_code == 200
+    assert len(queues.sent["job-events"]) == events_before  # nothing changed, so no new event
+    assert report(client, job_id, "RUNNING").status_code == 200
+
+
+def test_a_cancelled_job_still_refuses_to_be_scheduled(client):
+    job_id = submit(client)["job_id"]
+    client.post(f"/jobs/{job_id}/cancel", headers={"X-User-Id": "user-1"})
+
+    assert report(client, job_id, "SCHEDULED").status_code == 409
+
+
 def test_regular_heartbeats_are_never_mistaken_for_a_dead_worker(client, clock):
     job_id = submit(client)["job_id"]
     start(client, job_id)

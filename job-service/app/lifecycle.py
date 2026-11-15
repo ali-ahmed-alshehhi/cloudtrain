@@ -125,6 +125,14 @@ class Lifecycle:
 
     def report(self, session: Session, job: Job, report: StatusReport) -> None:
         """A status report from the Scheduler or the worker. 409 if the step is not allowed."""
+        if report.status == "SCHEDULED" and job.status == "SCHEDULED":
+            # The Scheduler is placing the SAME attempt again: its queue message came back because
+            # no worker took the job. Answer 200 (no new event) so it tries again, instead of 409,
+            # which would make it drop the job and leave it SCHEDULED forever.
+            # Proposed as a contract change: docs/decisions/0006-job-service-design.md.
+            if report.machine_type:
+                job.machine_type = self.current_attempt(job).machine_type = report.machine_type
+            return
         if report.status not in ALLOWED_REPORTS.get(job.status, set()):
             raise ApiError(
                 409,
