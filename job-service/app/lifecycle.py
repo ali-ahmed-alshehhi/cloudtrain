@@ -129,7 +129,7 @@ class Lifecycle:
             # The Scheduler is placing the SAME attempt again: its queue message came back because
             # no worker took the job. Answer 200 (no new event) so it tries again, instead of 409,
             # which would make it drop the job and leave it SCHEDULED forever.
-            # Proposed as a contract change: docs/decisions/0006-job-service-design.md.
+            # Agreed in #89: contracts/job-states.md and docs/decisions/0007-job-service-design.md.
             if report.machine_type:
                 job.machine_type = self.current_attempt(job).machine_type = report.machine_type
             return

@@ -55,7 +55,7 @@ Plus `GET /health` (database and queues reachable) and `GET /metrics`.
 
 **The outbox, in one sentence:** a queue message is saved in the same database transaction as the
 change it announces, then sent right after, so a job and its message can never get out of step,
-even if SQS is down for a while. Why: [docs/decisions/0006-job-service-design.md](../docs/decisions/0006-job-service-design.md).
+even if SQS is down for a while. Why: [docs/decisions/0007-job-service-design.md](../docs/decisions/0007-job-service-design.md).
 
 ## Settings (`.env`)
 

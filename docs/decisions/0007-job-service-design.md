@@ -1,6 +1,6 @@
-# 0006 — How the Training Jobs service stays correct when things fail
+# 0007 — How the Training Jobs service stays correct when things fail
 
-- **Status:** accepted inside `job-service/`; points 6 and 7 are **proposed contract changes**
+- **Status:** accepted. Point 6 is an agreed contract change (#89); point 7 was declined for now (#89)
 - **Date:** 2026-11-15
 - **Decided by:** Mariam (Student 3)
 
@@ -39,19 +39,19 @@ the workers, and any of them can be down or late. These are the choices that kee
    two projects could train one project's job on the other's data. The alert feed answers 403 (not 404)
    for a project you cannot see, because the contract lists no 404 there.
 
-6. **PROPOSED CONTRACT CHANGE: a repeated `SCHEDULED` report is allowed (200, no event).**
+6. **CONTRACT CHANGE (agreed in #89): a repeated `SCHEDULED` report is allowed (200, no event).**
    *Found in the live failure-recovery run on 15 Nov:* the retry was reported `SCHEDULED` while the only
    worker was down. The Scheduler kept its queue message; when SQS showed it again, the second
    `SCHEDULED` report got 409, the Scheduler dropped the message, and the job stayed `SCHEDULED` forever.
    The service now answers 200 to `SCHEDULED` → `SCHEDULED` (same attempt, no new event); a cancelled
-   job still gets 409. With it, the failure-recovery demo passes. `contracts/job-states.md` needs one
-   line for it; the Contract change issue asks Ali and Maitha to agree.
+   job still gets 409. With it, the failure-recovery demo passes. The row is in `contracts/job-states.md`.
 
-7. **PROPOSED CONTRACT CHANGE (for discussion): a way out of `QUEUED` and `SCHEDULED`.** Today the only
+7. **Not now (decided in #89): a way out of `QUEUED` and `SCHEDULED`.** Today the only
    exits are `RUNNING` and `CANCELLED`. A job whose queue message SQS moved to `training-jobs-dlq`
    is put back on the queue up to `JOB_DLQ_MAX_REQUEUES` times, then logged as an error and left
-   `QUEUED` (the user can cancel). A clean answer is a step `QUEUED`/`SCHEDULED` → `FAILED` with the
-   reason "could not be scheduled", which would then retry like any failure.
+   `QUEUED` (the user can cancel). A step `QUEUED`/`SCHEDULED` → `FAILED` ("could not be scheduled") was
+   proposed; Ali decided the re-queue is enough for this project, to revisit with Maitha after the
+   scheduler capacity work.
 
 8. **Our own failure reports stay on `training-jobs-dlq`.** This service is the queue's only reader. It
    hides its own reports for 12 hours (the SQS maximum) instead of deleting them, so the queue depth

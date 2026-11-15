@@ -8,7 +8,7 @@
      times (for example the Scheduler was down). If the job is still QUEUED it would wait forever,
      so it is put back on `training-jobs`, at most JOB_DLQ_MAX_REQUEUES times. After that it is
      logged as an error and stays QUEUED: the user can cancel it. (Marking it FAILED would need a
-     new status step, QUEUED -> FAILED: see docs/decisions/0006-job-service-design.md.)
+     new status step, QUEUED -> FAILED: not now, see docs/decisions/0007-job-service-design.md.)
    - our own failure report for a job whose retries are used up (contracts/job-states.md). It is
      left on the queue for people and the queue-depth alarm, and hidden from us for 12 hours.
 
