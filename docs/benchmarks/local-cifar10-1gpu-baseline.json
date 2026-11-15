@@ -1,0 +1,261 @@
+{
+ "experiment": "scaling",
+ "machine_type": null,
+ "results": [
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "cifar10",
+   "data_dir": "/home/ahmed/datasets/cifar10",
+   "epochs": 10,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 8,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 3.2276728170000126,
+     "images": 49920,
+     "data_wait_seconds": 0.23175487999992583
+    },
+    {
+     "seconds": 2.0624698039999885,
+     "images": 49920,
+     "data_wait_seconds": 0.10059233500004439
+    },
+    {
+     "seconds": 2.0669499580000092,
+     "images": 49920,
+     "data_wait_seconds": 0.10215158999977803
+    },
+    {
+     "seconds": 2.095312168000021,
+     "images": 49920,
+     "data_wait_seconds": 0.09953141099990148
+    },
+    {
+     "seconds": 2.0756980069999997,
+     "images": 49920,
+     "data_wait_seconds": 0.10166737399995895
+    },
+    {
+     "seconds": 2.049336162000003,
+     "images": 49920,
+     "data_wait_seconds": 0.10179553799972041
+    },
+    {
+     "seconds": 2.0777887430000135,
+     "images": 49920,
+     "data_wait_seconds": 0.10261488899996607
+    },
+    {
+     "seconds": 2.1069320290000064,
+     "images": 49920,
+     "data_wait_seconds": 0.11006983900011846
+    },
+    {
+     "seconds": 2.161288305999989,
+     "images": 49920,
+     "data_wait_seconds": 0.09719968700048298
+    },
+    {
+     "seconds": 2.0909053389999883,
+     "images": 49920,
+     "data_wait_seconds": 0.10409584100031566
+    }
+   ],
+   "accuracy": 0.7345,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 26.041084654000002
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "cifar10",
+   "data_dir": "/home/ahmed/datasets/cifar10",
+   "epochs": 10,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 8,
+   "device": "auto",
+   "seed": 1,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 2.8896355339999786,
+     "images": 49920,
+     "data_wait_seconds": 0.20406287300096437
+    },
+    {
+     "seconds": 2.0243253019999656,
+     "images": 49920,
+     "data_wait_seconds": 0.10298117399952389
+    },
+    {
+     "seconds": 2.06797601400001,
+     "images": 49920,
+     "data_wait_seconds": 0.09700017899984914
+    },
+    {
+     "seconds": 1.9453612089999979,
+     "images": 49920,
+     "data_wait_seconds": 0.10091595800020059
+    },
+    {
+     "seconds": 1.937128733999998,
+     "images": 49920,
+     "data_wait_seconds": 0.10176145600013342
+    },
+    {
+     "seconds": 1.9766723499999443,
+     "images": 49920,
+     "data_wait_seconds": 0.09740575599880685
+    },
+    {
+     "seconds": 1.9682633680000095,
+     "images": 49920,
+     "data_wait_seconds": 0.09575459300020839
+    },
+    {
+     "seconds": 1.9711696439999855,
+     "images": 49920,
+     "data_wait_seconds": 0.10298848799982352
+    },
+    {
+     "seconds": 1.9646276039999861,
+     "images": 49920,
+     "data_wait_seconds": 0.09664930299993557
+    },
+    {
+     "seconds": 1.975176279999971,
+     "images": 49920,
+     "data_wait_seconds": 0.10230421399973011
+    }
+   ],
+   "accuracy": 0.7309,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 24.162327447999985
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "cifar10",
+   "data_dir": "/home/ahmed/datasets/cifar10",
+   "epochs": 10,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 8,
+   "device": "auto",
+   "seed": 2,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 2.8557449150000025,
+     "images": 49920,
+     "data_wait_seconds": 0.2218169799999714
+    },
+    {
+     "seconds": 2.0280018800000335,
+     "images": 49920,
+     "data_wait_seconds": 0.099887219999232
+    },
+    {
+     "seconds": 2.016748617000019,
+     "images": 49920,
+     "data_wait_seconds": 0.10508918599947492
+    },
+    {
+     "seconds": 2.02323097499999,
+     "images": 49920,
+     "data_wait_seconds": 0.10788282000038407
+    },
+    {
+     "seconds": 1.974424966000015,
+     "images": 49920,
+     "data_wait_seconds": 0.10268364400030805
+    },
+    {
+     "seconds": 2.0470391210000116,
+     "images": 49920,
+     "data_wait_seconds": 0.10384209800031385
+    },
+    {
+     "seconds": 2.026847540999995,
+     "images": 49920,
+     "data_wait_seconds": 0.09971971099992061
+    },
+    {
+     "seconds": 2.016313795999963,
+     "images": 49920,
+     "data_wait_seconds": 0.10080244899995705
+    },
+    {
+     "seconds": 1.98308277000001,
+     "images": 49920,
+     "data_wait_seconds": 0.10549964800020462
+    },
+    {
+     "seconds": 1.9936376230000405,
+     "images": 49920,
+     "data_wait_seconds": 0.10147136099993759
+    }
+   ],
+   "accuracy": 0.7536,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 24.398047221000013
+  }
+ ]
+}

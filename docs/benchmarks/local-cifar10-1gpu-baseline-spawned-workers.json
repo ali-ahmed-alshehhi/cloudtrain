@@ -1,0 +1,261 @@
+{
+ "experiment": "scaling",
+ "machine_type": null,
+ "results": [
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "cifar10",
+   "data_dir": "/home/ahmed/datasets/cifar10",
+   "epochs": 10,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 8,
+   "device": "auto",
+   "seed": 0,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 20.15831422699995,
+     "images": 49920,
+     "data_wait_seconds": 17.402329057999737
+    },
+    {
+     "seconds": 1.9827054479999902,
+     "images": 49920,
+     "data_wait_seconds": 0.10172804700027882
+    },
+    {
+     "seconds": 1.9612955539999462,
+     "images": 49920,
+     "data_wait_seconds": 0.09605924199888705
+    },
+    {
+     "seconds": 2.0050106300000152,
+     "images": 49920,
+     "data_wait_seconds": 0.09872349299979533
+    },
+    {
+     "seconds": 2.081105553000043,
+     "images": 49920,
+     "data_wait_seconds": 0.18707946900019579
+    },
+    {
+     "seconds": 1.9596885700000257,
+     "images": 49920,
+     "data_wait_seconds": 0.09535573200014369
+    },
+    {
+     "seconds": 1.9734232129999896,
+     "images": 49920,
+     "data_wait_seconds": 0.09671281100082751
+    },
+    {
+     "seconds": 2.0167114220000144,
+     "images": 49920,
+     "data_wait_seconds": 0.09946023899993861
+    },
+    {
+     "seconds": 2.007757271999992,
+     "images": 49920,
+     "data_wait_seconds": 0.09688254799954166
+    },
+    {
+     "seconds": 1.9633277399999542,
+     "images": 49920,
+     "data_wait_seconds": 0.10226446900003339
+    }
+   ],
+   "accuracy": 0.7384,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 56.642797331
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "cifar10",
+   "data_dir": "/home/ahmed/datasets/cifar10",
+   "epochs": 10,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 8,
+   "device": "auto",
+   "seed": 1,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 19.990843041999995,
+     "images": 49920,
+     "data_wait_seconds": 17.15563399299981
+    },
+    {
+     "seconds": 2.0085707900000216,
+     "images": 49920,
+     "data_wait_seconds": 0.10329435900109729
+    },
+    {
+     "seconds": 1.976259027000026,
+     "images": 49920,
+     "data_wait_seconds": 0.09948547700020072
+    },
+    {
+     "seconds": 1.9663574260000019,
+     "images": 49920,
+     "data_wait_seconds": 0.09373688800019409
+    },
+    {
+     "seconds": 2.0844722789999537,
+     "images": 49920,
+     "data_wait_seconds": 0.17362610800074663
+    },
+    {
+     "seconds": 1.9706554250000181,
+     "images": 49920,
+     "data_wait_seconds": 0.09247083200040151
+    },
+    {
+     "seconds": 2.006458450000025,
+     "images": 49920,
+     "data_wait_seconds": 0.09627133600042725
+    },
+    {
+     "seconds": 1.972763757999985,
+     "images": 49920,
+     "data_wait_seconds": 0.10300360000007913
+    },
+    {
+     "seconds": 1.9708943740000109,
+     "images": 49920,
+     "data_wait_seconds": 0.09570125400006191
+    },
+    {
+     "seconds": 1.9785829769999737,
+     "images": 49920,
+     "data_wait_seconds": 0.10378424299926792
+    }
+   ],
+   "accuracy": 0.7503,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 56.096984693000024
+  },
+  {
+   "strategy": "single",
+   "world_size": 1,
+   "model": "resnet18",
+   "dataset": "cifar10",
+   "data_dir": "/home/ahmed/datasets/cifar10",
+   "epochs": 10,
+   "batch_size": 128,
+   "learning_rate": 0.05,
+   "num_workers": 8,
+   "device": "auto",
+   "seed": 2,
+   "train_size": 50000,
+   "val_size": 10000,
+   "sync_probe_steps": 0,
+   "gpus": 1,
+   "backend": null,
+   "train_images": 50000,
+   "steps_per_epoch": 390,
+   "epochs_detail": [
+    {
+     "seconds": 19.711498527000003,
+     "images": 49920,
+     "data_wait_seconds": 16.836664055001165
+    },
+    {
+     "seconds": 1.9772289300000239,
+     "images": 49920,
+     "data_wait_seconds": 0.09673327800123843
+    },
+    {
+     "seconds": 2.0002003859999604,
+     "images": 49920,
+     "data_wait_seconds": 0.10316521999857287
+    },
+    {
+     "seconds": 2.0205825620000724,
+     "images": 49920,
+     "data_wait_seconds": 0.10531345400102055
+    },
+    {
+     "seconds": 2.131328910000093,
+     "images": 49920,
+     "data_wait_seconds": 0.20015044899992063
+    },
+    {
+     "seconds": 1.9805608469999925,
+     "images": 49920,
+     "data_wait_seconds": 0.09953515300117033
+    },
+    {
+     "seconds": 1.962687216000063,
+     "images": 49920,
+     "data_wait_seconds": 0.09138752200010458
+    },
+    {
+     "seconds": 2.007464710000022,
+     "images": 49920,
+     "data_wait_seconds": 0.10476723399983712
+    },
+    {
+     "seconds": 1.991703123000093,
+     "images": 49920,
+     "data_wait_seconds": 0.10535212299998875
+    },
+    {
+     "seconds": 1.9896830349999846,
+     "images": 49920,
+     "data_wait_seconds": 0.10143781899864734
+    }
+   ],
+   "accuracy": 0.7555,
+   "sync_probe": null,
+   "environment": {
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "gpus_on_machine": 1,
+    "cpu_count": 16,
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "torch": "2.9.1+cu128",
+    "cuda": "12.8",
+    "nccl": null
+   },
+   "total_seconds": 56.130025602000046
+  }
+ ]
+}
