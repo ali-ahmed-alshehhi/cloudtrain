@@ -1,13 +1,13 @@
-"""STAND-IN for the Scheduler (owner: Maitha). Replace it with the real service; keep the contract.
+"""Scheduler (owner: Maitha). Reads the training-jobs queue, picks a machine,
+checks capacity, hands the job to a worker, and releases the slot when done.
 
-What this stand-in already does:
-- it is the ONLY reader of the `training-jobs` queue (long polling: it waits up to 20 seconds for a
-  message instead of asking again and again)
-- for each job: reports SCHEDULED to the Training Jobs service, hands the job to the one local worker
-  (POST /internal/run, waiting while the worker is busy), reports RUNNING, then deletes the message
-- a 409 from Training Jobs means the job was cancelled or already handled: the message is dropped
-What it does NOT do (the real scheduler must): choose CPU or GPU machines, start cloud workers,
-capacity, quotas, release machines, use its PostgreSQL schema.
+What it does:
+- ONLY reader of the `training-jobs` queue (long polling, 20 s wait)
+- picks CPU or GPU machine type based on gpu_count (see machines.py)
+- enforces a concurrency limit via CapacityTracker (one local worker by default)
+- for each job: checks capacity, reports SCHEDULED, hands to the worker, reports RUNNING,
+  then deletes the queue message
+- a 409 from Training Jobs means the job was cancelled: drop and release
 """
 
 import json
@@ -21,6 +21,7 @@ import httpx
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI
 
+from app.capacity import CapacityTracker
 from app.common import iso, now_utc, setup_service
 from app.machines import LOCAL_MACHINE, pick_machine
 
@@ -38,7 +39,13 @@ def sqs_client():
 
 
 class Scheduler:
-    def __init__(self, sqs, http: httpx.Client, logger) -> None:
+    def __init__(
+        self,
+        sqs,
+        http: httpx.Client,
+        logger,
+        capacity: CapacityTracker | None = None,
+    ) -> None:
         self.sqs = sqs
         self.http = http
         self.logger = logger
@@ -47,6 +54,8 @@ class Scheduler:
         self.worker = os.environ.get("TRAINING_WORKER_URL", "http://training-worker:8010")
         self.max_wait_for_worker = float(os.environ.get("SQS_VISIBILITY_TIMEOUT_SECONDS", "300"))
         self._queue_url: str | None = None
+        max_w = int(os.environ.get("SCHEDULER_MAX_WORKERS", "1"))
+        self.capacity = capacity or CapacityTracker(max_workers=max_w)
 
     def queue_url(self) -> str:
         if self._queue_url is None:
@@ -75,19 +84,31 @@ class Scheduler:
         job_id = form["job_id"]
         gpu_count = form.get("resources", {}).get("gpu_count", 0)
         machine = pick_machine(gpu_count)
+
+        # Check capacity before doing anything
+        if not self.capacity.reserve(job_id, machine):
+            self.logger.info(
+                "no capacity; message stays on queue",
+                extra={"job_id": job_id, "active": self.capacity.active_count},
+            )
+            return False
+
         scheduled = self.report(job_id, "SCHEDULED", machine_type=machine)
         if scheduled.status_code == 409:
+            self.capacity.release(job_id)
             self.logger.info("job cancelled or already scheduled; dropping message", extra={"job_id": job_id})
             return True
         if scheduled.status_code != 200:
-            return False  # Training Jobs is unhappy; the message comes back later
+            self.capacity.release(job_id)
+            return False
 
         waited = 0.0
-        while True:  # wait while the single local worker is busy ("queueing when capacity is full")
+        while True:
             answer = self.http.post(f"{self.worker}/internal/run", json=form)
             if answer.status_code == 202:
                 break
             if answer.status_code != 409 or waited >= self.max_wait_for_worker:
+                self.capacity.release(job_id)
                 self.logger.error("worker did not accept the job", extra={"job_id": job_id})
                 return False
             time.sleep(BUSY_RETRY_SECONDS)
@@ -95,8 +116,15 @@ class Scheduler:
 
         running = self.report(job_id, "RUNNING", machine_type=machine, started_at=iso(now_utc()))
         if running.status_code == 409:
+            self.capacity.release(job_id)
             self.logger.info("job was cancelled while starting", extra={"job_id": job_id})
         return True
+
+    def release_job(self, job_id: str) -> None:
+        """Called when a job finishes or fails — free the capacity slot."""
+        released = self.capacity.release(job_id)
+        if released:
+            self.logger.info("released machine", extra={"job_id": job_id, "machine": released})
 
     def read_queue_once(self) -> None:
         answer = self.sqs.receive_message(
@@ -112,8 +140,13 @@ class Scheduler:
                 self.sqs.delete_message(QueueUrl=self.queue_url(), ReceiptHandle=message["ReceiptHandle"])
 
 
-def create_app(sqs=None, transport: httpx.BaseTransport | None = None, start_loop: bool = True) -> FastAPI:
-    """`sqs` and `transport` let the tests replace SQS and the other services with fakes."""
+def create_app(
+    sqs=None,
+    transport: httpx.BaseTransport | None = None,
+    start_loop: bool = True,
+    capacity: CapacityTracker | None = None,
+) -> FastAPI:
+    """`sqs`, `transport` and `capacity` let the tests inject fakes."""
     holder: dict[str, Scheduler] = {}
 
     @asynccontextmanager
@@ -133,9 +166,14 @@ def create_app(sqs=None, transport: httpx.BaseTransport | None = None, start_loo
         yield
         stop.set()
 
-    app = FastAPI(title="CloudTrain Scheduler (stand-in)", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="CloudTrain Scheduler", version="1.0.0", lifespan=lifespan)
     logger = setup_service(app, SERVICE_NAME, is_ready=lambda: holder["scheduler"].ready())
-    scheduler = Scheduler(sqs or sqs_client(), httpx.Client(transport=transport, timeout=10), logger)
+    scheduler = Scheduler(
+        sqs or sqs_client(),
+        httpx.Client(transport=transport, timeout=10),
+        logger,
+        capacity=capacity,
+    )
     holder["scheduler"] = scheduler
     app.state.scheduler = scheduler
     return app
