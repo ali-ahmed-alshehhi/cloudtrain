@@ -1,5 +1,5 @@
 # Shared input variables. Values per environment live in environments/<env>/
-# (*.tfvars files are git-ignored; commit only non-secret examples).
+# (*.tfvars files are git-ignored; commit only non-secret *.example files).
 # Owners: Hamda + Fatma.
 
 variable "project" {
@@ -26,4 +26,53 @@ variable "owner" {
 variable "aws_region" {
   description = "AWS region, decided with the instructors (see docs/OPEN_DECISIONS.md)."
   type        = string
+}
+
+variable "use_localstack" {
+  description = "Point the AWS provider at LocalStack (local practice, no cloud bill)."
+  type        = bool
+  default     = false
+}
+
+variable "localstack_endpoint" {
+  description = "LocalStack edge URL when use_localstack=true (host port from docker compose)."
+  type        = string
+  default     = "http://localhost:4568"
+}
+
+variable "datasets_bucket_name" {
+  description = "S3 datasets bucket. Local: datasets. Real AWS: must be globally unique."
+  type        = string
+}
+
+variable "artifacts_bucket_name" {
+  description = "S3 artifacts bucket. Local: artifacts. Real AWS: must be globally unique."
+  type        = string
+}
+
+variable "sqs_visibility_timeout_seconds" {
+  type    = number
+  default = 300
+}
+
+variable "sqs_max_receive_count" {
+  type    = number
+  default = 3
+}
+
+variable "enable_networking" {
+  description = "Create VPC/subnets. Off when targeting LocalStack with only s3,sqs enabled."
+  type        = bool
+  default     = true
+}
+
+variable "enable_container_registry" {
+  description = "Create ECR repositories. Off for LocalStack until ECR is enabled there."
+  type        = bool
+  default     = true
+}
+
+variable "availability_zones" {
+  type    = list(string)
+  default = ["us-east-1a", "us-east-1b"]
 }

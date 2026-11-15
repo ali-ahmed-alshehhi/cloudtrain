@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars (git-ignored) for a real AWS apply:
+#   cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
+# Then fill in the region and unique bucket names.
+
+environment = "dev"
+owner       = "hamda-fatma"
+aws_region  = "us-east-1" # confirm with instructors (OPEN_DECISIONS #1)
+
+use_localstack             = false
+enable_networking          = true
+enable_container_registry  = true
+
+# S3 names must be globally unique on real AWS.
+datasets_bucket_name  = "cloudtrain-dev-datasets-CHANGE-ME"
+artifacts_bucket_name = "cloudtrain-dev-artifacts-CHANGE-ME"
+
+sqs_visibility_timeout_seconds = 300
+sqs_max_receive_count          = 3
+
+availability_zones = ["us-east-1a", "us-east-1b"]
