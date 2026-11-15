@@ -43,6 +43,7 @@ class DatasetClient:
                 )
             extracted.mkdir()
             self._extract(archive, extracted)
+            (extracted / ".cloudtrain-checksum-sha256").write_text(actual)
             return extracted
         except Exception:
             shutil.rmtree(work, ignore_errors=True)

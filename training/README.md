@@ -1,8 +1,8 @@
 # Training runtime / worker — `training/`
 
-Day 1 provides the real single-job worker foundation and a CPU-capable
-CIFAR-10/ResNet-18 path. The API remains the contract-defined asynchronous
-worker: `POST /internal/run` returns `202`, a second concurrent job receives
+The worker trains CIFAR-10/ResNet-18 and numeric CSV `tabular_mlp` jobs in
+single-process or one-machine DDP mode. The contract-defined asynchronous API
+is unchanged: `POST /internal/run` returns `202`, a second concurrent job gets
 `409 WORKER_BUSY`, and health, metrics, shared errors, request IDs, and JSON
 request logs remain enabled.
 
@@ -10,11 +10,12 @@ request logs remain enabled.
 |---|---|---|
 | Abdullah (Student 4) | 8010 (internal, local development only) | `contracts/openapi/training-worker.yaml`, `contracts/training-job.schema.json` |
 
-Distributed training building blocks live in `training/distributed/` (Ahmed +
-Abdulla). Day 1 reuses their dataset, model, and loader helpers. Connecting the
-worker lifecycle to multi-process DDP is intentionally a Day 2 task.
+Distributed building blocks remain in `training/distributed/` (Ahmed +
+Abdulla). The worker calls `ddp.launch`, uses a module-level spawn target,
+`make_loader`, `set_epoch`, `wrap`, and `unwrap`. Only rank 0 produces
+checkpoints, final bundles, and parent-process MLflow records.
 
-## Day 1 execution
+## Execution
 
 For each accepted job the parent runtime:
 
@@ -23,16 +24,35 @@ For each accepted job the parent runtime:
    size bound, verifies `checksum_sha256`, and safely extracts zip or tar data
    into temporary storage. Absolute paths, `..`, tar links, and device members
    are rejected.
-3. Opens one MLflow run, logs job hyperparameters, and runs ResNet-18 against a
-   downloaded archive containing `cifar-10-batches-py`.
-4. Logs train/validation loss and accuracy per epoch plus final metrics.
-5. Reports exactly one `SUCCEEDED` or `FAILED`. A `CANCELLED` heartbeat stops
+3. Opens one MLflow run and logs the checksum, strategy/world size, software
+   versions, job parameters, epoch metrics, and final metrics.
+4. Resumes only from an S3 checkpoint whose job, model, dataset checksum,
+   hyperparameters, strategy, world size, and checkpoint schema all match.
+5. Trains either ResNet-18 from a CIFAR archive containing
+   `cifar-10-batches-py`, or a small MLP from exactly one CSV.
+6. Writes each immutable checkpoint object before updating the `latest` and
+   optional `best` manifests. It writes a reusable final bundle and then the
+   `final` manifest.
+7. Logs a loadable PyTorch model to MLflow artifact path `model`, with an input
+   example and inferred signature.
+8. Reports exactly one `SUCCEEDED` or `FAILED`. A `CANCELLED` heartbeat stops
    cooperative work without a terminal callback. The job's
    `max_runtime_minutes` is enforced and busy state is always released.
 
-Dataset metadata, download, checksum, archive, MLflow, and training failures are
-reported as failed job reasons. Temporary dataset data is removed after the
-attempt.
+Python, NumPy, PyTorch, DataLoader workers, splits, and samplers are seeded.
+cuDNN benchmarking is disabled and deterministic behavior is requested where
+PyTorch supports it. This targets repeatability in the same environment; it
+does not promise bitwise equality across hardware, drivers, or PyTorch builds.
+
+## Tabular CSV
+
+`model: tabular_mlp` expects one CSV with finite numeric features and a
+categorical target. `target_column` defaults to `diagnosis`. The seeded split is
+stratified, and means/scales are learned only from training rows. Metrics are
+cross-entropy loss, accuracy, and macro F1. The final bundle contains weights,
+architecture, feature order, train-only standardization statistics, target
+name, class labels, and input schema. `app.tabular.load_model_bundle` rebuilds
+the model for inference.
 
 ## Endpoints
 **Public:** none.
@@ -54,17 +74,25 @@ All runtime configuration is through environment variables:
 - `DATASET_SERVICE_URL` (default `http://dataset-service:8002`)
 - `MLFLOW_TRACKING_URI` (required for production execution)
 - `MLFLOW_EXPERIMENT_NAME` (default `cloudtrain`)
+- `ARTIFACTS_BUCKET` (required)
+- `S3_ENDPOINT` (set for LocalStack; omit/empty for AWS)
+- `AWS_REGION` (default `us-east-1`; credentials use the normal boto3 IAM/env chain)
 - `HEARTBEAT_INTERVAL_SECONDS` (default `30`)
 - `HTTP_TIMEOUT_SECONDS` (default `30`)
 - `DATASET_MAX_BYTES` (default 10 GiB)
+- `TRAINING_SHM_SIZE` (Compose shared memory, default 2 GiB in `.env.example`)
 
-Job hyperparameters `epochs`, `batch_size`, and `learning_rate` come directly
-from the job form. Optional `momentum`, `num_workers`, and `seed` values are
-also honored.
+Job hyperparameters `epochs`, `batch_size`, and `learning_rate` come from the
+job form. Optional common values are `momentum`, `num_workers`, and `seed`.
+Tabular jobs also accept `target_column` (default `diagnosis`), `hidden_size`
+(default `32`), and `validation_fraction` (default `0.2`).
 
 ## Reads and writes
-- Reads: the dataset version from the `datasets` bucket (through the download link).
-- Writes: MLflow run parameters and metrics. Never reads any queue.
+- Reads: the dataset through its versioned download link and compatible
+  `latest` checkpoint manifests from the artifacts bucket.
+- Writes: immutable checkpoints, `latest`/`best`/`final` manifests, final model
+  bundles, and MLflow parameters, tags, metrics, signature, and model.
+- Never reads a queue.
 
 ## Test
 
@@ -72,12 +100,10 @@ also honored.
 PYTHON=python3.11 bash scripts/test_service.sh training
 ```
 
-Unit tests inject tiny trainer and tracker implementations, so they do not
-download CIFAR-10 or run ResNet-18. Production dependencies are pinned in
-`requirements.txt`, and the image includes both `app/` and `distributed/`.
+Storage and tracking clients are injectable; unit tests need neither AWS nor a
+live MLflow server. The tiny CSV fixture keeps the tabular path fast. CPU DDP
+checks use Gloo where the installed PyTorch/platform supports process spawning.
+Production dependencies pin PyTorch/torchvision 2.9.1/0.24.1 and MLflow 3.18.0.
 
-## Deferred to Day 2
-
-S3 checkpoints and model artifacts, a loadable MLflow model, tabular training,
-full reproducibility controls, and worker-level DDP integration are not part of
-Day 1. No cloud or GPU execution has been proven by this unit.
+No cloud, LocalStack container, CUDA, multi-GPU, or cross-hardware
+reproducibility proof is claimed by the unit suite.

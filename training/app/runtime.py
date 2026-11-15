@@ -108,6 +108,8 @@ class Worker:
         dataset_dir = self.dataset_client.download(job.dataset_id, job.dataset_version)
         try:
             with self.tracker_factory(job) as tracker:
+                from app.trainer import _dataset_checksum
+
                 tracker.log_params(
                     {
                         "model": job.model,
@@ -118,12 +120,19 @@ class Worker:
                         **job.hyperparameters.model_dump(),
                     }
                 )
+                if hasattr(tracker, "log_tags"):
+                    tracker.log_tags({"dataset_checksum": _dataset_checksum(dataset_dir)})
 
                 def record(epoch: int, metrics: dict[str, float]) -> None:
                     tracker.log_metrics(metrics, step=epoch)
 
-                final_metrics = self.trainer(job, dataset_dir, record, stop_event)
+                result = self.trainer(job, dataset_dir, record, stop_event)
+                final_metrics = getattr(result, "metrics", result)
                 tracker.log_metrics({f"final_{name}": value for name, value in final_metrics.items()})
+                if hasattr(result, "model") and hasattr(tracker, "log_model"):
+                    tracker.log_model(result.model, result.input_example)
+                if getattr(result, "artifact_uri", None) and hasattr(tracker, "log_tags"):
+                    tracker.log_tags({"final_model_artifact": result.artifact_uri})
                 return final_metrics
         finally:
             cleanup = getattr(self.dataset_client, "cleanup", None)
