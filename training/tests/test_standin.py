@@ -1,10 +1,11 @@
-"""The worker stand-in: one job at a time, heartbeats, SUCCEEDED, and stops when cancelled."""
+"""The worker API and orchestration lifecycle."""
 
 import json
+import tempfile
 import time
+from pathlib import Path
 
 import httpx
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -32,10 +33,46 @@ class FakeJobService:
         return httpx.Response(200, json={"job_id": "job-01", "status": self.job_status})
 
 
-@pytest.fixture(autouse=True)
-def quick_training(monkeypatch):
-    monkeypatch.setenv("STANDIN_TRAINING_SECONDS", "0.3")
-    monkeypatch.setenv("HEARTBEAT_INTERVAL_SECONDS", "0.1")
+class FakeDatasetClient:
+    def __init__(self) -> None:
+        self.folder = tempfile.TemporaryDirectory()
+
+    def download(self, dataset_id: str, version: int) -> Path:
+        return Path(self.folder.name)
+
+
+class FakeTracker:
+    def __init__(self) -> None:
+        self.params = {}
+        self.metrics = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return None
+
+    def log_params(self, params):
+        self.params.update(params)
+
+    def log_metrics(self, metrics, step=None):
+        self.metrics.append((step, metrics))
+
+
+def successful_trainer(job, dataset_dir, metric_callback, stop_event):
+    metric_callback(1, {"loss": 0.4, "accuracy": 0.8})
+    return {"loss": 0.4, "accuracy": 0.8}
+
+
+def make_app(job_service, trainer=successful_trainer, *, runtime_minute_seconds=60):
+    return create_app(
+        transport=httpx.MockTransport(job_service.handle),
+        dataset_client=FakeDatasetClient(),
+        trainer=trainer,
+        tracker_factory=lambda job: FakeTracker(),
+        heartbeat_seconds=0.01,
+        runtime_minute_seconds=runtime_minute_seconds,
+    )
 
 
 def wait_until_idle(app) -> None:
@@ -48,13 +85,13 @@ def wait_until_idle(app) -> None:
 
 
 def test_health():
-    with TestClient(create_app(httpx.MockTransport(FakeJobService().handle))) as client:
+    with TestClient(make_app(FakeJobService())) as client:
         assert client.get("/health").json() == {"status": "ok", "service": "training-worker"}
 
 
 def test_runs_with_heartbeats_then_reports_success():
     job_service = FakeJobService()
-    app = create_app(httpx.MockTransport(job_service.handle))
+    app = make_app(job_service, trainer=lambda *args: (time.sleep(0.04), {"accuracy": 0.8})[1])
     with TestClient(app) as client:
         response = client.post("/internal/run", json=FORM)
         wait_until_idle(app)
@@ -66,8 +103,30 @@ def test_runs_with_heartbeats_then_reports_success():
     assert job_service.calls[-1][1]["status"] == "SUCCEEDED"
 
 
+def test_logs_job_parameters_epoch_metrics_and_final_metrics():
+    job_service = FakeJobService()
+    tracker = FakeTracker()
+    app = create_app(
+        transport=httpx.MockTransport(job_service.handle),
+        dataset_client=FakeDatasetClient(),
+        trainer=successful_trainer,
+        tracker_factory=lambda job: tracker,
+        heartbeat_seconds=0.01,
+    )
+    with TestClient(app) as client:
+        client.post("/internal/run", json=FORM)
+        wait_until_idle(app)
+
+    assert tracker.params["model"] == "resnet18"
+    assert tracker.params["epochs"] == 1
+    assert tracker.metrics == [
+        (1, {"loss": 0.4, "accuracy": 0.8}),
+        (None, {"final_loss": 0.4, "final_accuracy": 0.8}),
+    ]
+
+
 def test_second_job_while_busy_is_409():
-    app = create_app(httpx.MockTransport(FakeJobService().handle))
+    app = make_app(FakeJobService(), trainer=lambda *args: (time.sleep(0.04), {})[1])
     with TestClient(app) as client:
         client.post("/internal/run", json=FORM)
         second = client.post("/internal/run", json={**FORM, "job_id": "job-02"})
@@ -79,14 +138,60 @@ def test_second_job_while_busy_is_409():
 
 def test_stops_without_reporting_when_cancelled():
     job_service = FakeJobService(job_status="CANCELLED")
-    app = create_app(httpx.MockTransport(job_service.handle))
+    stopped = []
+
+    def trainer(job, dataset_dir, metric_callback, stop_event):
+        while not stop_event.wait(0.005):
+            pass
+        stopped.append(True)
+        return {}
+
+    app = make_app(job_service, trainer=trainer)
     with TestClient(app) as client:
         client.post("/internal/run", json=FORM)
         wait_until_idle(app)
 
     assert [path for path, _ in job_service.calls] == ["/internal/jobs/job-01/heartbeat"]
+    assert stopped == [True]
+
+
+def test_timeout_reports_failed_once_and_releases_busy_state():
+    job_service = FakeJobService()
+
+    def trainer(job, dataset_dir, metric_callback, stop_event):
+        stop_event.wait()
+        return {}
+
+    app = make_app(job_service, trainer=trainer, runtime_minute_seconds=0.02)
+    with TestClient(app) as client:
+        assert client.post("/internal/run", json=FORM).status_code == 202
+        wait_until_idle(app)
+        assert client.post("/internal/run", json={**FORM, "job_id": "job-02"}).status_code == 202
+        wait_until_idle(app)
+
+    reports = [body for path, body in job_service.calls if path.endswith("/status")]
+    assert len(reports) == 2
+    assert all(report["status"] == "FAILED" for report in reports)
+    assert all("maximum runtime" in report["reason"] for report in reports)
+
+
+def test_training_failure_reports_failed_once():
+    job_service = FakeJobService()
+
+    def trainer(*args):
+        raise RuntimeError("training exploded")
+
+    app = make_app(job_service, trainer=trainer)
+    with TestClient(app) as client:
+        client.post("/internal/run", json=FORM)
+        wait_until_idle(app)
+
+    reports = [body for path, body in job_service.calls if path.endswith("/status")]
+    assert len(reports) == 1
+    assert reports[0]["status"] == "FAILED"
+    assert "training exploded" in reports[0]["reason"]
 
 
 def test_bad_form_is_422():
-    with TestClient(create_app(httpx.MockTransport(FakeJobService().handle))) as client:
+    with TestClient(make_app(FakeJobService())) as client:
         assert client.post("/internal/run", json={**FORM, "job_id": "104"}).status_code == 422
