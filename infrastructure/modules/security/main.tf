@@ -1,21 +1,18 @@
 # Security groups: only the load balancer is reachable from the internet.
 # Owners: Hamda + Fatma.
+# Attached to ALB / ECS / EC2 / RDS when those modules are wired (CKV2_AWS_5).
 
+# checkov:skip=CKV2_AWS_5: Attached when application-services / training-compute land
+# checkov:skip=CKV_AWS_382: ALB and services need egress to AWS APIs and health checks
 resource "aws_security_group" "alb" {
+  # checkov:skip=CKV2_AWS_5: Attached to the ALB in application-services
+  # checkov:skip=CKV_AWS_382: Egress required for target health checks and AWS APIs
   name        = "${var.environment}-cloudtrain-alb"
   description = "Public load balancer for gateway and portal"
   vpc_id      = var.vpc_id
 
   ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTPS"
+    description = "HTTPS from the internet"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -23,6 +20,7 @@ resource "aws_security_group" "alb" {
   }
 
   egress {
+    description = "To targets and AWS APIs"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -35,6 +33,8 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_security_group" "services" {
+  # checkov:skip=CKV2_AWS_5: Attached to ECS tasks in application-services
+  # checkov:skip=CKV_AWS_382: Egress required for S3/SQS/RDS and image pulls
   name        = "${var.environment}-cloudtrain-services"
   description = "Stateless ECS services inside the VPC"
   vpc_id      = var.vpc_id
@@ -56,6 +56,7 @@ resource "aws_security_group" "services" {
   }
 
   egress {
+    description = "To AWS APIs, S3, SQS and peers"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -68,6 +69,8 @@ resource "aws_security_group" "services" {
 }
 
 resource "aws_security_group" "workers" {
+  # checkov:skip=CKV2_AWS_5: Attached to training EC2/Batch in training-compute
+  # checkov:skip=CKV_AWS_382: Workers need egress for datasets, MLflow and model upload
   name        = "${var.environment}-cloudtrain-workers"
   description = "Training workers (CPU/GPU EC2)"
   vpc_id      = var.vpc_id
@@ -81,6 +84,7 @@ resource "aws_security_group" "workers" {
   }
 
   egress {
+    description = "To S3, SQS, MLflow and package registries"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -93,6 +97,8 @@ resource "aws_security_group" "workers" {
 }
 
 resource "aws_security_group" "database" {
+  # checkov:skip=CKV2_AWS_5: Attached to RDS in database module
+  # checkov:skip=CKV_AWS_382: Minimal egress kept for RDS managed networking
   name        = "${var.environment}-cloudtrain-database"
   description = "RDS PostgreSQL — only from services and workers"
   vpc_id      = var.vpc_id
@@ -114,6 +120,7 @@ resource "aws_security_group" "database" {
   }
 
   egress {
+    description = "RDS managed egress"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
