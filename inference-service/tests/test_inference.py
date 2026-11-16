@@ -1,10 +1,12 @@
 """Inference: real predictions from the live version, and the health gate that protects it."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from app import fixture_model
+from app.common import iso
 from app.model import PNG_START, Deployment, ModelProblem, fetch_files, load, read_image
 from tests.conftest import USER, candidate
 
@@ -213,3 +215,8 @@ def test_model_files_are_read_from_s3(models, tmp_path):
         fetch_files("s3://artifacts/nothing/here", tmp_path, lambda: FakeS3(files))
     with pytest.raises(ModelProblem):
         fetch_files("ftp://elsewhere/model", tmp_path, lambda: FakeS3(files))
+
+
+def test_naive_times_are_utc_whatever_the_machine_clock(dubai_time):
+    assert iso(datetime(2026, 11, 16, 12)) == "2026-11-16T12:00:00Z"
+    assert iso(datetime(2026, 11, 16, 12, tzinfo=UTC)) == "2026-11-16T12:00:00Z"

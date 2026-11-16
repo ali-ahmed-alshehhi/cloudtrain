@@ -6,6 +6,7 @@ The real PostgreSQL + MLflow path is covered by `make up`, the contract tests an
 """
 
 import json
+import time
 from pathlib import Path
 
 import httpx
@@ -170,3 +171,13 @@ def check():
         Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER).validate(body)
 
     return matches
+
+
+@pytest.fixture
+def dubai_time(monkeypatch):
+    """The machine clock at UTC+4, as on a laptop in the UAE: naive times must still read as UTC."""
+    monkeypatch.setenv("TZ", "Asia/Dubai")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()

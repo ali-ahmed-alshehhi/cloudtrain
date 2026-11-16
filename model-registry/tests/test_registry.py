@@ -1,9 +1,12 @@
 """The Model Registry: register from MLflow, promote and roll back behind the health gate."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import Deployment
+from app.common import iso
+from app.db import Deployment, Release
 from tests.conftest import ALICE, BOB, registration
 
 
@@ -256,3 +259,19 @@ def test_unknown_model_or_version_is_404(client):
 def test_without_login_is_401(client):
     assert client.get("/models").status_code == 401
     assert client.post("/models", json=registration()).status_code == 401
+
+
+def test_naive_database_times_are_utc_whatever_the_machine_clock(dubai_time):
+    assert iso(datetime(2026, 11, 16, 12)) == "2026-11-16T12:00:00Z"
+    assert iso(datetime(2026, 11, 16, 12, tzinfo=UTC)) == "2026-11-16T12:00:00Z"
+
+
+def test_promoted_at_reads_back_unchanged_whatever_the_machine_clock(client, engine, dubai_time):
+    register(client)
+    promoted = client.post("/models/model-01/versions/1/promote", headers=ALICE).json()
+
+    with Session(engine) as session:
+        stored = session.scalars(select(Release)).one().promoted_at
+
+    assert client.get("/models/model-01/production").json()["promoted_at"] == promoted["promoted_at"]
+    assert promoted["promoted_at"] == stored.isoformat() + "Z"  # SQLite gives the UTC time back naive
