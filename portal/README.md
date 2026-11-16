@@ -116,7 +116,7 @@ npm run build
 Without host Node, from the repository root:
 
 ```bash
-docker build --progress=plain -f portal/Dockerfile.test ./portal
+docker build --progress=plain -f portal/Dockerfile.test .
 docker build -t cloudtrain-portal-hilal:projects ./portal
 ```
 
@@ -138,7 +138,8 @@ that simulate a broken network/service use browser interception; the successful
 uploads and reads use the real gateway and service. Screenshots are written to
 `portal/test-results/` (ignored by Git).
 
-The test image runs the dependency-free gateway-client tests during its build.
+The test image runs both portal test suites during its build. Use the repository
+root as its build context so the shared contracts are included at `/workspace/contracts`.
 The production image checks the complete Next.js compilation. Before a PR, run
 `make check` at the repository root and reference the actual issue as `Closes #N`.
 

@@ -1,7 +1,9 @@
+# Build from the repository root so Adel's tests can read the shared contracts.
 FROM node:24-alpine
-WORKDIR /portal
-COPY app/lib ./app/lib
-COPY tests ./tests
-COPY test ./test
-COPY lib ./lib
+WORKDIR /workspace/portal
+COPY contracts /workspace/contracts
+COPY portal/app/lib ./app/lib
+COPY portal/tests ./tests
+COPY portal/test ./test
+COPY portal/lib ./lib
 RUN node --test "test/**/*.test.mjs" tests/*.test.mjs
