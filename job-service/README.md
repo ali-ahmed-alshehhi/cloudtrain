@@ -35,6 +35,8 @@ to the kitchen and follows it until it is served or sent back.
 - `GET /jobs/{id}/events` · `GET /jobs/events?after=<event_id>&project_id=&limit=` (alert feed)
 
 **Internal** (never through the gateway):
+- `GET /internal/jobs/{id}` (Scheduler): status, attempt and machine type, read-only and without a
+  user, so the Scheduler can free a slot when a job ends or is retried (#102)
 - `POST /internal/jobs/{id}/status` (Scheduler, worker) · `POST /internal/jobs/{id}/heartbeat` (worker;
   the answer carries the status, `CANCELLED` = stop)
 
@@ -72,7 +74,7 @@ even if SQS is down for a while. Why: [docs/decisions/0007-job-service-design.md
 ## Run and test
 
 ```bash
-make test                         # all unit tests (this folder: 57 tests, ~4 s, no Docker needed)
+make test                         # all unit tests (this folder: 62 tests, ~4 s, no Docker needed)
 cd job-service && .venv/bin/python -m pytest -q    # only this service
 make up && make e2e               # the walk-through through the gateway
 ```
