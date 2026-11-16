@@ -69,7 +69,7 @@ even if SQS is down for a while. Why: [docs/decisions/0007-job-service-design.md
 | `JOB_OUTBOX_INTERVAL_SECONDS` | 2 | How often unsent queue messages are retried |
 | `JOB_DLQ_WAIT_SECONDS` | 20 | Long-polling wait on `training-jobs-dlq` |
 | `JOB_DLQ_MAX_REQUEUES` | 3 | How often a job back from the dead-letter queue is queued again |
-| `PRICING_FILE` | `/contracts/pricing.yaml` | Prices per machine type |
+| `PRICING_FILE` | `/contracts/pricing.yaml` | Prices per machine type. The file is copied into the image at build time (nothing is mounted in the cloud) |
 
 ## Run and test
 
@@ -78,6 +78,9 @@ make test                         # all unit tests (this folder: 63 tests, ~4 s,
 cd job-service && .venv/bin/python -m pytest -q    # only this service
 make up && make e2e               # the walk-through through the gateway
 ```
+
+Building the image outside Compose (for example a deploy pipeline) needs the contracts folder too:
+`docker build --build-context contracts=contracts job-service`. Without it the build stops.
 
 The failure-recovery demo (`tests/integration/test_failure_recovery.py`) passes with this service and
 the stand-in scheduler and worker. Run it with short settings in `.env`, then `make reset && make up`:

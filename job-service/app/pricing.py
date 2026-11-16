@@ -34,6 +34,11 @@ class Pricing:
 
     @classmethod
     def from_file(cls, path: str | Path) -> "Pricing":
+        if not Path(path).is_file():
+            raise FileNotFoundError(
+                f"PRICING_FILE {path} does not exist. The image copies contracts/pricing.yaml to "
+                "/contracts/pricing.yaml; build it with Compose, or with --build-context contracts=contracts"
+            )
         data = yaml.safe_load(Path(path).read_text()) or {}
         machines = data.get("machine_types") or {}
         return cls({name: float(info.get("hourly_usd") or 0) for name, info in machines.items()})

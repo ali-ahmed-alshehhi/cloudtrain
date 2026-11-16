@@ -61,3 +61,13 @@ def test_a_machine_missing_from_pricing_is_free_not_an_error(client, clock):
 
     assert done["gpu_hours"] == 1.0
     assert done["estimated_cost_usd"] == 0
+
+
+def test_a_missing_pricing_file_says_how_to_fix_it(tmp_path):
+    """On AWS nothing is mounted: if the file is not in the image, the start-up error must say why."""
+    import pytest
+
+    from app.pricing import Pricing
+
+    with pytest.raises(FileNotFoundError, match="build-context contracts=contracts"):
+        Pricing.from_file(tmp_path / "pricing.yaml")
