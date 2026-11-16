@@ -53,6 +53,16 @@ export function createGatewayClient({ gatewayUrl, getToken = () => "", fetchImpl
   }
   return {
     request,
+    // Adel's feed handles HTTP states itself; preserve that interface on the shared client.
+    async fetchEvents(query) {
+      const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== null && value !== undefined));
+      try {
+        return { status: 200, body: await request(`/api/v1/jobs/events?${params}`) };
+      } catch (error) {
+        if (!error.status) throw error;
+        return { status: error.status, body: { error: { code: error.code, message: error.message, request_id: error.requestId } } };
+      }
+    },
     listProjects: (signal) => request("/api/v1/projects", { signal }),
     listDatasets: (projectId, signal) => request(`/api/v1/datasets?${new URLSearchParams({ project_id: projectId })}`, { signal }),
     uploadDataset: (form, idempotencyKey, signal) => request("/api/v1/datasets", {

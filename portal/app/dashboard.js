@@ -4,9 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createGatewayClient } from "./lib/gateway.mjs";
 import Problem from "./components/problem";
 import Datasets from "./components/datasets";
+import ProjectAlerts from "./components/project-alerts";
 
-const FIRST_WAIT_MS = 5000;
-const LONGEST_WAIT_MS = 60000;
 
 
 export default function Dashboard({ gatewayUrl, devToken }) {
@@ -22,8 +21,6 @@ export default function Dashboard({ gatewayUrl, devToken }) {
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmation, setConfirmation] = useState("");
-  const [alerts, setAlerts] = useState([]);
-  const [alertProblem, setAlertProblem] = useState(null);
   // Keep the same key when retrying an unchanged form after a lost response.
   const submission = useRef(null);
   const savingRef = useRef(false);
@@ -50,39 +47,6 @@ export default function Dashboard({ gatewayUrl, devToken }) {
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [api, refresh]);
-
-  // Existing alert feed retained for Adel to extend; reset its cursor per project.
-  useEffect(() => {
-    setAlerts([]);
-    setAlertProblem(null);
-    if (!selectedId) return;
-    const controller = new AbortController();
-    let lastEventId = null;
-    let wait = FIRST_WAIT_MS;
-    let timer;
-    const seen = new Set();
-    async function poll() {
-      const query = new URLSearchParams({ project_id: selectedId });
-      if (lastEventId) query.set("after", lastEventId);
-      try {
-        const body = await api.request(`/api/v1/jobs/events?${query}`, { signal: controller.signal });
-        if (controller.signal.aborted) return;
-        const fresh = body.items.filter((event) => !seen.has(event.event_id));
-        fresh.forEach((event) => seen.add(event.event_id));
-        setAlerts((old) => [...old, ...fresh].slice(-20));
-        if (body.last_event_id) lastEventId = body.last_event_id;
-        setAlertProblem(null);
-        wait = FIRST_WAIT_MS;
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setAlertProblem(error);
-        wait = Math.min(wait * 2, LONGEST_WAIT_MS);
-      }
-      if (!controller.signal.aborted) timer = setTimeout(poll, wait);
-    }
-    poll();
-    return () => { controller.abort(); clearTimeout(timer); };
-  }, [api, selectedId]);
 
   async function createProject(event) {
     event.preventDefault();
@@ -118,7 +82,7 @@ export default function Dashboard({ gatewayUrl, devToken }) {
 
   return <div className="shell">
     <aside className="sidebar">
-      <a className="brand" href="/">CloudTrain<span>ML workspace</span></a>
+      <a className="brand" href="/"><img src="/brand/cloudtrain-logo-dark.png" alt="CloudTrain" width="168" height="69" /><span>ML workspace</span></a>
       <nav aria-label="Main navigation"><a href="#projects" aria-current="page">Projects</a><a href="#datasets">Datasets</a></nav>
       <p className="sidebar-note">Organize your data, training and models in one workspace.</p>
     </aside>
@@ -161,10 +125,8 @@ export default function Dashboard({ gatewayUrl, devToken }) {
         <p>{selectedProject.description || "No description provided."}</p><small>{selectedProject.project_id}</small>
       </section>}
       <Datasets key={selectedId} api={api} project={selectedProject} />
-      <section className="panel" aria-labelledby="alerts-title"><h2 id="alerts-title">Job alerts</h2>
-        <Problem error={alertProblem} />
-        {!selectedId ? <p className="muted">Select a project to view its job events.</p> : alerts.length === 0 ? <p className="muted">No job events yet for this project.</p> :
-          <ul className="events">{alerts.map((event) => <li key={event.event_id}><strong>{event.job_id}</strong> · {event.event_type}<small>{event.occurred_at}{event.data?.reason ? ` · ${event.data.reason}` : ""}</small></li>)}</ul>}
+      <section className="panel">
+        {selectedId ? <ProjectAlerts key={selectedId} api={api} projectId={selectedId} /> : <><h2>Job alerts</h2><p className="muted">Select a project to view its job events.</p></>}
       </section>
     </main>
   </div>;

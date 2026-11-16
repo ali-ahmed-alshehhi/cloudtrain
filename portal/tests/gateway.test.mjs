@@ -104,3 +104,21 @@ test("cancellation while reading a response body remains an abort", async () => 
   }));
   await assert.rejects(api.listProjects(), { name: "AbortError" });
 });
+
+test("Adel's alert adapter preserves cursor/project and returns its HTTP state", async () => {
+  const api = client(async (url) => {
+    const query = new URL(url).searchParams;
+    assert.equal(query.get("after"), "event-7");
+    assert.equal(query.get("project_id"), "project-01");
+    assert.equal(query.get("limit"), "200");
+    return Response.json({ error: { code: "NOT_A_MEMBER", message: "No access", request_id: "req-alert" } }, { status: 403 });
+  });
+  const result = await api.fetchEvents({ after: "event-7", project_id: "project-01", limit: 200 });
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error.request_id, "req-alert");
+});
+
+test("Adel's alert adapter leaves network errors for the feed's back-off", async () => {
+  const api = client(async () => { throw new TypeError("Disconnected"); });
+  await assert.rejects(api.fetchEvents({ project_id: "project-01" }), (error) => error.code === "NETWORK_ERROR");
+});

@@ -38,9 +38,11 @@ in `app/dashboard.js`, the dataset workflow in `app/components/datasets.js`,
 and the shared client in `app/lib/gateway.mjs`. Shared error rendering lives in
 `app/components/problem.js`.
 Adel owns the upcoming monitoring, experiment comparison, usage/cost and evaluation
-features. The existing alert feed is retained in `dashboard.js`, scoped to the
-selected project; coordinate before editing that shared file. Extracting it into
-Adel's component is the next handoff when his component is ready.
+features. Adel's merged `JobAlerts` and `useAlertFeed` components are integrated through
+`app/components/project-alerts.js`, using the shared gateway client's `fetchEvents`
+adapter. One feed runs for the selected project; remounting on project changes
+prevents previous-project state from being shown. Future live job badges should
+share this feed's state when the job page is built.
 
 The project form follows `contracts/openapi/project-service.yaml`: name is required
 (maximum 100 characters), description is optional (maximum 1000). A successful
@@ -140,37 +142,38 @@ The test image runs the dependency-free gateway-client tests during its build.
 The production image checks the complete Next.js compilation. Before a PR, run
 `make check` at the repository root and reference the actual issue as `Closes #N`.
 
-### Verification on 15 November 2026
+### Verification on 16 November 2026
 
-- Thirteen gateway-client tests passed.
-- Two browser integration scenarios passed against the live local gateway and services.
+- All 39 portal unit tests passed (Adel's 24 alert tests plus 15 gateway/client tests).
+- Two Chrome browser integration scenarios passed against the live local gateway and services.
 - CSV, ZIP and TAR.GZ uploads, versions 1/2, checksum selection and retry safety passed.
 - Production Next.js Docker build passed; desktop and mobile screenshots reviewed.
-- Full `make check` passed linting, service/unit tests and seven service contract checks,
-  but failed the existing Projects service contract check described below.
-- Running `make e2e` separately passed: 6 tests passed and 9 existing tests were skipped
-  for functionality still assigned to the team. These skips were not changed.
+- Full `make check` passed: lint, service tests, all contract checks and integration walkthrough.
+- The integration walkthrough reports 7 passed and 8 pre-existing skips for work still
+  assigned to the team; no skips were removed by this portal change.
+- Rebased onto `1a97336` (merged alerts #96, Jobs #90, branding #80, Projects fix #87).
 
 The services currently running locally include stand-ins. These checks establish
 portal integration with the current repository, not completion of classmates'
 production backends or AWS deployment.
 
-### Existing Projects service contract failure (Ali)
+### Previous backend blocker resolved
 
-The 15 November full check generated a project name containing a null character
-(`\u0000`). `POST /projects` returned 500 `INTERNAL_ERROR`, outside its documented
-201/400/401/409/422 statuses. A minimal gateway reproduction with JSON
-`{"name":"portal-null-\u0000"}` also returned 500. This is an existing backend
-validation/storage issue; no Projects service or shared contract files were changed.
-Schemathesis test case: `EqkXQY`. The minimal gateway request reproduces the failure
-independently of the generated test seed.
+The null-character Projects failure recorded on 15 November was fixed by Ali in
+PR #87 and is included in this branch. All service contract checks now pass.
 
-The check was run with Python 3.11.15 prepared in temporary storage, using:
+The repository checks on this machine use an isolated Python 3.11.15 interpreter:
 
 ```bash
 make check PYTHON=/private/tmp/cloudtrain-python/cpython-3.11.15-macos-aarch64-none/bin/python3.11
-make e2e PYTHON=/private/tmp/cloudtrain-python/cpython-3.11.15-macos-aarch64-none/bin/python3.11
 ```
 
-Temporary interpreter paths are local to this machine; classmates with Python
-3.11 installed can use the normal `make check` and `make e2e` commands.
+Classmates with Python 3.11 on PATH can use the normal `make check` command.
+The portal's JavaScript tests and browser tests must also be run explicitly with
+`npm test` and `npm run test:e2e`; the root Makefile currently runs Python checks.
+
+### Brand assets
+
+`public/brand/cloudtrain-logo-dark.png` and `app/icon.svg` are unchanged copies
+of the team's assets in `docs/brand/` (PR #80). The portal image copies `public/`
+so the approved wordmark is served in production as well as development.
