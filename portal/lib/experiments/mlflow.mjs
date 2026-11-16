@@ -12,7 +12,17 @@
 //
 // Plain JavaScript with no React, so it can be tested with `node --test`.
 
+import { identityOf } from "../identity.mjs";
+
 export const DEFAULT_EXPERIMENT = "cloudtrain";
+
+/**
+ * Whose results these are: job + project + experiment + API client (a new login = a new client).
+ * JobResults shows only results loaded for the current identity.
+ */
+export function resultsIdentity({ job, api, experimentName = DEFAULT_EXPERIMENT }) {
+  return identityOf(job?.job_id, job?.project_id, experimentName, api);
+}
 
 // The metrics we know, in the order they are shown. accuracy and f1 are fractions (0..1).
 export const KNOWN_METRICS = Object.freeze([

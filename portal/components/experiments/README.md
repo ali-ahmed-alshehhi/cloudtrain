@@ -31,6 +31,12 @@ const experimentsApi = useMemo(() => makeExperimentsApi({ gatewayUrl, authToken 
 the alert feed (`latestJobStatus(job, feedState.events).status`) so results reload when the job
 finishes. While a run is RUNNING the box reloads every 30 seconds by itself.
 
+## Switching jobs
+Switching `job_id`, `project_id`, experiment or API client (a new login) shows "Loading…" at once:
+the box is keyed by that identity, and every stored answer carries the identity it was loaded for and
+is shown only while it is still current (`lib/identity.mjs`, tested in `test/identity.test.mjs`).
+A late answer for the previous job is never shown under the new one.
+
 ## What it never does
 - Never shows a missing metric as 0, and never invents values: missing metrics are left out.
 - Never shows a run whose `job_id`/`project_id` tags do not match the job, even if MLflow returns one.

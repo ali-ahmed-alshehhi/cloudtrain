@@ -7,9 +7,14 @@
 // `job` is GET /api/v1/jobs/{id}. `liveStatus` (optional) is the status from <LiveJobStatus>'s feed;
 // when it changes (for example RUNNING -> SUCCEEDED) the results load again. While the newest run is
 // RUNNING they also reload every 30 seconds.
+//
+// Results never show under the wrong job: switching job, project, experiment or API client (a new
+// login) mounts a fresh box (the `key` below), and every stored answer is labelled with the identity it
+// was loaded for and shown only while that identity is current (lib/identity.mjs).
 
 import { useEffect, useState } from "react";
 
+import { labelled, valueFor } from "../../lib/identity.mjs";
 import {
   CHART_METRICS,
   KNOWN_METRICS,
@@ -19,6 +24,7 @@ import {
   formatMetric,
   loadJobResults,
   loadMetricHistory,
+  resultsIdentity,
   resultsMessage,
   summarizeMetrics,
 } from "../../lib/experiments/mlflow.mjs";
@@ -28,10 +34,15 @@ import MetricChart from "./MetricChart";
 const RELOAD_WHILE_RUNNING_MS = 30000;
 const RUN_STATUS_WORDS = { RUNNING: "running", SCHEDULED: "scheduled", FINISHED: "finished", FAILED: "failed", KILLED: "stopped" };
 
-export default function JobResults({ job, api, liveStatus = null, experimentName }) {
-  const [result, setResult] = useState(null);
-  const [chosenRunId, setChosenRunId] = useState(null);
-  const [history, setHistory] = useState(null);
+export default function JobResults(props) {
+  const identity = resultsIdentity(props);
+  return <ResultsBox key={identity} identity={identity} {...props} />;
+}
+
+function ResultsBox({ identity, job, api, liveStatus = null, experimentName }) {
+  const [stored, setStored] = useState(null); // labelled(identity, result)
+  const [chosen, setChosen] = useState(null); // labelled(identity, runId)
+  const [history, setHistory] = useState(null); // labelled(identity, { runId, points })
   const [tick, setTick] = useState(0);
   const jobStatus = liveStatus ?? job?.status ?? null;
 
@@ -40,13 +51,16 @@ export default function JobResults({ job, api, liveStatus = null, experimentName
     if (!api || !job) return undefined;
     let cancelled = false;
     loadJobResults({ api, job, experimentName }).then((loaded) => {
-      if (!cancelled) setResult(loaded);
+      if (!cancelled) setStored(labelled(identity, loaded));
     });
     return () => {
       cancelled = true;
     };
-  }, [api, job?.job_id, job?.project_id, experimentName, jobStatus, tick]);
+  }, [identity, jobStatus, tick]); // identity covers api, job_id, project_id and experimentName
 
+  const result = valueFor(stored, identity);
+  const chosenRunId = valueFor(chosen, identity);
+  const setChosenRunId = (runId) => setChosen(labelled(identity, runId));
   const runs = result?.runs ?? [];
   const run = runs.find((r) => r.runId === chosenRunId) ?? result?.latest ?? null;
 
@@ -62,16 +76,17 @@ export default function JobResults({ job, api, liveStatus = null, experimentName
     if (!api || !run?.runId) return undefined;
     let cancelled = false;
     loadMetricHistory({ api, runId: run.runId }).then((loaded) => {
-      if (!cancelled) setHistory({ runId: run.runId, points: loaded });
+      if (!cancelled) setHistory(labelled(identity, { runId: run.runId, points: loaded }));
     });
     return () => {
       cancelled = true;
     };
-  }, [api, run?.runId, run?.metrics]);
+  }, [identity, run?.runId, run?.metrics]);
 
   const message = resultsMessage(result, jobStatus);
   const rows = run ? summarizeMetrics(run) : [];
-  const charts = history && run && history.runId === run.runId ? history.points : null;
+  const shownHistory = valueFor(history, identity);
+  const charts = shownHistory && run && shownHistory.runId === run.runId ? shownHistory.points : null;
   const details = run
     ? [
         `MLflow run ${RUN_STATUS_WORDS[run.status] ?? run.status ?? "status unknown"}`,
