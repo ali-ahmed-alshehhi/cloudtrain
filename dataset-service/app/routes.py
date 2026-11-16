@@ -5,12 +5,15 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Header, Path, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.db import Dataset, DatasetVersion
+from app.db import Dataset, DatasetVersion, LineageRecord
 from app.errors import ApiError
 from app.idempotency import create_once, fingerprint
+from app.projects import ProjectsClient
 from app.schemas import dataset_json, iso, version_json
 from app.storage import ObjectStorage, object_key, storage_uri
 from app.validation import matches_format
@@ -21,6 +24,10 @@ DatasetIdPath = Annotated[str, Path(pattern=r"^dataset-[0-9]+$")]
 VersionPath = Annotated[int, Path(ge=1)]
 IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key", min_length=1, max_length=128)]
 LARGEST_DATASET_NUMBER = 2**31 - 1
+
+
+class LineageBody(BaseModel):
+    job_id: str = Field(pattern=r"^job-[0-9]+$")
 
 
 def get_session(request: Request):
@@ -38,9 +45,14 @@ def get_storage(request: Request) -> ObjectStorage:
     return request.app.state.storage
 
 
+def get_projects(request: Request) -> ProjectsClient:
+    return request.app.state.projects
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 UserDep = Annotated[str, Depends(current_user)]
 StorageDep = Annotated[ObjectStorage, Depends(get_storage)]
+ProjectsDep = Annotated[ProjectsClient, Depends(get_projects)]
 
 
 def load_dataset(session: Session, dataset_id: str) -> Dataset:
@@ -61,6 +73,12 @@ def load_version(session: Session, dataset_id: str, number: int) -> tuple[Datase
     if version is None:
         raise ApiError(404, "DATASET_VERSION_NOT_FOUND", f"Dataset {dataset_id} has no version {number}")
     return dataset, version
+
+
+def require_dataset_member(
+    projects: ProjectsClient, dataset: Dataset, user_id: str, request: Request
+) -> None:
+    projects.require_member(dataset.project_id, user_id, request.state.request_id)
 
 
 def add_version(
@@ -95,8 +113,10 @@ def add_version(
 
 @router.post("/datasets", status_code=201)
 async def create_dataset(
+    request: Request,
     session: SessionDep,
     storage: StorageDep,
+    projects: ProjectsDep,
     user_id: UserDep,
     project_id: Annotated[str, Form(pattern=r"^project-[0-9]+$")],
     name: Annotated[str, Form(min_length=1, max_length=100)],
@@ -105,6 +125,7 @@ async def create_dataset(
     description: Annotated[str | None, Form(max_length=1000)] = None,
     idempotency_key: IdempotencyKey = None,
 ) -> JSONResponse:
+    projects.require_member(project_id, user_id, request.state.request_id)
     data = await file.read()
     checksum = hashlib.sha256(data).hexdigest()
 
@@ -137,10 +158,13 @@ async def create_dataset(
 
 @router.get("/datasets")
 def list_datasets(
+    request: Request,
     session: SessionDep,
+    projects: ProjectsDep,
     user_id: UserDep,
     project_id: Annotated[str, Query(pattern=r"^project-[0-9]+$")],
 ) -> dict:
+    projects.require_member(project_id, user_id, request.state.request_id)
     query = (
         select(Dataset)
         .where(Dataset.project_id == project_id)
@@ -151,15 +175,21 @@ def list_datasets(
 
 
 @router.get("/datasets/{dataset_id}")
-def get_dataset(dataset_id: DatasetIdPath, session: SessionDep, user_id: UserDep) -> dict:
-    return dataset_json(load_dataset(session, dataset_id))
+def get_dataset(
+    request: Request, dataset_id: DatasetIdPath, session: SessionDep, projects: ProjectsDep, user_id: UserDep
+) -> dict:
+    dataset = load_dataset(session, dataset_id)
+    require_dataset_member(projects, dataset, user_id, request)
+    return dataset_json(dataset)
 
 
 @router.post("/datasets/{dataset_id}/versions", status_code=201)
 async def create_version(
+    request: Request,
     dataset_id: DatasetIdPath,
     session: SessionDep,
     storage: StorageDep,
+    projects: ProjectsDep,
     user_id: UserDep,
     file: Annotated[UploadFile, File()],
     note: Annotated[str | None, Form(max_length=1000)] = None,
@@ -170,6 +200,7 @@ async def create_version(
 
     def create() -> tuple[int, dict]:
         dataset = load_dataset(session, dataset_id)
+        require_dataset_member(projects, dataset, user_id, request)
         version = add_version(session, storage, dataset, data, note, user_id)
         return 201, version_json(dataset, version)
 
@@ -184,20 +215,30 @@ async def create_version(
 
 @router.get("/datasets/{dataset_id}/versions/{version}")
 def get_version(
-    dataset_id: DatasetIdPath, version: VersionPath, session: SessionDep, user_id: UserDep
+    request: Request,
+    dataset_id: DatasetIdPath,
+    version: VersionPath,
+    session: SessionDep,
+    projects: ProjectsDep,
+    user_id: UserDep,
 ) -> dict:
-    return version_json(*load_version(session, dataset_id, version))
+    dataset, found = load_version(session, dataset_id, version)
+    require_dataset_member(projects, dataset, user_id, request)
+    return version_json(dataset, found)
 
 
 @router.get("/datasets/{dataset_id}/versions/{version}/download")
 def download(
+    request: Request,
     dataset_id: DatasetIdPath,
     version: VersionPath,
     session: SessionDep,
     storage: StorageDep,
+    projects: ProjectsDep,
     user_id: UserDep,
 ) -> Response:
-    _, found = load_version(session, dataset_id, version)
+    dataset, found = load_version(session, dataset_id, version)
+    require_dataset_member(projects, dataset, user_id, request)
     return Response(content=storage.get(found.object_key), media_type="application/octet-stream")
 
 
@@ -211,4 +252,60 @@ def download_url(
         "url": link.url,
         "expires_at": iso(link.expires_at),
         "checksum_sha256": found.checksum_sha256,
+    }
+
+
+@router.post("/internal/datasets/{dataset_id}/versions/{version}/lineage", status_code=201)
+def record_lineage(
+    dataset_id: DatasetIdPath, version: VersionPath, body: LineageBody, session: SessionDep
+) -> dict:
+    """Record that a training job used this dataset version."""
+    dataset, found = load_version(session, dataset_id, version)
+    existing = session.scalars(
+        select(LineageRecord).where(
+            LineageRecord.dataset_id == dataset.id,
+            LineageRecord.version == found.number,
+            LineageRecord.job_id == body.job_id,
+        )
+    ).first()
+    if existing is None:
+        existing = LineageRecord(dataset_id=dataset.id, version=found.number, job_id=body.job_id)
+        session.add(existing)
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            existing = session.scalars(
+                select(LineageRecord).where(
+                    LineageRecord.dataset_id == dataset.id,
+                    LineageRecord.version == found.number,
+                    LineageRecord.job_id == body.job_id,
+                )
+            ).one()
+    return {
+        "dataset_id": dataset.public_id,
+        "version": found.number,
+        "job_id": body.job_id,
+        "recorded_at": iso(existing.recorded_at),
+    }
+
+
+@router.get("/internal/datasets/{dataset_id}/versions/{version}/lineage")
+def list_lineage(dataset_id: DatasetIdPath, version: VersionPath, session: SessionDep) -> dict:
+    dataset, found = load_version(session, dataset_id, version)
+    rows = session.scalars(
+        select(LineageRecord)
+        .where(LineageRecord.dataset_id == dataset.id, LineageRecord.version == found.number)
+        .order_by(LineageRecord.recorded_at)
+    )
+    return {
+        "items": [
+            {
+                "dataset_id": dataset.public_id,
+                "version": row.version,
+                "job_id": row.job_id,
+                "recorded_at": iso(row.recorded_at),
+            }
+            for row in rows
+        ]
     }

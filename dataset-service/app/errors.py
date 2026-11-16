@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.storage import StorageUnavailable
+
 
 class ApiError(Exception):
     """Raise this anywhere to answer with the shared error format."""
@@ -63,6 +65,12 @@ def install_error_handlers(app: FastAPI) -> None:
     async def database_down(request: Request, error: OperationalError) -> JSONResponse:
         return error_response(
             503, "SERVICE_UNAVAILABLE", "The database is not reachable", request_id_of(request)
+        )
+
+    @app.exception_handler(StorageUnavailable)
+    async def storage_down(request: Request, error: StorageUnavailable) -> JSONResponse:
+        return error_response(
+            503, "SERVICE_UNAVAILABLE", "Object storage is not reachable", request_id_of(request)
         )
 
     @app.exception_handler(StarletteHTTPException)

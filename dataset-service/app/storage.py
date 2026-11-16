@@ -13,6 +13,11 @@ from typing import Protocol
 
 import boto3
 from botocore.client import Config
+from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
+
+
+class StorageUnavailable(Exception):
+    """Raised when object storage cannot be reached or fails a read/write."""
 
 
 def storage_uri(dataset_id: str, version: int) -> str:
@@ -42,14 +47,22 @@ class MemoryStorage:
     """In-memory stand-in used by unit tests (no LocalStack needed)."""
 
     objects: dict[str, bytes] = field(default_factory=dict)
+    fail: bool = False
+
+    def _maybe_fail(self) -> None:
+        if self.fail:
+            raise StorageUnavailable("Object storage is not reachable")
 
     def put(self, key: str, data: bytes) -> None:
+        self._maybe_fail()
         self.objects[key] = data
 
     def get(self, key: str) -> bytes:
+        self._maybe_fail()
         return self.objects[key]
 
     def presigned_get(self, key: str, expires_seconds: int = 900) -> PresignedDownload:
+        self._maybe_fail()
         if key not in self.objects:
             raise KeyError(key)
         return PresignedDownload(
@@ -77,18 +90,27 @@ class S3Storage:
         )
 
     def put(self, key: str, data: bytes) -> None:
-        self.client.put_object(Bucket=self.bucket, Key=key, Body=data)
+        try:
+            self.client.put_object(Bucket=self.bucket, Key=key, Body=data)
+        except (ClientError, EndpointConnectionError, BotoCoreError) as error:
+            raise StorageUnavailable("Object storage is not reachable") from error
 
     def get(self, key: str) -> bytes:
-        response = self.client.get_object(Bucket=self.bucket, Key=key)
-        return response["Body"].read()
+        try:
+            response = self.client.get_object(Bucket=self.bucket, Key=key)
+            return response["Body"].read()
+        except (ClientError, EndpointConnectionError, BotoCoreError) as error:
+            raise StorageUnavailable("Object storage is not reachable") from error
 
     def presigned_get(self, key: str, expires_seconds: int = 900) -> PresignedDownload:
-        url = self.client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self.bucket, "Key": key},
-            ExpiresIn=expires_seconds,
-        )
+        try:
+            url = self.client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket, "Key": key},
+                ExpiresIn=expires_seconds,
+            )
+        except (ClientError, EndpointConnectionError, BotoCoreError) as error:
+            raise StorageUnavailable("Object storage is not reachable") from error
         return PresignedDownload(
             url=url,
             expires_at=datetime.now(UTC) + timedelta(seconds=expires_seconds),

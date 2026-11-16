@@ -16,21 +16,28 @@ from starlette.responses import Response
 from app.errors import error_response, install_error_handlers
 from app.logs import SERVICE_NAME, setup_logging
 from app.metrics import DURATION, REQUESTS
+from app.projects import ProjectsClient
 from app.routes import router
 from app.storage import ObjectStorage, default_storage
 
 SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
-def create_app(engine: Engine | None = None, storage: ObjectStorage | None = None) -> FastAPI:
-    """`engine` and `storage` let the tests use SQLite and memory; normally they come from the environment."""
+def create_app(
+    engine: Engine | None = None,
+    storage: ObjectStorage | None = None,
+    projects: ProjectsClient | None = None,
+) -> FastAPI:
+    """Tests may inject engine, storage and projects; otherwise they come from the environment."""
     engine = engine or create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
     storage = storage or default_storage()
+    projects = projects or ProjectsClient()
     logger = setup_logging(os.environ.get("LOG_LEVEL", "INFO"))
 
     app = FastAPI(title="CloudTrain Datasets service", version="1.0.0")
     app.state.sessions = sessionmaker(engine, expire_on_commit=False)
     app.state.storage = storage
+    app.state.projects = projects
     install_error_handlers(app)
     app.include_router(router)
 

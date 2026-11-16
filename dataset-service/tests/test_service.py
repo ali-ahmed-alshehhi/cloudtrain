@@ -4,15 +4,16 @@ import hashlib
 import io
 import zipfile
 
-from tests.conftest import USER
+from tests.conftest import STRANGER, USER
 
 CSV = b"age,income,label\n31,42000,1\n"
+CSV_V2 = b"age,income,label\n40,55000,0\n"
 
 
-def upload(client, data=CSV, file_format="csv", headers=USER):
+def upload(client, data=CSV, file_format="csv", headers=USER, project_id="project-01"):
     return client.post(
         "/datasets",
-        data={"project_id": "project-01", "name": "customers", "format": file_format},
+        data={"project_id": project_id, "name": "customers", "format": file_format},
         files={"file": ("data", data, "application/octet-stream")},
         headers=headers,
     )
@@ -99,3 +100,69 @@ def test_idempotent_upload(client):
     assert first.status_code == 201
     assert second.status_code == 201
     assert first.json() == second.json()
+
+
+def test_storage_down_is_503(client, check, storage):
+    storage.fail = True
+
+    response = upload(client)
+
+    assert response.status_code == 503
+    check(response.json(), "Error")
+    assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
+
+
+def test_download_url_missing_dataset_is_404(client, check):
+    response = client.get("/internal/datasets/dataset-99/versions/1/download-url")
+
+    assert response.status_code == 404
+    check(response.json(), "Error")
+
+
+def test_download_url_missing_version_is_404(client, check):
+    dataset_id = upload(client).json()["dataset_id"]
+
+    response = client.get(f"/internal/datasets/{dataset_id}/versions/9/download-url")
+
+    assert response.status_code == 404
+    check(response.json(), "Error")
+
+
+def test_idempotency_key_reused_with_different_file_is_409(client, check):
+    headers = {**USER, "Idempotency-Key": "same-key"}
+    assert upload(client, CSV, headers=headers).status_code == 201
+
+    response = upload(client, CSV_V2, headers=headers)
+
+    assert response.status_code == 409
+    check(response.json(), "Error")
+    assert response.json()["error"]["code"] == "IDEMPOTENCY_KEY_REUSED"
+
+
+def test_non_member_cannot_see_dataset(client, check):
+    dataset_id = upload(client).json()["dataset_id"]
+
+    response = client.get(f"/datasets/{dataset_id}", headers=STRANGER)
+
+    assert response.status_code == 403
+    check(response.json(), "Error")
+    assert response.json()["error"]["code"] == "NOT_A_MEMBER"
+
+
+def test_non_member_cannot_list_or_upload(client, check):
+    assert upload(client, headers=STRANGER).status_code == 403
+    listed = client.get("/datasets?project_id=project-01", headers=STRANGER)
+    assert listed.status_code == 403
+    check(listed.json(), "Error")
+
+
+def test_lineage_records_which_job_used_a_version(client):
+    dataset_id = upload(client).json()["dataset_id"]
+
+    created = client.post(f"/internal/datasets/{dataset_id}/versions/1/lineage", json={"job_id": "job-04"})
+    listed = client.get(f"/internal/datasets/{dataset_id}/versions/1/lineage")
+
+    assert created.status_code == 201
+    assert created.json()["job_id"] == "job-04"
+    assert listed.status_code == 200
+    assert listed.json()["items"][0]["job_id"] == "job-04"

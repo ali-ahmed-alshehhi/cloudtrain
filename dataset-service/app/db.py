@@ -69,3 +69,18 @@ class IdempotencyRecord(Base):
     status_code: Mapped[int] = mapped_column(Integer)
     response_body: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class LineageRecord(Base):
+    """Which training job used which dataset version (recorded by jobs/workers)."""
+
+    __tablename__ = "lineage"
+    __table_args__ = (
+        UniqueConstraint("job_id", "dataset_id", "version", name="uq_lineage_job_dataset_version"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    dataset_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.datasets.id"))
+    version: Mapped[int] = mapped_column(Integer)
+    job_id: Mapped[str] = mapped_column(String(32))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
