@@ -18,6 +18,12 @@ computing and DevOps each fix part of that.
 
 ## 1. Architecture diagram
 
+![CloudTrain architecture](diagrams/architecture.svg)
+
+The numbered steps follow the walk-through in section 18. The picture is drawn by
+`diagrams/build.py`; change a box there, run `python docs/diagrams/build.py`, and commit both.
+The same view as text:
+
 ```mermaid
 flowchart LR
   browser([Browser])
@@ -62,6 +68,11 @@ flowchart LR
 Every service also has its own schema in PostgreSQL (lines omitted for clarity).
 
 ## 2. Deployment diagram (which AWS piece runs what)
+
+![CloudTrain on AWS](diagrams/deployment.svg)
+
+Dashed boxes are not in the Terraform on `main` yet. When one is merged, remove its name from
+`PLANNED` in `diagrams/build.py` and run the script again. The same view as text:
 
 ```mermaid
 flowchart TB

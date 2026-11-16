@@ -30,6 +30,8 @@ Below about 48 px, use the icon files, not the full mark: the full network turns
 
 The wordmark is [Nunito](https://fonts.google.com/specimen/Nunito) Black (900), free under the SIL Open Font License. "Cloud" is slate, "Train" is steel blue (on dark: cloud white and baby blue).
 
+`fonts/nunito-latin.woff2` (with its licence, `fonts/OFL.txt`) is embedded in the diagrams in `docs/diagrams/`.
+
 ## Rules
 
 - Keep clear space around the logo of at least the height of the amber output node times 3.
