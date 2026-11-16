@@ -7,6 +7,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY next.config.mjs ./
 COPY app ./app
+COPY lib ./lib
+COPY components ./components
 RUN npm run build
 
 # 2. Run only the built server (much smaller image).
