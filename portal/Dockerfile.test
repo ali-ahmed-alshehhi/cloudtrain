@@ -1,0 +1,5 @@
+FROM node:24-alpine
+WORKDIR /portal
+COPY app/lib ./app/lib
+COPY tests ./tests
+RUN node --test tests/*.test.mjs

@@ -1,8 +1,6 @@
 # Web Portal — `portal/`
 
-> **Stand-in.** Hilal + Adel: Replace this stand-in with your real service. Keep the contract. Run `make check` before opening a PR.
->
-> What the stand-in already does, and what it does not, is written at `app/page.js`. It shows the gateway's `/health`, your project list and the job alert feed.
+> **In progress.** Projects and dataset upload/version selection are implemented through the gateway. Run `make check` before opening a PR. Job submission, model and prediction workflows are next.
 
 | Owners (partners) | Port | Contracts |
 |---|---|---|
@@ -31,3 +29,148 @@ never a service directly.
 ## Acceptance test
 A user completes the whole flow, from upload to deployed inference, through the web interface with
 real metrics and status.
+
+
+## Current implementation and ownership
+
+Hilal owns `app/layout.js`, `app/globals.css`, `app/page.js`, the project workflow
+in `app/dashboard.js`, the dataset workflow in `app/components/datasets.js`,
+and the shared client in `app/lib/gateway.mjs`. Shared error rendering lives in
+`app/components/problem.js`.
+Adel owns the upcoming monitoring, experiment comparison, usage/cost and evaluation
+features. The existing alert feed is retained in `dashboard.js`, scoped to the
+selected project; coordinate before editing that shared file. Extracting it into
+Adel's component is the next handoff when his component is ready.
+
+The project form follows `contracts/openapi/project-service.yaml`: name is required
+(maximum 100 characters), description is optional (maximum 1000). A successful
+create selects the returned project. The form reuses its idempotency key when an
+unchanged submission is retried after an error. Loading and request errors are
+shown explicitly, including the backend's request reference when available.
+
+### Dataset workflow
+
+Select a project to load its datasets. New dataset uploads send `project_id`,
+`name`, optional `description`, `format` (`csv`, `zip` or `tar_gz`) and `file` as
+multipart form data. The service validates actual file contents. A successful
+upload selects the returned dataset/version. The version picker uses numbered
+versions up to the backend's `latest_version`; metadata is fetched from
+`GET /api/v1/datasets/{id}/versions/{version}`. There is no invented list-versions
+endpoint. The details show actual file size, SHA-256 checksum, upload time and note.
+Users can also upload a new version with a file and optional note.
+
+Retries of an unchanged upload reuse the idempotency key. A new file or changed
+metadata gets a new key. Switching projects resets dataset state and cancels
+outstanding requests. Version fetch errors hide previous metadata and offer retry.
+Clicking an already selected dataset preserves the selection and metadata.
+
+**Backend dependency:** the current dataset service is still Faisal's in-memory
+stand-in. Data disappears when that service restarts; S3/PostgreSQL persistence
+and project membership enforcement remain his responsibility. Project filtering
+in this UI does not replace backend authorization. Production login also remains
+pending Salem's integration.
+
+### Shared client for Adel
+
+```js
+import { createGatewayClient } from "./lib/gateway.mjs";
+
+const api = createGatewayClient({ gatewayUrl, getToken: () => token });
+const result = await api.request("/api/v1/jobs?project_id=project-01", { signal });
+```
+
+Create this client once per gateway/session (for example with React `useMemo`).
+`request(path, options)` accepts `method`, `body`, `headers` and `signal`. JSON bodies
+are encoded automatically; `FormData` retains its browser-generated multipart
+boundary. `GatewayError` exposes `status`, `code`, `message` and `requestId`.
+Abort errors remain abort errors, so components can ignore cancelled requests.
+Do not put tokens in local storage or commit them. Real login integration awaits
+Salem's provider; a dev token is supplied to the browser only when both
+`ENVIRONMENT=local` and `AUTH_MODE=dev`. No production sign-in is implemented yet.
+
+## Run and verify
+
+From the repository root, with Docker Desktop running:
+
+```bash
+make up
+```
+
+Open http://localhost:3000. Create a project with a name and optional description;
+it should appear in Your projects and become selected. Refresh the project list;
+the project should remain. Select another project to switch its alert feed.
+Check an empty name is rejected. With the gateway unavailable, refresh should
+show an error rather than claiming there are no projects.
+
+With Node 24 installed:
+
+```bash
+cd portal
+npm ci
+npm test
+npm run build
+```
+
+Without host Node, from the repository root:
+
+```bash
+docker build --progress=plain -f portal/Dockerfile.test ./portal
+docker build -t cloudtrain-portal-hilal:projects ./portal
+```
+
+For browser integration tests, first start the local stack, then from `portal/`:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+Alternatively, set `PLAYWRIGHT_CHROME_EXECUTABLE` to your installed Chrome
+executable. These tests create small test projects and datasets in the local
+backend. They cover project creation/refresh, blank-name validation, network
+recovery, CSV/ZIP/TAR.GZ uploads, invalid CSV rejection, a lost upload response and
+safe retry, new versions, old-version checksums, version-service errors and retry,
+project switching, unauthenticated API rejection, and mobile width. Error cases
+that simulate a broken network/service use browser interception; the successful
+uploads and reads use the real gateway and service. Screenshots are written to
+`portal/test-results/` (ignored by Git).
+
+The test image runs the dependency-free gateway-client tests during its build.
+The production image checks the complete Next.js compilation. Before a PR, run
+`make check` at the repository root and reference the actual issue as `Closes #N`.
+
+### Verification on 15 November 2026
+
+- Thirteen gateway-client tests passed.
+- Two browser integration scenarios passed against the live local gateway and services.
+- CSV, ZIP and TAR.GZ uploads, versions 1/2, checksum selection and retry safety passed.
+- Production Next.js Docker build passed; desktop and mobile screenshots reviewed.
+- Full `make check` passed linting, service/unit tests and seven service contract checks,
+  but failed the existing Projects service contract check described below.
+- Running `make e2e` separately passed: 6 tests passed and 9 existing tests were skipped
+  for functionality still assigned to the team. These skips were not changed.
+
+The services currently running locally include stand-ins. These checks establish
+portal integration with the current repository, not completion of classmates'
+production backends or AWS deployment.
+
+### Existing Projects service contract failure (Ali)
+
+The 15 November full check generated a project name containing a null character
+(`\u0000`). `POST /projects` returned 500 `INTERNAL_ERROR`, outside its documented
+201/400/401/409/422 statuses. A minimal gateway reproduction with JSON
+`{"name":"portal-null-\u0000"}` also returned 500. This is an existing backend
+validation/storage issue; no Projects service or shared contract files were changed.
+Schemathesis test case: `EqkXQY`. The minimal gateway request reproduces the failure
+independently of the generated test seed.
+
+The check was run with Python 3.11.15 prepared in temporary storage, using:
+
+```bash
+make check PYTHON=/private/tmp/cloudtrain-python/cpython-3.11.15-macos-aarch64-none/bin/python3.11
+make e2e PYTHON=/private/tmp/cloudtrain-python/cpython-3.11.15-macos-aarch64-none/bin/python3.11
+```
+
+Temporary interpreter paths are local to this machine; classmates with Python
+3.11 installed can use the normal `make check` and `make e2e` commands.
