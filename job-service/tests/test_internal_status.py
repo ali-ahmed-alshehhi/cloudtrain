@@ -60,3 +60,11 @@ def test_reading_changes_nothing(client, queues):
 
     assert len(queues.sent["job-events"]) == events_before
     assert client.get(f"/jobs/{job_id}", headers={"X-User-Id": "user-1"}).json()["status"] == "QUEUED"
+
+
+def test_a_malformed_job_id_is_422(client, check):
+    """Found by the contract fuzzer in CI: the answer must be in the contract's list (422)."""
+    answer = status(client, "%C2%84")
+
+    assert answer.status_code == 422
+    check(answer.json(), "Error")

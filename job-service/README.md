@@ -74,7 +74,7 @@ even if SQS is down for a while. Why: [docs/decisions/0007-job-service-design.md
 ## Run and test
 
 ```bash
-make test                         # all unit tests (this folder: 62 tests, ~4 s, no Docker needed)
+make test                         # all unit tests (this folder: 63 tests, ~4 s, no Docker needed)
 cd job-service && .venv/bin/python -m pytest -q    # only this service
 make up && make e2e               # the walk-through through the gateway
 ```
