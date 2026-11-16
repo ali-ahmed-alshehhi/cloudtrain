@@ -3,6 +3,9 @@
 One short file per important decision, numbered in order: `NNNN-short-title.md`.
 Each one says: **context** (the problem), **decision**, **why**, **trade-offs**.
 
+**Numbering:** when you open the pull request, take the next free number on `main`. If two pull
+requests pick the same number, whoever merges second renumbers. Gaps are fine; a number is never reused.
+
 Write one when you change a default (portal framework, login provider, EC2 vs Batch), change a contract,
 or make a choice others must live with. Copy the shape of `0001-microservices-and-gateway.md`.
 
