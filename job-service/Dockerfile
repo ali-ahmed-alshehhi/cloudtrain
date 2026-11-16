@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY alembic.ini .
 COPY migrations ./migrations
 COPY app ./app
+# The prices for GPU-hours and cost (PRICING_FILE). Built in, because nothing is mounted in the cloud.
+COPY --from=contracts pricing.yaml /contracts/pricing.yaml
 
 # Run as a normal user, not root.
 RUN useradd --create-home --uid 10001 appuser
