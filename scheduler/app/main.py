@@ -28,6 +28,7 @@ from app.machines import LOCAL_MACHINE, pick_machine
 
 SERVICE_NAME = "scheduler"
 QUEUE_ERRORS = (BotoCoreError, ClientError)
+FREE_SLOT_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED", "QUEUED"}  # QUEUED = retried
 BUSY_RETRY_SECONDS = 5
 
 # ---- Scheduler-specific Prometheus metrics ----
@@ -108,8 +109,11 @@ class Scheduler:
         gpu_count = form.get("resources", {}).get("gpu_count", 0)
         machine = pick_machine(gpu_count)
 
-        # Check capacity before doing anything
-        if not self.capacity.reserve(job_id, machine):
+        # Check capacity before doing anything. When full, first free the slots of jobs that ended or
+        # were retried (asked only now, when a job needs a slot: no polling loop).
+        if not self.capacity.reserve(job_id, machine) and (
+            not self.free_finished_slots() or not self.capacity.reserve(job_id, machine)
+        ):
             self.logger.info(
                 "no capacity; message stays on queue",
                 extra={"job_id": job_id, "active": self.capacity.active_count},
@@ -151,6 +155,22 @@ class Scheduler:
             self._update_metrics()
             self.logger.info("job was cancelled while starting", extra={"job_id": job_id})
         return True
+
+    def free_finished_slots(self) -> int:
+        """Release every tracked job that has ended, or that Training Jobs put back in the queue
+        (a retry: status QUEUED, attempt + 1). Uses GET /internal/jobs/{id} (#102). Returns how many."""
+        freed = 0
+        for job_id in list(self.capacity.active_jobs):
+            try:
+                answer = self.http.get(f"{self.job_service}/internal/jobs/{job_id}")
+            except httpx.HTTPError:
+                continue  # Training Jobs not reachable: keep the slot, try again next time
+            if answer.status_code == 404 or (
+                answer.status_code == 200 and answer.json().get("status") in FREE_SLOT_STATUSES
+            ):
+                self.release_job(job_id)
+                freed += 1
+        return freed
 
     def release_job(self, job_id: str) -> None:
         """Called when a job finishes or fails — free the capacity slot."""
