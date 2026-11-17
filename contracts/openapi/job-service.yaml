@@ -162,6 +162,26 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
+  /internal/jobs/{job_id}:
+    get:
+      operationId: getJobStatusInternal
+      summary: INTERNAL (Scheduler). Where a job stands, without a user. Read-only.
+      description: >-
+        The Scheduler frees a machine slot when the status is SUCCEEDED, FAILED or CANCELLED, or when
+        attempt changed (the job was retried). No X-User-Id: the gateway refuses every /internal/ path.
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The job's status and current attempt.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InternalJobStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
   /internal/jobs/{job_id}/status:
     post:
       operationId: reportStatus
@@ -393,6 +413,15 @@ components:
       properties:
         worker_id: { type: string, minLength: 1, maxLength: 128 }
         sent_at: { type: string, format: date-time }
+    InternalJobStatus:
+      type: object
+      required: [job_id, status, attempt, machine_type, updated_at]
+      properties:
+        job_id: { type: string, pattern: "^job-[0-9]+$" }
+        status: { $ref: "#/components/schemas/JobStatus" }
+        attempt: { type: integer, minimum: 1 }
+        machine_type: { type: [string, "null"] }
+        updated_at: { type: string, format: date-time }
     HeartbeatAck:
       type: object
       required: [job_id, status]

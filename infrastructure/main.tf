@@ -7,7 +7,7 @@ module "networking" {
 
   environment        = var.environment
   availability_zones = var.availability_zones
-  enable_nat         = !var.use_emulator
+  enable_nat         = !var.use_localstack
 }
 
 module "security" {

@@ -28,16 +28,16 @@ variable "aws_region" {
   type        = string
 }
 
-variable "use_emulator" {
-  description = "Point Terraform at the official AWS Emulator (Student 6 practice account)."
+variable "use_localstack" {
+  description = "Point Terraform at LocalStack (same tool as the app — decisions 0005, 0009)."
   type        = bool
   default     = false
 }
 
-variable "emulator_endpoint" {
-  description = "AWS Emulator HTTPS endpoint when use_emulator=true."
+variable "localstack_endpoint" {
+  description = "LocalStack edge endpoint when use_localstack=true."
   type        = string
-  default     = "https://127.0.0.1:9297"
+  default     = "http://localhost:4568"
 }
 
 variable "datasets_bucket_name" {
@@ -61,19 +61,19 @@ variable "sqs_max_receive_count" {
 }
 
 variable "enable_networking" {
-  description = "Create VPC/subnets. Start false on the emulator until EC2 fidelity is confirmed."
+  description = "Create VPC/subnets. Off for LocalStack practice; on for real AWS."
   type        = bool
   default     = true
 }
 
 variable "enable_container_registry" {
-  description = "Create ECR repositories. Start false on the emulator until ECR fidelity is confirmed."
+  description = "Create ECR repositories. Off for LocalStack practice; on for real AWS."
   type        = bool
   default     = true
 }
 
 variable "enable_database" {
-  description = "Create RDS PostgreSQL. Requires networking. Off on emulator practice."
+  description = "Create RDS PostgreSQL. Requires networking. Off for LocalStack practice."
   type        = bool
   default     = false
 }

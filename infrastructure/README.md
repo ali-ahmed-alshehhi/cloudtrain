@@ -10,29 +10,29 @@ container registry, the services' deployment, CPU/GPU training machines, monitor
 Remote state in S3 with locking and restricted access. Dev and staging environments. Tagging and cost
 visibility. Deploy and clean-up docs in `docs/DEPLOYMENT_GUIDE.md`. Prices in `contracts/pricing.yaml`.
 
-## Practice AWS account (Student 6) — official AWS Emulator
+## Practice on LocalStack (Student 6)
 
-We use the **official** [AWS Emulator](https://github.com/aws/aws-emulator) as our local fake AWS account
-for Terraform practice. This does **not** replace the app LocalStack in the root `docker-compose.yml`
-(that stays for Faisal/Mariam/`make up`).
+Terraform practice uses **LocalStack** — the same tool as the app (`docker-compose.yml`, decision
+[0005](../docs/decisions/0005-localstack-for-s3.md) / [0009](../docs/decisions/0009-terraform-local-uses-localstack.md)).
+We do **not** run a second AWS emulator.
 
 ```bash
 cd infrastructure
-./scripts/emulator-up.sh          # build + start https://127.0.0.1:9297
-source ./scripts/emulator-env.sh  # point AWS CLI / Terraform at the emulator
+docker compose -f docker-compose.localstack.yml up -d
+export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
 terraform init
-terraform plan  -var-file=environments/dev/emulator.tfvars.example
-terraform apply -var-file=environments/dev/emulator.tfvars.example
+terraform plan  -var-file=environments/dev/localstack.tfvars.example
+terraform apply -var-file=environments/dev/localstack.tfvars.example
 terraform output
-terraform destroy -var-file=environments/dev/emulator.tfvars.example
-./scripts/emulator-down.sh
+terraform destroy -var-file=environments/dev/localstack.tfvars.example
+docker compose -f docker-compose.localstack.yml down
 ```
 
 Creates the same names teammates already use: `datasets`, `artifacts`, `training-jobs`,
 `training-jobs-dlq`, `job-events`.
 
-Docs: [Getting started with Docker](https://docs.aws.amazon.com/emulator/latest/userguide/getting-started-docker.html) ·
-[Point SDK at emulator](https://docs.aws.amazon.com/emulator/latest/userguide/point-sdk-to-emulator.html)
+> The small compose file only publishes host port `4568` so Terraform can reach LocalStack from the
+> laptop. Image pin matches root compose: `localstack/localstack:4.14`.
 
 ## Cloud mapping (real AWS)
 
@@ -74,7 +74,6 @@ terraform apply -var-file=environments/dev/terraform.tfvars
 terraform output                 # share db_endpoint + buckets + queues + ecr
 ```
 
-
 ## Real AWS (after instructors give the account)
 
 ```bash
@@ -94,7 +93,7 @@ terraform apply -var-file=environments/dev/terraform.tfvars
 - Tags on every resource: `Project`, `Environment`, `Owner`.
 - Never commit state or secrets.
 - `terraform destroy` disposable environments after tests.
-- Emulator is for building/testing only — final demo uses real AWS.
+- LocalStack is for building/testing only — final demo uses real AWS (RDS/ECS/GPU need it).
 
 ## Acceptance test
 The group creates the dev environment with Terraform, deploys CloudTrain, changes infrastructure

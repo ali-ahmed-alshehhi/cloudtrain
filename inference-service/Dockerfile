@@ -1,8 +1,9 @@
-# CloudTrain Inference service image (stand-in).
+# CloudTrain Inference service image (PyTorch for CPU, MLflow model loading).
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    MLFLOW_DISABLE_AGENT_HINT=1
 
 WORKDIR /service
 

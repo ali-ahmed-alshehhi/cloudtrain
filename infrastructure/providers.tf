@@ -1,9 +1,8 @@
 # AWS provider. Every resource gets the three required tags automatically.
 # Owners: Hamda + Fatma.
 #
-# Practice (no AWS bill): official AWS Emulator — see scripts/emulator-up.sh
-# and environments/dev/emulator.tfvars.example.
-# Docs: https://github.com/aws/aws-emulator
+# Local practice (no AWS bill): LocalStack — same tool as the app (decisions 0005, 0009).
+# See environments/dev/localstack.tfvars.example
 
 terraform {
   required_version = ">= 1.6"
@@ -24,30 +23,29 @@ provider "aws" {
   region = var.aws_region
 
   # Credentials: real AWS → AWS_PROFILE / IAM role.
-  # Emulator → source scripts/emulator-env.sh (uses ~/.aws/emulator/9297/…)
-  skip_credentials_validation = var.use_emulator
-  skip_metadata_api_check     = var.use_emulator
-  skip_requesting_account_id  = var.use_emulator
-  s3_use_path_style           = var.use_emulator
+  # LocalStack → AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test
+  access_key = var.use_localstack ? "test" : null
+  secret_key = var.use_localstack ? "test" : null
 
-  # Emulator serves HTTPS with its own CA; Terraform also reads AWS_CA_BUNDLE
-  # from scripts/emulator-env.sh. insecure=true covers SDKs that skip the bundle.
-  insecure = var.use_emulator
+  skip_credentials_validation = var.use_localstack
+  skip_metadata_api_check     = var.use_localstack
+  skip_requesting_account_id  = var.use_localstack
+  s3_use_path_style           = var.use_localstack
 
   dynamic "endpoints" {
-    for_each = var.use_emulator ? [1] : []
+    for_each = var.use_localstack ? [1] : []
     content {
-      s3             = var.emulator_endpoint
-      sqs            = var.emulator_endpoint
-      ecr            = var.emulator_endpoint
-      iam            = var.emulator_endpoint
-      sts            = var.emulator_endpoint
-      ec2            = var.emulator_endpoint
-      rds            = var.emulator_endpoint
-      secretsmanager = var.emulator_endpoint
-      logs           = var.emulator_endpoint
-      cloudwatch     = var.emulator_endpoint
-      s3control      = var.emulator_endpoint
+      s3             = var.localstack_endpoint
+      sqs            = var.localstack_endpoint
+      ecr            = var.localstack_endpoint
+      iam            = var.localstack_endpoint
+      sts            = var.localstack_endpoint
+      ec2            = var.localstack_endpoint
+      rds            = var.localstack_endpoint
+      secretsmanager = var.localstack_endpoint
+      logs           = var.localstack_endpoint
+      cloudwatch     = var.localstack_endpoint
+      s3control      = var.localstack_endpoint
     }
   }
 
