@@ -121,7 +121,20 @@ class Scheduler:
             return False
 
         self._update_metrics()
+        try:
+            return self._place(form, job_id, machine)
+        except httpx.HTTPError:
+            # Training Jobs or the worker is not reachable (e.g. the worker was just killed): free the
+            # slot, or this job could never be placed again and would block every job after it.
+            self.release_job(job_id)
+            self.logger.warning(
+                "job service or worker not reachable; slot released, message stays on queue",
+                extra={"job_id": job_id},
+            )
+            return False
 
+    def _place(self, form: dict, job_id: str, machine: str) -> bool:
+        """Report SCHEDULED, hand the job to a worker, report RUNNING. The slot is already reserved."""
         scheduled = self.report(job_id, "SCHEDULED", machine_type=machine)
         if scheduled.status_code == 409:
             self.capacity.release(job_id)

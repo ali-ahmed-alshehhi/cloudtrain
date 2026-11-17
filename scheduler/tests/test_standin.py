@@ -233,3 +233,22 @@ def test_job_service_is_asked_only_when_a_slot_is_needed():
     services = FakeServices(job_answers=(200,) * 2, worker_answers=(202,))
     make_app(sqs, services).state.scheduler.read_queue_once()
     assert services.status_reads == []  # there was room: no question asked
+
+
+def test_an_unreachable_worker_frees_the_slot():
+    """Found in the live failure demo: the worker was killed, the hand-over raised ConnectError, the slot
+    stayed reserved, and the retried job (and every job after it) waited for capacity forever."""
+
+    class WorkerDown(FakeServices):
+        def handle(self, request):
+            if request.url.host == "training-worker":
+                raise httpx.ConnectError("worker is down", request=request)
+            return super().handle(request)
+
+    sqs = FakeSqs([FORM])
+    services = WorkerDown(job_answers=(200,) * 2)
+    scheduler = make_app(sqs, services).state.scheduler
+    scheduler.read_queue_once()
+
+    assert scheduler.capacity.active_count == 0  # the slot is free again
+    assert sqs.deleted == []  # the message stays, so the job is placed when the worker is back
