@@ -1,0 +1,142 @@
+[
+ {
+  "event_id": "event-1",
+  "event_type": "job.queued",
+  "job_id": "job-01",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:00:00Z",
+  "data": {
+   "status": "QUEUED",
+   "previous_status": null,
+   "reason": null,
+   "machine_type": null,
+   "attempt": 1
+  }
+ },
+ {
+  "event_id": "event-2",
+  "event_type": "job.scheduled",
+  "job_id": "job-01",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:00:30Z",
+  "data": {
+   "status": "SCHEDULED",
+   "previous_status": "QUEUED",
+   "reason": null,
+   "machine_type": "g4dn.12xlarge",
+   "attempt": 1
+  }
+ },
+ {
+  "event_id": "event-3",
+  "event_type": "job.running",
+  "job_id": "job-01",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:00:30Z",
+  "data": {
+   "status": "RUNNING",
+   "previous_status": "SCHEDULED",
+   "reason": null,
+   "machine_type": "g4dn.12xlarge",
+   "attempt": 1
+  }
+ },
+ {
+  "event_id": "event-4",
+  "event_type": "job.failed",
+  "job_id": "job-01",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:02:31Z",
+  "data": {
+   "status": "FAILED",
+   "previous_status": "RUNNING",
+   "reason": "no heartbeat for 121 seconds (the worker stopped answering)",
+   "machine_type": "g4dn.12xlarge",
+   "attempt": 1
+  }
+ },
+ {
+  "event_id": "event-5",
+  "event_type": "job.retrying",
+  "job_id": "job-01",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:02:31Z",
+  "data": {
+   "status": "QUEUED",
+   "previous_status": "FAILED",
+   "reason": "retry 1 of 1",
+   "machine_type": null,
+   "attempt": 2
+  }
+ },
+ {
+  "event_id": "event-6",
+  "event_type": "job.scheduled",
+  "job_id": "job-01",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:02:46Z",
+  "data": {
+   "status": "SCHEDULED",
+   "previous_status": "QUEUED",
+   "reason": null,
+   "machine_type": "g4dn.12xlarge",
+   "attempt": 2
+  }
+ },
+ {
+  "event_id": "event-7",
+  "event_type": "job.running",
+  "job_id": "job-01",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:02:46Z",
+  "data": {
+   "status": "RUNNING",
+   "previous_status": "SCHEDULED",
+   "reason": null,
+   "machine_type": "g4dn.12xlarge",
+   "attempt": 2
+  }
+ },
+ {
+  "event_id": "event-8",
+  "event_type": "job.succeeded",
+  "job_id": "job-01",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:07:46Z",
+  "data": {
+   "status": "SUCCEEDED",
+   "previous_status": "RUNNING",
+   "reason": null,
+   "machine_type": "g4dn.12xlarge",
+   "attempt": 2
+  }
+ },
+ {
+  "event_id": "event-9",
+  "event_type": "job.queued",
+  "job_id": "job-02",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:07:46Z",
+  "data": {
+   "status": "QUEUED",
+   "previous_status": null,
+   "reason": null,
+   "machine_type": null,
+   "attempt": 1
+  }
+ },
+ {
+  "event_id": "event-10",
+  "event_type": "job.cancelled",
+  "job_id": "job-02",
+  "project_id": "project-01",
+  "occurred_at": "2026-11-20T09:07:51Z",
+  "data": {
+   "status": "CANCELLED",
+   "previous_status": "QUEUED",
+   "reason": "cancelled by user-1",
+   "machine_type": null,
+   "attempt": 1
+  }
+ }
+]
