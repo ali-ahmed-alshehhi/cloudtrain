@@ -4,7 +4,7 @@ Owners: Hamda + Fatma.
 
 | File | Purpose |
 |---|---|
-| `localstack.tfvars.example` | LocalStack practice (same tool as the app — decisions 0005 / 0007) |
+| `localstack.tfvars.example` | LocalStack practice (same tool as the app — decisions 0005 / 0009) |
 | `terraform.tfvars.example` | Real AWS values (copy to git-ignored `terraform.tfvars`) |
 
 ```bash

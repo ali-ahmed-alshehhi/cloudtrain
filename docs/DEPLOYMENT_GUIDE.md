@@ -43,7 +43,7 @@ docker compose -f docker-compose.localstack.yml down
 
 > Same LocalStack product/image as root `docker-compose.yml` (`localstack/localstack:4.14`).
 > The infra compose file only publishes host port `4568` for Terraform. RDS/ECS/GPU still need
-> real AWS (see decision 0007).
+> real AWS (see decision 0009).
 
 ### 3b. Real AWS
 
@@ -60,6 +60,17 @@ terraform init -migrate-state -backend-config=backends/dev.s3.backend.hcl
 terraform plan  -var-file=environments/dev/terraform.tfvars
 terraform apply -var-file=environments/dev/terraform.tfvars
 ```
+
+### 3c. Database schemas (after first RDS apply)
+
+```bash
+# Requires network path to private RDS + aws CLI + psql + jq
+ENVIRONMENT=dev ./scripts/bootstrap-schemas.sh
+```
+
+Creates roles/schemas: `projects`, `datasets`, `jobs`, `scheduler`, `registry`, `mlflow`
+(same as local `make up`). Store each service password in Secrets Manager for deploy.
+Service connection strings should use `?sslmode=require` because RDS forces SSL.
 
 ## 4. Deploy the services
 Images → ECR, services → ECS Fargate: Salem's pipeline. Hamda + Fatma provide ECR URLs and
@@ -101,3 +112,5 @@ Keep the **state bucket** on real AWS. Destroy disposable `dev` resources after 
 | `job_events_queue_url` | Mariam / notifications |
 | `ecr_repository_urls` | Salem |
 | `vpc_id` / subnet IDs / security groups | Maitha, Salem, Majed |
+| `db_endpoint` | Service owners (DATABASE_URL) |
+| `db_master_secret_arn` | Hamda/Fatma + deploy pipeline |
