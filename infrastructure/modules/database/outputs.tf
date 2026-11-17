@@ -20,6 +20,6 @@ output "db_name" {
 }
 
 output "master_secret_arn" {
-  description = "Secrets Manager ARN (password never printed as a plain output)."
-  value       = aws_secretsmanager_secret.db.arn
+  description = "RDS-managed Secrets Manager ARN for the master user (password never in Terraform state)."
+  value       = aws_db_instance.main.master_user_secret[0].secret_arn
 }
