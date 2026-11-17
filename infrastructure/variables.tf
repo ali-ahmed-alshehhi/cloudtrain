@@ -28,6 +28,18 @@ variable "aws_region" {
   type        = string
 }
 
+variable "use_emulator" {
+  description = "Point Terraform at the AWS Emulator instead of a real AWS account (decision 0011)."
+  type        = bool
+  default     = false
+}
+
+variable "emulator_endpoint" {
+  description = "AWS Emulator HTTPS endpoint when use_emulator=true."
+  type        = string
+  default     = "https://127.0.0.1:9297"
+}
+
 variable "use_localstack" {
   description = "Point Terraform at LocalStack (same tool as the app — decisions 0005, 0009)."
   type        = bool

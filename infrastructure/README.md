@@ -10,29 +10,32 @@ container registry, the services' deployment, CPU/GPU training machines, monitor
 Remote state in S3 with locking and restricted access. Dev and staging environments. Tagging and cost
 visibility. Deploy and clean-up docs in `docs/DEPLOYMENT_GUIDE.md`. Prices in `contracts/pricing.yaml`.
 
-## Practice on LocalStack (Student 6)
+## Run it on the AWS Emulator (Student 6)
 
-Terraform practice uses **LocalStack** — the same tool as the app (`docker-compose.yml`, decision
-[0005](../docs/decisions/0005-localstack-for-s3.md) / [0009](../docs/decisions/0009-terraform-local-uses-localstack.md)).
-We do **not** run a second AWS emulator.
+We have no AWS account: the official **AWS Emulator** stands in for it (decision
+[0011](../docs/decisions/0011-aws-emulator-instead-of-aws-account.md), which replaces 0009).
+The app's `make up` still uses LocalStack (decision [0005](../docs/decisions/0005-localstack-for-s3.md)).
 
 ```bash
 cd infrastructure
-docker compose -f docker-compose.localstack.yml up -d
-export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
+./scripts/emulator-up.sh
+source ./scripts/emulator-env.sh        # every new terminal needs this again
 terraform init
-terraform plan  -var-file=environments/dev/localstack.tfvars.example
-terraform apply -var-file=environments/dev/localstack.tfvars.example
+terraform plan  -var-file=environments/dev/emulator.tfvars.example
+terraform apply -var-file=environments/dev/emulator.tfvars.example
 terraform output
-terraform destroy -var-file=environments/dev/localstack.tfvars.example
-docker compose -f docker-compose.localstack.yml down
+terraform destroy -var-file=environments/dev/emulator.tfvars.example
+./scripts/emulator-down.sh
 ```
 
 Creates the same names teammates already use: `datasets`, `artifacts`, `training-jobs`,
 `training-jobs-dlq`, `job-events`.
 
-> The small compose file only publishes host port `4568` so Terraform can reach LocalStack from the
-> laptop. Image pin matches root compose: `localstack/localstack:4.14`.
+**Remote state with locking:** `bootstrap/` creates the state bucket once, then the root module
+moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
+
+> LocalStack still works for Terraform: `docker compose -f docker-compose.localstack.yml up -d`, then
+> `-var-file=environments/dev/localstack.tfvars.example`.
 
 ## Cloud mapping (real AWS)
 
@@ -58,6 +61,7 @@ Creates the same names teammates already use: `datasets`, `artifacts`, `training
 | `object-storage` | S3 `datasets` + `artifacts` |
 | `message-queue` | SQS `training-jobs` + DLQ + `job-events` |
 | `container-registry` | ECR repos per service |
+| `bootstrap/` (own folder) | S3 state bucket: versioned, encrypted, private, TLS only; locking with `use_lockfile` |
 | `database` | RDS Postgres + Secrets Manager (enable on real AWS) |
 | `iam` / `application-services` / `training-compute` / `monitoring` | stubs — next |
 
