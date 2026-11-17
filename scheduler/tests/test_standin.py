@@ -160,13 +160,23 @@ def test_metrics_endpoint_has_scheduler_gauges():
 
 def test_gpu_quota_blocks_job():
     """A GPU job is rejected when it would exceed the GPU quota."""
-    cap = CapacityTracker(max_workers=10, max_gpus=1)
-    cap.reserve("job-00", "g4dn.xlarge")  # 1 GPU, quota full
+    import os
 
-    gpu_form = {**FORM, "job_id": "job-01", "resources": {"gpu_count": 1, "cpu_cores": 2, "memory_gb": 4}}
-    sqs = FakeSqs([gpu_form])
-    services = FakeServices()
-    make_app(sqs, services, capacity=cap).state.scheduler.read_queue_once()
+    old_env = os.environ.get("ENVIRONMENT")
+    os.environ["ENVIRONMENT"] = "cloud"
+    try:
+        cap = CapacityTracker(max_workers=10, max_gpus=1)
+        cap.reserve("job-00", "g4dn.xlarge")  # 1 GPU, quota full
 
-    assert services.calls == []
-    assert sqs.deleted == []
+        gpu_form = {**FORM, "job_id": "job-01", "resources": {"gpu_count": 1, "cpu_cores": 2, "memory_gb": 4}}
+        sqs = FakeSqs([gpu_form])
+        services = FakeServices()
+        make_app(sqs, services, capacity=cap).state.scheduler.read_queue_once()
+
+        assert services.calls == []
+        assert sqs.deleted == []
+    finally:
+        if old_env is None:
+            os.environ.pop("ENVIRONMENT", None)
+        else:
+            os.environ["ENVIRONMENT"] = old_env
