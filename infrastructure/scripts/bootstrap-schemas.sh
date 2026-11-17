@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Create per-service Postgres roles/schemas on a new RDS instance, and store each
 # service DATABASE_URL in Secrets Manager (passwords are never printed).
-# Requires: aws CLI, psql, jq, openssl. Run after: terraform apply (enable_database=true)
+# Requires: aws CLI, psql, jq, openssl, terraform. Run after: terraform apply (enable_database=true)
+#
+# RDS-managed master secrets only contain username/password (no host/port), so host/port
+# come from terraform outputs (or DB_HOST / DB_PORT / DB_NAME env overrides).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,22 +14,31 @@ SCHEMAS=(projects datasets jobs scheduler registry mlflow)
 # RDS-managed master secret ARN from: terraform output -raw db_master_secret_arn
 MASTER_SECRET_ARN="${MASTER_SECRET_ARN:-${SECRET_ID:-}}"
 if [[ -z "${MASTER_SECRET_ARN}" ]]; then
-  echo "Set MASTER_SECRET_ARN from: terraform output -raw db_master_secret_arn" >&2
+  MASTER_SECRET_ARN="$(terraform -chdir="$ROOT" output -raw db_master_secret_arn)"
+fi
+
+DB_HOST="${DB_HOST:-$(terraform -chdir="$ROOT" output -raw db_address)}"
+DB_PORT="${DB_PORT:-$(terraform -chdir="$ROOT" output -raw db_port)}"
+DB_NAME="${DB_NAME:-$(terraform -chdir="$ROOT" output -raw db_name)}"
+
+if [[ -z "$DB_HOST" || "$DB_HOST" == "null" ]]; then
+  echo "db_address is empty. Apply with enable_database=true, or set DB_HOST." >&2
   exit 1
 fi
 
-echo "Reading master secret (ARN only; password not printed)"
+echo "Reading master secret for username/password only (not printed)"
 SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$MASTER_SECRET_ARN" --query SecretString --output text)
-HOST=$(echo "$SECRET_JSON" | jq -r '.host // .HOST')
-PORT=$(echo "$SECRET_JSON" | jq -r '.port // .PORT // 5432')
-DB=$(echo "$SECRET_JSON" | jq -r '.dbname // .DBNAME // "cloudtrain"')
 USER=$(echo "$SECRET_JSON" | jq -r '.username // .USERNAME')
 PASS=$(echo "$SECRET_JSON" | jq -r '.password // .PASSWORD')
 
-if [[ -z "$HOST" || "$HOST" == "null" || -z "$PASS" || "$PASS" == "null" ]]; then
-  echo "Master secret is missing host/password fields." >&2
+if [[ -z "$USER" || "$USER" == "null" || -z "$PASS" || "$PASS" == "null" ]]; then
+  echo "Master secret is missing username/password fields." >&2
   exit 1
 fi
+
+HOST="$DB_HOST"
+PORT="${DB_PORT:-5432}"
+DB="${DB_NAME:-cloudtrain}"
 
 export PGPASSWORD="$PASS"
 SQL_FILE=$(mktemp)

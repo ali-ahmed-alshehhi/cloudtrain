@@ -14,12 +14,15 @@ RDS PostgreSQL, encrypted, private, with one database and **one schema + user pe
 ## After first apply (one-time)
 ```bash
 # From a host that can reach the private RDS (bastion / VPN / SSM):
+cd infrastructure
 export MASTER_SECRET_ARN="$(terraform output -raw db_master_secret_arn)"
 ENVIRONMENT=dev ./scripts/bootstrap-schemas.sh
 ```
-That creates the six service roles/schemas (mirrors `local/postgres/init.sh`) and writes each
-service `DATABASE_URL` (with `?sslmode=require`) to Secrets Manager as
-`cloudtrain/<env>/database/<service>` — passwords are not printed.
+The script reads **username/password** from the RDS-managed secret, and **host/port/dbname**
+from terraform outputs (`db_address`, `db_port`, `db_name`). It creates the six service
+roles/schemas (mirrors `local/postgres/init.sh`) and writes each service `DATABASE_URL`
+(with `?sslmode=require`) to Secrets Manager as `cloudtrain/<env>/database/<service>` —
+passwords are not printed.
 
 ## LocalStack note
 Keep `enable_database = false` for LocalStack practice. Use real AWS for this module.

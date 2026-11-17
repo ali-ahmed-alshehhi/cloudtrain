@@ -64,8 +64,12 @@ terraform apply -var-file=environments/dev/terraform.tfvars
 ### 3c. Database schemas (after first RDS apply)
 
 ```bash
-# Requires network path to private RDS + aws CLI + psql + jq + openssl
+# Requires network path to private RDS + aws CLI + psql + jq + openssl + terraform
+# Host/port come from terraform outputs (RDS-managed secret has only username/password).
+cd infrastructure
 export MASTER_SECRET_ARN="$(terraform output -raw db_master_secret_arn)"
+# Optional overrides if outputs are unavailable:
+# export DB_HOST=... DB_PORT=5432 DB_NAME=cloudtrain
 ENVIRONMENT=dev ./scripts/bootstrap-schemas.sh
 ```
 
