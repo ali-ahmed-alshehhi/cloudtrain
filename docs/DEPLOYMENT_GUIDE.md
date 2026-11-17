@@ -34,9 +34,15 @@ terraform apply -var-file=environments/dev/emulator.tfvars.example
 terraform output
 ```
 
-Creates: S3 `datasets` + `artifacts`, SQS `training-jobs` (+ DLQ) + `job-events`. Turn on
-`enable_networking`, `enable_container_registry` and `enable_database` in your own copy of the
-tfvars as those modules are tested on the emulator.
+Creates the whole dev environment: VPC with public and private subnets and NAT (our security
+groups are skipped on the emulator because of an emulator gap, see `infrastructure/README.md`);
+S3 `datasets` + `artifacts`; SQS `training-jobs` (+ DLQ) + `job-events`; one ECR repository per
+service; RDS PostgreSQL 17 with its master secret in Secrets Manager. `terraform output` lists
+what each teammate needs (see the hand-off table in `infrastructure/README.md`).
+
+Skip `scripts/bootstrap-schemas.sh` on the emulator: the database endpoint lives inside the
+emulator container and is not published to your laptop. Services keep using `make up`
+(LocalStack + local Postgres) for their own work.
 
 Stop when done:
 

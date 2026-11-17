@@ -78,6 +78,17 @@ variable "enable_networking" {
   default     = true
 }
 
+variable "enable_security_groups" {
+  description = <<-EOT
+    Create our own security groups (ALB, services, workers, database). Off on the AWS Emulator:
+    its RevokeSecurityGroupEgress does not match the all-protocols rule Terraform removes right
+    after creating a group (ports 0-0), so every aws_security_group fails there. The database
+    then uses the VPC's locked-down default group. See infrastructure/README.md.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "enable_container_registry" {
   description = "Create ECR repositories. Off for LocalStack practice; on for real AWS."
   type        = bool

@@ -14,12 +14,15 @@ aws_region  = "us-east-1"
 use_emulator      = true
 emulator_endpoint = "https://127.0.0.1:9297"
 
-# Start with storage + queues (matches team contracts). Turn these on after
-# checking Emulator fidelity for EC2/ECR.
-enable_networking         = false
-enable_container_registry = false
-enable_database           = false
+# The full dev environment (#34): every API these modules call is implemented in the
+# emulator. Set any of them to false in your own copy if you only need storage + queues.
+enable_networking         = true
+enable_container_registry = true
+enable_database           = true
 
+# Emulator gap: it can't remove the default outbound rule the way Terraform asks, so creating
+# a security group fails. Skip ours; the database uses the VPC's locked-down default group.
+enable_security_groups = false
 
 datasets_bucket_name  = "datasets"
 artifacts_bucket_name = "artifacts"
