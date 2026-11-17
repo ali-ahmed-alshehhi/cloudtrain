@@ -25,7 +25,8 @@ to the kitchen and follows it until it is served or sent back.
 - **Reads `training-jobs-dlq`**: a job the Scheduler could not handle is put back on the queue
   (at most `JOB_DLQ_MAX_REQUEUES` times) instead of waiting in `QUEUED` forever.
 - **GPU-hours and cost** per job from `contracts/pricing.yaml`, summed over every attempt
-  (a failed attempt still paid for its machine). A running job shows its cost so far.
+  (a failed attempt still paid for its machine). A running job shows its cost so far. If a machine
+  type that ran has no price in `pricing.yaml`, `estimated_cost_usd` is `null` ("unknown"), never 0 (#108).
 - **Members only**: listing, reading, cancelling and following a job, and the alert feed, all check
   project membership through the Projects service.
 
