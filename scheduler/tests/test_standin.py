@@ -4,9 +4,10 @@ import json
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
+
 from app.capacity import CapacityTracker
 from app.main import create_app
-from fastapi.testclient import TestClient
 
 FORM = {
     "job_id": "job-01",
