@@ -40,12 +40,8 @@ def _scheduler_metrics() -> dict:
         _SCHED_METRICS["jobs_placed"] = Counter(
             "scheduler_jobs_placed_total", "Jobs successfully placed on a worker"
         )
-        _SCHED_METRICS["workers_busy"] = Gauge(
-            "scheduler_workers_busy", "Workers currently running jobs"
-        )
-        _SCHED_METRICS["gpus_in_use"] = Gauge(
-            "scheduler_gpus_in_use", "Total GPUs reserved by active jobs"
-        )
+        _SCHED_METRICS["workers_busy"] = Gauge("scheduler_workers_busy", "Workers currently running jobs")
+        _SCHED_METRICS["gpus_in_use"] = Gauge("scheduler_gpus_in_use", "Total GPUs reserved by active jobs")
     return _SCHED_METRICS
 
 

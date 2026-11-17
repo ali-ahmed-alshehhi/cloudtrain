@@ -60,17 +60,17 @@ def test_active_jobs_snapshot():
 def test_gpu_quota_blocks_when_exceeded():
     """A job requiring more GPUs than the remaining quota is rejected."""
     cap = CapacityTracker(max_workers=10, max_gpus=2)
-    assert cap.reserve("job-1", "g4dn.xlarge")   # 1 GPU used
-    assert cap.reserve("job-2", "g4dn.xlarge")   # 2 GPUs used, at limit
+    assert cap.reserve("job-1", "g4dn.xlarge")  # 1 GPU used
+    assert cap.reserve("job-2", "g4dn.xlarge")  # 2 GPUs used, at limit
     assert not cap.reserve("job-3", "g4dn.xlarge")  # would exceed limit
 
 
 def test_gpu_quota_allows_cpu_jobs():
     """CPU jobs (0 GPUs) are allowed even when GPU quota is fully used."""
     cap = CapacityTracker(max_workers=10, max_gpus=1)
-    assert cap.reserve("job-1", "g4dn.xlarge")   # 1 GPU used, at limit
-    assert cap.reserve("job-2", "local-cpu")     # 0 GPUs, still allowed
-    assert cap.reserve("job-3", "c6i.2xlarge")   # 0 GPUs, still allowed
+    assert cap.reserve("job-1", "g4dn.xlarge")  # 1 GPU used, at limit
+    assert cap.reserve("job-2", "local-cpu")  # 0 GPUs, still allowed
+    assert cap.reserve("job-3", "c6i.2xlarge")  # 0 GPUs, still allowed
 
 
 def test_gpu_quota_release_frees_gpus():
