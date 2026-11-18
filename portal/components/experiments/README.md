@@ -44,3 +44,24 @@ A late answer for the previous job is never shown under the new one.
 
 ## Test
 `cd portal && npm test`. MLflow test answers are in `test/fixtures/mlflow.fixture.mjs`, marked **FIXTURE**.
+
+## 1 GPU vs multi-GPU DDP comparison (`RunComparison.js`, `../../lib/experiments/compare.mjs`)
+Walk-through step 8: finished MLflow runs of the same workload with strategy `single` and `ddp`, side by side.
+
+```jsx
+import { makeExperimentsApi } from "../lib/experiments/mlflow.mjs";
+import { makeJobsApi } from "../lib/usage/cost.mjs";
+import RunComparison from "../components/experiments/RunComparison";
+
+<RunComparison projectId={projectId} experimentsApi={experimentsApi} jobsApi={jobsApi} />
+```
+
+- **Same arithmetic as `docs/BENCHMARKS.md`** (`training/distributed/metrics.py`): time per epoch leaves out the
+  first epoch; one row per GPU count = mean of its runs; speedup = 1-GPU time ÷ N-GPU time; efficiency = speedup ÷ N.
+  Checked against the Python tool on the same input: identical numbers.
+- **Same workload only** (model, dataset and version, epochs, batch size, data workers, from the run's MLflow params);
+  CPU runs and runs without `strategy`/`world_size` tags are left out.
+- **GPU-hours and cost** are Training Jobs' numbers for each run's job (`job_id` tag), never computed here.
+- **Needs two per-epoch MLflow metrics** (step = epoch): `epoch_seconds` and `epoch_images`, the same per-epoch
+  `seconds` and `images` the benchmark tool records. Until the training runtime logs them, those columns say
+  "not logged" and no speedup is shown.
