@@ -270,6 +270,18 @@ def create_app(
 
     # ---------- internal (Scheduler and worker; the gateway blocks /internal/) ----------
 
+    @app.get("/internal/jobs/{job_id}")
+    def internal_job_status(job_id: JobIdPath, session: SessionDep) -> dict:
+        """Read-only, for the Scheduler: free a slot when the job ended or its attempt changed (#102)."""
+        job = load(session, job_id)
+        return {
+            "job_id": job.public_id,
+            "status": job.status,
+            "attempt": job.attempt,
+            "machine_type": job.machine_type,
+            "updated_at": iso(aware(job.updated_at)),
+        }
+
     @app.post("/internal/jobs/{job_id}/status")
     def report_status(job_id: JobIdPath, report: StatusReport, session: SessionDep) -> dict:
         job = load(session, job_id, lock=True)

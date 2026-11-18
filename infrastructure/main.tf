@@ -38,3 +38,16 @@ module "container_registry" {
 
   environment = var.environment
 }
+
+module "database" {
+  count  = var.enable_database ? 1 : 0
+  source = "./modules/database"
+
+  environment                = var.environment
+  project                    = var.project
+  private_subnet_ids         = module.networking[0].private_subnet_ids
+  database_security_group_id = module.security[0].database_security_group_id
+  instance_class             = var.db_instance_class
+  multi_az                   = var.db_multi_az
+  deletion_protection        = var.db_deletion_protection
+}

@@ -48,7 +48,9 @@ def now_utc() -> datetime:
 
 
 def iso(moment: datetime) -> str:
-    """ISO 8601 in UTC, e.g. 2026-11-14T09:30:00Z."""
+    """ISO 8601 in UTC, e.g. 2026-11-14T09:30:00Z. A naive moment is UTC (SQLite drops the zone)."""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
     return moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
