@@ -1,0 +1,115 @@
+# Push images — owner: Salem (Student 9), task #52. Rules: security/DEPLOYMENT_POLICY.md
+#
+# Builds the 10 CloudTrain images, refuses any with a CRITICAL vulnerability that has a fix, and
+# pushes each one tagged with its Git commit (build once, deploy the same image; never "latest").
+#
+# Where the images go:
+#   - Today: GitHub Container Registry (ghcr.io). There is no AWS account (decision 0011) and the
+#     AWS Emulator's ECR keeps repositories but refuses image uploads ("the operation is unsupported",
+#     checked in CI on 18 Nov). The ECR repositories and their rules stay in Terraform (Hamda + Fatma).
+#   - With an AWS account: set the repository variables AWS_DEPLOY_ROLE_ARN and AWS_REGION. The same
+#     workflow then signs in with GitHub OIDC (no AWS keys stored in GitHub) and pushes to ECR,
+#     into the repositories cloudtrain/<environment>/<service>.
+name: Images
+
+on:
+  push:
+    branches: [main]
+  pull_request: # pull requests from this repository: build, scan and push, tagged pr-<number>-<commit>
+    paths:
+      - ".github/workflows/images.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  push:
+    name: Build, scan and push the images
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write # push to ghcr.io with the run's own short-lived token
+      id-token: write # GitHub OIDC, only used when an AWS account is configured
+    env:
+      SERVICES: gateway project-service dataset-service job-service scheduler training-worker model-registry inference-service portal mlflow
+      COMPOSE_PROJECT_NAME: cloudtrain
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 1. Tag and registry
+        id: where
+        run: |
+          short=${GITHUB_SHA::7}
+          if [ "${{ github.event_name }}" = "pull_request" ]; then tag="pr-${{ github.event.number }}-$short"; else tag="$short"; fi
+          if [ -n "$AWS_DEPLOY_ROLE_ARN" ]; then
+            echo "registry=ecr" >> "$GITHUB_OUTPUT"
+          else
+            owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+            echo "prefix=ghcr.io/$owner/cloudtrain" >> "$GITHUB_OUTPUT"
+            echo "registry=ghcr" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Images will be tagged: $tag"
+
+      - name: 2a. Sign in to GitHub Container Registry
+        if: steps.where.outputs.registry == 'ghcr'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: 2b. Sign in to AWS with GitHub OIDC (only with an AWS account)
+        if: steps.where.outputs.registry == 'ecr'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 2c. Sign in to ECR (only with an AWS account)
+        if: steps.where.outputs.registry == 'ecr'
+        id: ecr
+        run: |
+          account=$(aws sts get-caller-identity --query Account --output text)
+          registry="$account.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+          echo "prefix=$registry/cloudtrain/dev" >> "$GITHUB_OUTPUT"
+
+      - name: 3. Build all images
+        run: |
+          cp .env.example .env
+          docker compose build $SERVICES
+
+      - name: 4. Refuse images with a CRITICAL vulnerability that has a fix (Trivy)
+        run: |
+          mkdir -p trivy-cache
+          failed=""
+          for service in $SERVICES; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/trivy-cache:/root/.cache" \
+              aquasec/trivy:0.76.2 image --quiet --severity CRITICAL --ignore-unfixed --exit-code 1 \
+              "cloudtrain-$service" > /dev/null || failed="$failed $service"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::Not pushed. CRITICAL vulnerabilities with a fix in:$failed (details: Security workflow, job 3)"
+            exit 1
+          fi
+
+      - name: 5. Push, tagged with the commit
+        env:
+          PREFIX: ${{ steps.where.outputs.prefix || steps.ecr.outputs.prefix }}
+          TAG: ${{ steps.where.outputs.tag }}
+        run: |
+          {
+            echo "## Images pushed ($TAG)"
+            echo "| Service | Image |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for service in $SERVICES; do
+            image="$PREFIX/$service:$TAG"
+            docker tag "cloudtrain-$service" "$image"
+            docker push --quiet "$image"
+            digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
+            echo "| $service | \`$digest\` |" >> "$GITHUB_STEP_SUMMARY"
+            echo "pushed $image"
+          done
