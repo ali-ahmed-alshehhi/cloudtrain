@@ -1,0 +1,69 @@
+# Unit tests for alerts.yml (promtool test rules). FIXTURE series, not real measurements.
+rule_files:
+  - alerts.yml
+evaluation_interval: 15s
+tests:
+  - interval: 15s
+    input_series:
+      - series: 'up{job="cloudtrain", service="scheduler"}'
+        values: "1 1 0 0 0 0 0 0"
+      - series: 'up{job="cloudtrain", service="gateway"}'
+        values: "1x8"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: CloudTrainServiceDown
+        exp_alerts: []
+      - eval_time: 105s
+        alertname: CloudTrainServiceDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: cloudtrain, service: scheduler }
+            exp_annotations:
+              summary: "scheduler is down"
+              description: "Prometheus could not read scheduler/metrics for 1 minute."
+
+  - interval: 1m
+    input_series:
+      # 10 requests/min, of which 1/min fails (10%) on job-service; gateway is clean.
+      - series: 'job_service_requests_total{service="job-service", status="200"}'
+        values: "0+9x15"
+      - series: 'job_service_requests_total{service="job-service", status="503"}'
+        values: "0+1x15"
+      - series: 'gateway_requests_total{service="gateway", status="200"}'
+        values: "0+10x15"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: CloudTrainHighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: warning, service: job-service }
+            exp_annotations: { summary: "job-service answers more than 5% errors" }
+
+  - interval: 1m
+    input_series:
+      - series: 'job_service_dead_letters_total{action="failed"}'
+        values: "0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1"
+      - series: "job_service_outbox_pending"
+        values: "0 60 60 60 60 60 60 60"
+      - series: "cloudtrain_job_events_last_poll_timestamp_seconds"
+        values: "0 60 120 120 120 120 120 120"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CloudTrainDeadLetters
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations: { summary: "A training job reached the dead-letter queue in the last 10 minutes" }
+      - eval_time: 15m
+        alertname: CloudTrainDeadLetters
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: CloudTrainOutboxBacklog
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations: { summary: "60 job events are waiting in the job-service outbox" }
+      - eval_time: 3m
+        alertname: CloudTrainJobEventsNotRead
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CloudTrainJobEventsNotRead
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations: { summary: "job-events-monitor has not read the job-events queue for over 2 minutes" }
