@@ -65,6 +65,22 @@ jobs:
           python -m pip install --quiet -r security/tests/requirements.txt
           python -m pytest security/tests -v -p no:warnings
 
+      - name: Why a real token is refused (only when something failed)
+        if: failure()
+        run: |
+          TOKEN=$(security/login/token.sh alice)
+          python3 -c "import jwt,json,sys; t=sys.argv[1]; print('token header:', jwt.get_unverified_header(t)); print('jwks kids:', [k.get('kid') for k in json.load(open('security/login/.local/jwks.json'))['keys']])" "$TOKEN"
+          docker compose -f docker-compose.yml -f security/login/compose.login.yml exec -T -e T="$TOKEN" gateway python -c "
+          import os, traceback, jwt
+          from app.config import load_settings
+          from app import auth
+          s = load_settings()
+          try:
+              print('OK user', auth.verify_token(os.environ['T'], s))
+          except Exception as e:
+              traceback.print_exception(e.__cause__ or e)
+          " || true
+
       - name: Gateway and emulator logs (only when something failed)
         if: failure()
         run: |
