@@ -1,6 +1,6 @@
 # Evaluation: performance, reliability and cloud cost
 
-**Owners:** Hilal + Adel (Student 10). **Status on 18 Nov 2026: skeleton.** The methods are fixed; most
+**Owners:** Hilal + Adel (Student 10). **Status on 18 Nov 2026 (evening): skeleton.** The methods are fixed; most
 numbers wait for the integrated system (see "Waiting on" in each table). Final version: Fri 27 Nov.
 
 **How to read the status column**
@@ -12,14 +12,14 @@ numbers wait for the integrated system (see "Waiting on" in each table). Final v
 | ⏳ Not measured yet | Method fixed, number pending. "Waiting on" names who or what |
 
 No number in this report is invented, estimated by hand or taken from FIXTURE data. Simulated or emulated
-results are always labelled as such (decision 0011: AWS Emulator, no AWS account).
+results are always labelled as such ([decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md): AWS Emulator, no AWS account).
 
 ## 0. Setup
 
 | | Value |
 |---|---|
 | Where everything runs | Docker Compose on a laptop (`make up`): 12 containers, i.e. the 9 CloudTrain services plus Postgres, LocalStack (S3, SQS) and MLflow |
-| "Cloud" | The AWS Emulator with the same Terraform (decision 0011, #112): checks the infrastructure, runs no real machines |
+| "Cloud" | The AWS Emulator with the same Terraform ([decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md), merged in #112): checks the infrastructure, runs no real machines |
 | GPUs | Real GPU runs only on a team workstation (Ahmed + Abdulla, `docs/BENCHMARKS.md`). No cloud GPU |
 | Monitoring | Prometheus + Grafana dashboard "CloudTrain overview" and `job-events-monitor` (`monitoring/`, #115, #109) |
 | Versions | Recorded with each measurement (Git commit, `docker compose version`, Python, Node 24, PyTorch for GPU runs) |
@@ -60,13 +60,22 @@ results are always labelled as such (decision 0011: AWS Emulator, no AWS account
 **Method.** Training Jobs computes `gpu_hours` and `estimated_cost_usd` for every job: on-demand hourly
 price of the machine type × machine time, summed over every attempt (failed attempts count too). The
 portal only adds up a project's jobs (#117). An unknown price is `null` and shown as "Price unknown",
-never $0 (#108, #114). Prices: `contracts/pricing.yaml`, real us-east-1 on-demand prices (#111).
+never $0 (#108, #114). Prices: `contracts/pricing.yaml`, real us-east-1 on-demand prices copied from AWS on 17 Nov 2026 (#111).
+All three are on `main` since 18 Nov.
+
+| Machine type (`contracts/pricing.yaml`) | GPUs | USD per hour |
+|---|---|---|
+| `local-cpu` (laptop worker) | 0 | 0 (free) |
+| `c6i.2xlarge` | 0 | 0.34 |
+| `g4dn.xlarge` | 1 × T4 | 0.526 |
+| `g4dn.12xlarge` | 4 × T4 | 3.912 |
+| `g4dn.metal` | 8 × T4 | 7.824 |
 
 | What | Status | Result | Evidence |
 |---|---|---|---|
-| Cost per job and per project | ⏳ Waiting on: #111, #114, #105 merged and real jobs (#93) | | Portal cost page (#117) |
+| Cost per job and per project | 🧪 Portal views on `main` (#117), tested with FIXTURE jobs. ⏳ Real numbers waiting on: machine types from the scheduler (#105) and real jobs (#93) | | `portal/components/usage/`, `portal/test/usage.test.mjs` |
 | Cost of the 1 GPU vs 2 GPU benchmark | ⏳ Waiting on: Ahmed + Abdulla | | `docs/BENCHMARKS.md` |
-| Total cloud spend | **$0: no AWS account.** The team uses the AWS Emulator (decision 0011, #112), so all costs in this report are **estimates of what the same work would cost on AWS**, not bills | | #112 |
+| Total cloud spend | **$0: no AWS account.** The team uses the AWS Emulator (decision 0011), so all costs in this report are **estimates of what the same work would cost on AWS**, not bills | | [decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md) |
 | Keeping cost down (as designed) | GPU machines only while a job runs (scheduler frees the slot), smallest machine that fits the GPU count, `terraform destroy` after use | ⏳ Confirm once #105 is merged | |
 
 ## 5. Observability (monitoring)
