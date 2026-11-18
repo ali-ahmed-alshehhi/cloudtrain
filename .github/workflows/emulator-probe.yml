@@ -15,10 +15,12 @@ jobs:
       - name: Start the emulator
         working-directory: infrastructure
         run: |
-          chmod +x scripts/*.sh
-          # The emulator runs as user 1000; the GitHub runner is user 1001
           mkdir -p ~/.aws/emulator && chmod 777 ~/.aws/emulator
-          ./scripts/emulator-up.sh || { docker compose -f docker-compose.emulator.yml logs --tail 80; exit 1; }
+          docker compose -f docker-compose.emulator.yml up -d --build
+          # The emulator (user 1000) writes its files with private permissions; the runner is user 1001
+          for _ in $(seq 1 90); do sudo test -f ~/.aws/emulator/9297/ca.pem && break; sleep 2; done
+          sudo chown -R "$(id -u):$(id -g)" ~/.aws/emulator
+          ls -la ~/.aws/emulator/9297/
       - name: Probe
         run: |
           source infrastructure/scripts/emulator-env.sh
