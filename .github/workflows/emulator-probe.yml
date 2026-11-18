@@ -1,0 +1,63 @@
+# TEMPORARY probe (Salem): which AWS services the AWS Emulator supports for login and deploy.
+# Draft PR only, never merged.
+name: Emulator probe
+on:
+  pull_request:
+    paths: [".github/workflows/emulator-probe.yml"]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start the emulator
+        working-directory: infrastructure
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/emulator-up.sh
+      - name: Probe
+        run: |
+          source infrastructure/scripts/emulator-env.sh
+          aws --version
+          ls -la ~/.aws/emulator/9297/
+          cat ~/.aws/emulator/9297/config || true
+          t() { echo; echo "=================== $1"; shift; "$@" 2>&1 | head -c 3000; echo "[exit ${PIPESTATUS[0]}]"; }
+          t STS aws sts get-caller-identity
+          t COGNITO-create-pool aws cognito-idp create-user-pool --pool-name probe
+          POOL=$(aws cognito-idp list-user-pools --max-results 10 --query 'UserPools[0].Id' --output text 2>/dev/null)
+          echo "POOL=$POOL"
+          t COGNITO-client aws cognito-idp create-user-pool-client --user-pool-id "$POOL" --client-name portal --explicit-auth-flows ALLOW_ADMIN_USER_PASSWORD_AUTH ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH
+          CLIENT=$(aws cognito-idp list-user-pool-clients --user-pool-id "$POOL" --query 'UserPoolClients[0].ClientId' --output text 2>/dev/null)
+          echo "CLIENT=$CLIENT"
+          t COGNITO-group aws cognito-idp create-group --user-pool-id "$POOL" --group-name data-scientist
+          t COGNITO-user aws cognito-idp admin-create-user --user-pool-id "$POOL" --username alice --message-action SUPPRESS
+          t COGNITO-password aws cognito-idp admin-set-user-password --user-pool-id "$POOL" --username alice --password 'Probe-Passw0rd!' --permanent
+          t COGNITO-addgroup aws cognito-idp admin-add-user-to-group --user-pool-id "$POOL" --username alice --group-name data-scientist
+          t COGNITO-auth aws cognito-idp admin-initiate-auth --user-pool-id "$POOL" --client-id "$CLIENT" --auth-flow ADMIN_USER_PASSWORD_AUTH --auth-parameters USERNAME=alice,PASSWORD='Probe-Passw0rd!'
+          IDT=$(aws cognito-idp admin-initiate-auth --user-pool-id "$POOL" --client-id "$CLIENT" --auth-flow ADMIN_USER_PASSWORD_AUTH --auth-parameters USERNAME=alice,PASSWORD='Probe-Passw0rd!' --query 'AuthenticationResult.IdToken' --output text 2>/dev/null)
+          python3 - "$IDT" <<'PY'
+          import sys,base64,json
+          t=sys.argv[1]
+          try:
+              h,p,_=t.split('.')
+              d=lambda s: json.loads(base64.urlsafe_b64decode(s+'='*(-len(s)%4)))
+              print("HEADER",d(h)); print("PAYLOAD",d(p))
+          except Exception as e: print("no token:",e, t[:200])
+          PY
+          for u in "$AWS_ENDPOINT_URL/$POOL/.well-known/jwks.json" "$AWS_ENDPOINT_URL/$POOL/.well-known/openid-configuration" "https://cognito-idp.us-east-1.amazonaws.com/$POOL/.well-known/jwks.json"; do echo "GET $u"; curl -sS --cacert "$AWS_CA_BUNDLE" --max-time 10 "$u" | head -c 800; echo; done
+          t ECR-create aws ecr create-repository --repository-name probe/app
+          t ECR-login-token aws ecr get-authorization-token
+          REG=$(aws ecr describe-repositories --query 'repositories[0].repositoryUri' --output text 2>/dev/null); echo "REPO URI=$REG"
+          t ECR-docker-login sh -c "aws ecr get-login-password | docker login --username AWS --password-stdin ${REG%%/*}"
+          docker pull -q busybox:1.37 >/dev/null && docker tag busybox:1.37 "$REG:probe1"
+          t ECR-push docker push "$REG:probe1"
+          t ECR-list aws ecr list-images --repository-name probe/app
+          t ECR-lifecycle aws ecr put-lifecycle-policy --repository-name probe/app --lifecycle-policy-text '{"rules":[{"rulePriority":1,"selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}]}'
+          t ECS-cluster aws ecs create-cluster --cluster-name probe
+          t ECS-taskdef aws ecs register-task-definition --family gateway --requires-compatibilities FARGATE --network-mode awsvpc --cpu 256 --memory 512 --container-definitions "[{\"name\":\"gateway\",\"image\":\"$REG:probe1\",\"essential\":true}]"
+          t ECS-service aws ecs create-service --cluster probe --service-name gateway --task-definition gateway --desired-count 1 --launch-type FARGATE --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true}' --network-configuration 'awsvpcConfiguration={subnets=[subnet-12345678]}'
+          t ECS-update aws ecs update-service --cluster probe --service gateway --task-definition gateway:1
+          t IAM-oidc aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+          t SECRETS aws secretsmanager create-secret --name probe/secret --secret-string x
