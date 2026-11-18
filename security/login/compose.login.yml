@@ -2,9 +2,24 @@
 # Owner: Salem. Run security/login/setup.sh first, then from the repository root:
 #   docker compose -f docker-compose.yml -f security/login/compose.login.yml up -d --build --wait
 services:
+  # The user pool's PUBLIC keys, for the gateway. The emulator's TLS certificate only covers
+  # 127.0.0.1, so the gateway container cannot download them from the emulator itself. This small
+  # web server is reachable only inside Docker (no port is published). On AWS it is not needed:
+  # JWT_JWKS_URL is Cognito's https address.
+  login-keys:
+    image: python:3.11-slim
+    command: ["python", "-m", "http.server", "8000", "--directory", "/login", "--bind", "0.0.0.0"]
+    volumes:
+      - ./security/login/.local/jwks.json:/login/jwks.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/jwks.json', timeout=3)"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   gateway:
     env_file:
       - .env
       - security/login/.local/gateway.env # AUTH_MODE=jwt and the three JWT_* settings
-    volumes:
-      - ./security/login/.local/jwks.json:/login/jwks.json:ro # the user pool's public keys
+    depends_on:
+      login-keys: { condition: service_healthy }

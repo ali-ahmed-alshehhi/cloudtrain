@@ -62,14 +62,14 @@ add_user vera viewer
 
 echo "3/3 Gateway settings"
 # The emulator's TLS certificate only covers 127.0.0.1, so the gateway container cannot download
-# the keys from it. We give the gateway a copy of the PUBLIC keys instead (not a secret).
-# On AWS, JWT_JWKS_URL is the https address from the module output and this copy is not needed.
+# the keys from it. A copy of the PUBLIC keys (not a secret) is served to the gateway inside Docker
+# by the login-keys container (compose.login.yml). On AWS, JWT_JWKS_URL is Cognito's https address.
 curl -fsS --cacert "$AWS_CA_BUNDLE" "$JWKS_URL" -o "$LOCAL/jwks.json"
 cat >"$LOCAL/gateway.env" <<EOF
 AUTH_MODE=jwt
 JWT_ISSUER=$ISSUER
 JWT_AUDIENCE=$CLIENT_ID
-JWT_JWKS_URL=file:///login/jwks.json
+JWT_JWKS_URL=http://login-keys:8000/jwks.json
 EOF
 cat >"$LOCAL/login.env" <<EOF
 POOL_ID=$POOL_ID
