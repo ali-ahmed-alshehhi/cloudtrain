@@ -1,4 +1,4 @@
-# LocalStack for Student 6 Terraform practice (same tool as the app — decision 0005 / 0007).
+# LocalStack for Student 6 Terraform practice (same tool as the app — decision 0005 / 0009).
 # Does not replace root docker-compose.yml; this only publishes a host port for terraform apply.
 #
 #   cd infrastructure

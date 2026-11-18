@@ -1,7 +1,7 @@
 # AWS provider. Every resource gets the three required tags automatically.
 # Owners: Hamda + Fatma.
 #
-# Local practice (no AWS bill): LocalStack — same tool as the app (decisions 0005, 0007).
+# Local practice (no AWS bill): LocalStack — same tool as the app (decisions 0005, 0009).
 # See environments/dev/localstack.tfvars.example
 
 terraform {
@@ -11,6 +11,10 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
     }
   }
 }

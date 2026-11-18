@@ -29,7 +29,7 @@ variable "aws_region" {
 }
 
 variable "use_localstack" {
-  description = "Point Terraform at LocalStack (same tool as the app — decisions 0005, 0007)."
+  description = "Point Terraform at LocalStack (same tool as the app — decisions 0005, 0009)."
   type        = bool
   default     = false
 }
@@ -70,6 +70,27 @@ variable "enable_container_registry" {
   description = "Create ECR repositories. Off for LocalStack practice; on for real AWS."
   type        = bool
   default     = true
+}
+
+variable "enable_database" {
+  description = "Create RDS PostgreSQL. Requires networking. Off for LocalStack practice."
+  type        = bool
+  default     = false
+}
+
+variable "db_instance_class" {
+  type    = string
+  default = "db.t4g.micro"
+}
+
+variable "db_multi_az" {
+  type    = bool
+  default = false
+}
+
+variable "db_deletion_protection" {
+  type    = bool
+  default = false
 }
 
 variable "availability_zones" {
