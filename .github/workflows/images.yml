@@ -105,11 +105,20 @@ jobs:
             echo "| Service | Image |"
             echo "|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
+          failed=""
           for service in $SERVICES; do
             image="$PREFIX/$service:$TAG"
             docker tag "cloudtrain-$service" "$image"
-            docker push --quiet "$image"
-            digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
-            echo "| $service | \`$digest\` |" >> "$GITHUB_STEP_SUMMARY"
-            echo "pushed $image"
+            if docker push --quiet "$image"; then
+              digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
+              echo "| $service | \`$digest\` |" >> "$GITHUB_STEP_SUMMARY"
+              echo "pushed $image"
+            else
+              echo "| $service | ❌ push refused |" >> "$GITHUB_STEP_SUMMARY"
+              failed="$failed $service"
+            fi
           done
+          if [ -n "$failed" ]; then
+            echo "::error::Push refused for:$failed"
+            exit 1
+          fi
