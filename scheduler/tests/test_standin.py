@@ -42,12 +42,20 @@ class FakeSqs:
 class FakeServices:
     """Training Jobs and the worker."""
 
-    def __init__(self, job_answers=(200, 200), worker_answers=(202,)) -> None:
+    def __init__(self, job_answers=(200, 200), worker_answers=(202,), statuses=None) -> None:
         self.job_answers = list(job_answers)
         self.worker_answers = list(worker_answers)
+        self.statuses = statuses or {}  # job_id -> status answered by GET /internal/jobs/{id}
         self.calls: list[tuple[str, dict]] = []
+        self.status_reads: list[str] = []
 
     def handle(self, request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            job_id = request.url.path.rsplit("/", 1)[-1]
+            self.status_reads.append(job_id)
+            if job_id not in self.statuses:
+                return httpx.Response(404, json={})
+            return httpx.Response(200, json={"job_id": job_id, "status": self.statuses[job_id]})
         body = json.loads(request.content)
         self.calls.append((request.url.path, body))
         if request.url.host == "training-worker":
@@ -108,10 +116,11 @@ def test_job_rejected_when_capacity_full():
     cap.reserve("job-00", "local-cpu")  # fill the only slot
 
     sqs = FakeSqs([FORM])
-    services = FakeServices()
+    services = FakeServices(statuses={"job-00": "RUNNING"})  # job-00 is still running
     make_app(sqs, services, capacity=cap).state.scheduler.read_queue_once()
 
-    assert services.calls == []  # never called job-service or worker
+    assert services.calls == []  # never reported to job-service nor handed to the worker
+    assert services.status_reads == ["job-00"]  # only asked whether job-00 had ended
     assert sqs.deleted == []  # message stays for retry
 
 
@@ -170,7 +179,7 @@ def test_gpu_quota_blocks_job():
 
         gpu_form = {**FORM, "job_id": "job-01", "resources": {"gpu_count": 1, "cpu_cores": 2, "memory_gb": 4}}
         sqs = FakeSqs([gpu_form])
-        services = FakeServices()
+        services = FakeServices(statuses={"job-00": "RUNNING"})  # job-00 still holds the GPU
         make_app(sqs, services, capacity=cap).state.scheduler.read_queue_once()
 
         assert services.calls == []
@@ -180,3 +189,66 @@ def test_gpu_quota_blocks_job():
             os.environ.pop("ENVIRONMENT", None)
         else:
             os.environ["ENVIRONMENT"] = old_env
+
+
+# ---------- slots are freed when a job ends or is retried (GET /internal/jobs/{id}, #102) ----------
+
+
+def placed(services):
+    return [body["job_id"] for path, body in services.calls if path == "/internal/run"]
+
+
+def test_a_finished_job_frees_its_slot_for_the_next_one():
+    sqs = FakeSqs([FORM, {**FORM, "job_id": "job-02"}])
+    services = FakeServices(
+        job_answers=(200,) * 4, worker_answers=(202, 202), statuses={"job-01": "SUCCEEDED"}
+    )
+    scheduler = make_app(sqs, services).state.scheduler
+    scheduler.read_queue_once()
+    scheduler.read_queue_once()
+    assert placed(services) == ["job-01", "job-02"]
+
+
+def test_a_retried_job_is_placed_again():
+    """Training Jobs retried job-01 (its worker died): status QUEUED again, same job_id on the queue."""
+    sqs = FakeSqs([FORM, FORM])
+    services = FakeServices(job_answers=(200,) * 4, worker_answers=(202, 202), statuses={"job-01": "QUEUED"})
+    scheduler = make_app(sqs, services).state.scheduler
+    scheduler.read_queue_once()
+    scheduler.read_queue_once()
+    assert placed(services) == ["job-01", "job-01"]
+
+
+def test_a_running_job_keeps_its_slot():
+    sqs = FakeSqs([FORM, {**FORM, "job_id": "job-02"}])
+    services = FakeServices(job_answers=(200,) * 4, worker_answers=(202, 202), statuses={"job-01": "RUNNING"})
+    scheduler = make_app(sqs, services).state.scheduler
+    scheduler.read_queue_once()
+    scheduler.read_queue_once()
+    assert placed(services) == ["job-01"]  # job-02 waits on the queue
+
+
+def test_job_service_is_asked_only_when_a_slot_is_needed():
+    sqs = FakeSqs([FORM])
+    services = FakeServices(job_answers=(200,) * 2, worker_answers=(202,))
+    make_app(sqs, services).state.scheduler.read_queue_once()
+    assert services.status_reads == []  # there was room: no question asked
+
+
+def test_an_unreachable_worker_frees_the_slot():
+    """Found in the live failure demo: the worker was killed, the hand-over raised ConnectError, the slot
+    stayed reserved, and the retried job (and every job after it) waited for capacity forever."""
+
+    class WorkerDown(FakeServices):
+        def handle(self, request):
+            if request.url.host == "training-worker":
+                raise httpx.ConnectError("worker is down", request=request)
+            return super().handle(request)
+
+    sqs = FakeSqs([FORM])
+    services = WorkerDown(job_answers=(200,) * 2)
+    scheduler = make_app(sqs, services).state.scheduler
+    scheduler.read_queue_once()
+
+    assert scheduler.capacity.active_count == 0  # the slot is free again
+    assert sqs.deleted == []  # the message stays, so the job is placed when the worker is back
