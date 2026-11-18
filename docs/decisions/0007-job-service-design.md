@@ -32,7 +32,8 @@ the workers, and any of them can be down or late. These are the choices that kee
 
 4. **Cost counts every attempt.** `gpu_hours` = job's `gpu_count` x hours; `estimated_cost_usd` = the
    machine's hourly price x hours; both summed over all attempts, because a failed attempt still used
-   its machine. A machine type missing from `pricing.yaml` counts as 0 and is logged.
+   its machine. A machine type missing from `pricing.yaml` makes the cost `null` ("price unknown",
+   changed in #108: 0 would read as free) and is logged.
 
 5. **Members only, everywhere.** Every public endpoint checks membership with the Projects service. A
    job's dataset must belong to the job's project (`422 DATASET_NOT_IN_PROJECT`); otherwise a member of
