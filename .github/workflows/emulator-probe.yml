@@ -16,7 +16,9 @@ jobs:
         working-directory: infrastructure
         run: |
           chmod +x scripts/*.sh
-          ./scripts/emulator-up.sh
+          # The emulator runs as user 1000; the GitHub runner is user 1001
+          mkdir -p ~/.aws/emulator && chmod 777 ~/.aws/emulator
+          ./scripts/emulator-up.sh || { docker compose -f docker-compose.emulator.yml logs --tail 80; exit 1; }
       - name: Probe
         run: |
           source infrastructure/scripts/emulator-env.sh
