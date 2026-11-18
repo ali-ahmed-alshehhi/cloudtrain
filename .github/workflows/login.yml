@@ -1,0 +1,72 @@
+# Real login, end to end — owner: Salem (Student 9), task #53. How it works: security/login/README.md
+#
+# Starts the AWS Emulator (decision 0011), creates the Cognito user pool and test users, starts
+# CloudTrain with AUTH_MODE=jwt, and runs security/tests: real tokens work, forged, changed,
+# unsigned, wrong-app and access tokens get 401, and users cannot open each other's projects (403).
+name: Login
+
+on:
+  pull_request:
+    paths:
+      - "security/**"
+      - "gateway/**"
+      - "project-service/**"
+      - "infrastructure/modules/identity/**"
+      - "infrastructure/scripts/emulator-*.sh"
+      - "infrastructure/emulator/**"
+      - "infrastructure/docker-compose.emulator.yml"
+      - "docker-compose.yml"
+      - ".github/workflows/login.yml"
+  push:
+    branches: [main]
+  workflow_dispatch: # "Run workflow" button, for the demo
+
+permissions:
+  contents: read
+
+concurrency:
+  group: login-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-login:
+    name: Real login (Cognito on the AWS Emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false # plain output, so `terraform output -raw` works in setup.sh
+
+      - name: 1. Start the AWS Emulator
+        working-directory: infrastructure
+        run: |
+          mkdir -p ~/.aws/emulator && chmod 777 ~/.aws/emulator
+          docker compose -f docker-compose.emulator.yml up -d --build
+          # The emulator runs as user 1000 and writes private files; the GitHub runner is user 1001
+          for _ in $(seq 1 90); do sudo test -f ~/.aws/emulator/9297/ca.pem && break; sleep 2; done
+          sudo chown -R "$(id -u):$(id -g)" ~/.aws/emulator
+          test -f ~/.aws/emulator/9297/emulator_credentials
+
+      - name: 2. Cognito user pool, app client, role groups and test users
+        run: bash security/login/setup.sh
+
+      - name: 3. Start CloudTrain with the real login
+        run: |
+          cp .env.example .env
+          docker compose -f docker-compose.yml -f security/login/compose.login.yml up -d --build --wait
+
+      - name: 4. Login tests
+        run: |
+          python -m pip install --quiet -r security/tests/requirements.txt
+          python -m pytest security/tests -v -p no:warnings
+
+      - name: Gateway and emulator logs (only when something failed)
+        if: failure()
+        run: |
+          docker compose logs gateway --tail 80 || true
+          docker compose -f infrastructure/docker-compose.emulator.yml logs --tail 40 || true

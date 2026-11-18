@@ -1,0 +1,10 @@
+# Starts CloudTrain with the REAL login (Cognito on the AWS Emulator) instead of the dev token.
+# Owner: Salem. Run security/login/setup.sh first, then from the repository root:
+#   docker compose -f docker-compose.yml -f security/login/compose.login.yml up -d --build --wait
+services:
+  gateway:
+    env_file:
+      - .env
+      - security/login/.local/gateway.env # AUTH_MODE=jwt and the three JWT_* settings
+    volumes:
+      - ./security/login/.local/jwks.json:/login/jwks.json:ro # the user pool's public keys

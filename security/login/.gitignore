@@ -1,0 +1,4 @@
+# Test passwords, tokens and Terraform files, created by setup.sh. Never commit them.
+.local/
+terraform/.terraform/
+terraform/.terraform.lock.hcl
