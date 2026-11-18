@@ -14,36 +14,39 @@ On **real AWS**, create a dedicated S3 bucket for Terraform state (once per acco
 Enable versioning and block public access. Locking uses S3-native `use_lockfile`
 (see `infrastructure/backends/s3.backend.tf.example`).
 
-Until the AWS account exists, practice with **LocalStack** (same tool as the app —
-decisions [0005](decisions/0005-localstack-for-s3.md) /
-[0009](decisions/0009-terraform-local-uses-localstack.md)) — local state in `backend.tf`.
+We have no AWS account: the **AWS Emulator** stands in for it
+(decision [0011](decisions/0011-aws-emulator-instead-of-aws-account.md)). `infrastructure/bootstrap/`
+creates the state bucket on the emulator (versioned, encrypted, private, TLS only), and
+`infrastructure/backends/emulator.s3.backend.hcl.example` points the root module at it.
+Steps: [infrastructure/bootstrap/README.md](../infrastructure/bootstrap/README.md).
 
 ## 3. Create an environment (`dev`, `staging`)
 
-### 3a. LocalStack practice (Student 6 — today)
+### 3a. AWS Emulator (our stand-in for an AWS account — decision 0011)
 
 ```bash
 cd infrastructure
-docker compose -f docker-compose.localstack.yml up -d
-export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
+./scripts/emulator-up.sh
+source ./scripts/emulator-env.sh        # every new terminal needs this again
 terraform init
-terraform plan  -var-file=environments/dev/localstack.tfvars.example
-terraform apply -var-file=environments/dev/localstack.tfvars.example
+terraform plan  -var-file=environments/dev/emulator.tfvars.example
+terraform apply -var-file=environments/dev/emulator.tfvars.example
 terraform output
 ```
 
-Creates: S3 `datasets` + `artifacts`, SQS `training-jobs` (+ DLQ) + `job-events`.
+Creates: S3 `datasets` + `artifacts`, SQS `training-jobs` (+ DLQ) + `job-events`. Turn on
+`enable_networking`, `enable_container_registry` and `enable_database` in your own copy of the
+tfvars as those modules are tested on the emulator.
 
 Stop when done:
 
 ```bash
-terraform destroy -var-file=environments/dev/localstack.tfvars.example
-docker compose -f docker-compose.localstack.yml down
+terraform destroy -var-file=environments/dev/emulator.tfvars.example
+./scripts/emulator-down.sh
 ```
 
-> Same LocalStack product/image as root `docker-compose.yml` (`localstack/localstack:4.14`).
-> The infra compose file only publishes host port `4568` for Terraform. RDS/ECS/GPU still need
-> real AWS (see decision 0009).
+> LocalStack still works for Terraform (`docker-compose.localstack.yml` +
+> `environments/dev/localstack.tfvars.example`), but the team uses the emulator.
 
 ### 3b. Real AWS
 
