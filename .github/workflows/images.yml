@@ -109,7 +109,13 @@ jobs:
           for service in $SERVICES; do
             image="$PREFIX/$service:$TAG"
             docker tag "cloudtrain-$service" "$image"
-            if docker push --quiet "$image"; then
+            # GHCR sometimes refuses the very first push while it creates a new package: retry
+            ok=""
+            for attempt in 1 2 3; do
+              if docker push --quiet "$image"; then ok=1; break; fi
+              echo "push of $service refused (attempt $attempt), retrying in 10 s"; sleep 10
+            done
+            if [ -n "$ok" ]; then
               digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
               echo "| $service | \`$digest\` |" >> "$GITHUB_STEP_SUMMARY"
               echo "pushed $image"
