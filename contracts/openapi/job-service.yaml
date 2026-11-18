@@ -360,7 +360,12 @@ components:
         started_at: { type: [string, "null"], format: date-time }
         finished_at: { type: [string, "null"], format: date-time }
         gpu_hours: { type: number, minimum: 0 }
-        estimated_cost_usd: { type: number, minimum: 0 }
+        estimated_cost_usd:
+          type: [number, "null"]
+          minimum: 0
+          description: >-
+            Hourly price x hours, summed over every attempt. null = price unknown: an attempt ran on a
+            machine type missing from contracts/pricing.yaml (never shown as 0, which means free).
         history:
           type: array
           items: { $ref: "#/components/schemas/StatusChange" }
