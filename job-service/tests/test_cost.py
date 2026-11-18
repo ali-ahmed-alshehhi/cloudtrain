@@ -52,15 +52,49 @@ def test_a_failed_attempt_still_counts(client, clock):
     assert done["estimated_cost_usd"] == 0.526
 
 
-def test_a_machine_missing_from_pricing_is_free_not_an_error(client, clock):
+def test_a_machine_missing_from_pricing_has_an_unknown_cost_not_zero(client, clock, check):
+    """#108: 0 means free (local-cpu), so a missing price is null, and the portal can say so."""
     job_id = submit(client, ONE_GPU)["job_id"]
     start(client, job_id, machine_type="p5.48xlarge")
     clock.advance(3600)
 
     done = report(client, job_id, "SUCCEEDED", reported_by="worker").json()
 
-    assert done["gpu_hours"] == 1.0
-    assert done["estimated_cost_usd"] == 0
+    check(done, "Job")
+    assert done["gpu_hours"] == 1.0  # still exact
+    assert done["estimated_cost_usd"] is None
+
+
+def test_local_cpu_really_is_free(client, clock):
+    job_id = submit(client, ONE_GPU)["job_id"]
+    start(client, job_id, machine_type="local-cpu")
+    clock.advance(3600)
+
+    assert report(client, job_id, "SUCCEEDED", reported_by="worker").json()["estimated_cost_usd"] == 0
+
+
+def test_no_machine_reported_means_unknown_cost(client, clock):
+    job_id = submit(client, ONE_GPU)["job_id"]
+    report(client, job_id, "SCHEDULED")  # an old Scheduler that sends no machine_type
+    report(client, job_id, "RUNNING")
+    clock.advance(600)
+
+    assert job(client, job_id)["estimated_cost_usd"] is None
+
+
+def test_one_unknown_attempt_makes_the_total_unknown(client, clock):
+    """Attempt 1 on a priced machine, attempt 2 on an unpriced one: a partial sum would be wrong."""
+    job_id = submit(client, ONE_GPU)["job_id"]
+    start(client, job_id, machine_type="g4dn.xlarge")
+    clock.advance(121)
+    sweep(client)
+    start(client, job_id, machine_type="p5.48xlarge")
+    clock.advance(600)
+
+    done = report(client, job_id, "SUCCEEDED", reported_by="worker").json()
+
+    assert done["estimated_cost_usd"] is None
+    assert done["gpu_hours"] > 0
 
 
 def test_a_missing_pricing_file_says_how_to_fix_it(tmp_path):
