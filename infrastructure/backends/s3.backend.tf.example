@@ -1,0 +1,11 @@
+# Copy over backend.tf when the real AWS state bucket exists:
+#   cp backends/s3.backend.tf.example backend.tf
+#   terraform init -migrate-state -backend-config=backends/dev.s3.backend.hcl
+
+terraform {
+  backend "s3" {
+    encrypt      = true
+    use_lockfile = true # S3-native state locking
+    # bucket / key / region come from -backend-config=...
+  }
+}
