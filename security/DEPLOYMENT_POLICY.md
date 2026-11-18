@@ -16,6 +16,18 @@ and ECS ready (Wed 18 and Sun 22 Nov). Changes to this file: pull request review
 > a `prod` copy of `staging` for the last week only (cost). Alternative: promote inside one
 > environment. To agree before Sat 21 Nov.
 
+## Where the images are (task #52)
+`.github/workflows/images.yml` builds the 10 images, refuses any with a CRITICAL vulnerability that
+has a fix, and pushes each one tagged with its commit (`gateway:4999c59`) on every push to `main`.
+
+- **Today: GitHub Container Registry**, `ghcr.io/ali-ahmed-alshehhi/cloudtrain/<service>:<commit>`.
+  There is no AWS account (decision 0011), and the AWS Emulator's ECR keeps repositories and rules
+  but refuses image uploads ("the operation is unsupported", checked in CI on 18 Nov). The run uses
+  its own short-lived token: no password is stored.
+- **With an AWS account:** set the repository variables `AWS_DEPLOY_ROLE_ARN` and `AWS_REGION`. The
+  same workflow signs in with GitHub OIDC and pushes to ECR (`cloudtrain/dev/<service>`). Nothing
+  else changes.
+
 ## Rules
 1. **Nobody deploys from a laptop** to staging or production. Only the pipeline does, with a GitHub
    OIDC role: GitHub stores **no AWS keys**.
