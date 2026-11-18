@@ -40,3 +40,12 @@ def test_cloud_multi_gpu():
 def test_default_environment_is_local():
     os.environ.pop("ENVIRONMENT", None)
     assert pick_machine(4) == "local-cpu"
+
+
+def test_cloud_8_gpu():
+    os.environ["ENVIRONMENT"] = "cloud"
+    try:
+        assert pick_machine(5) == "g4dn.metal"
+        assert pick_machine(8) == "g4dn.metal"
+    finally:
+        os.environ["ENVIRONMENT"] = "local"

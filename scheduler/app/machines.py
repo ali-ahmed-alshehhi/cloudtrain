@@ -10,6 +10,7 @@ CLOUD_MACHINES = {
     0: "c6i.2xlarge",
     1: "g4dn.xlarge",
     4: "g4dn.12xlarge",
+    8: "g4dn.metal",
 }
 
 
@@ -18,7 +19,7 @@ def pick_machine(gpu_count: int) -> str:
 
     Locally (ENVIRONMENT=local, the default) every job runs on local-cpu.
     In the cloud, 0 GPUs gets a CPU instance, 1 GPU gets g4dn.xlarge,
-    and 2-4 GPUs get g4dn.12xlarge (the smallest type with enough GPUs).
+    2-4 GPUs get g4dn.12xlarge, and 5-8 GPUs get g4dn.metal.
     """
     if os.environ.get("ENVIRONMENT", "local") == "local":
         return LOCAL_MACHINE
@@ -27,4 +28,6 @@ def pick_machine(gpu_count: int) -> str:
         return CLOUD_MACHINES[0]
     if gpu_count <= 1:
         return CLOUD_MACHINES[1]
-    return CLOUD_MACHINES[4]
+    if gpu_count <= 4:
+        return CLOUD_MACHINES[4]
+    return CLOUD_MACHINES[8]
