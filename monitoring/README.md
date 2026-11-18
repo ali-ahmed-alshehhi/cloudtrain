@@ -11,6 +11,7 @@ built by Hamda + Fatma in `infrastructure/modules/monitoring` (decision 0011).
 | `prometheus/alerts.test.yml` | Unit tests for the alert rules (FIXTURE series) |
 | `grafana/provisioning/` | Grafana's data source (Prometheus) and dashboard folder, so nothing is clicked by hand |
 | `grafana/dashboards/cloudtrain-overview.json` | The dashboard. **Generated:** edit `grafana/build_dashboard.py`, then run it |
+| `aws/` | For Hamda + Fatma: CloudWatch dashboard template, alarms, and the monitor's IAM policy ([README](aws/README.md)) |
 
 ## The dashboard: "CloudTrain overview"
 | Row | Panels |
@@ -58,16 +59,16 @@ at the dashboard is on a laptop once it is in Compose.
       retries: 20
 
   prometheus: # Hilal + Adel
-    image: prom/prometheus:v3.5.0
+    image: prom/prometheus:v3.5.5 # pinned (#109); alert rules also checked with promtool 3.5.5
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
 
   grafana: # Hilal + Adel
-    image: grafana/grafana-oss:<pin a current 12.x tag>
+    image: grafana/grafana:12.4.15 # pinned (#109): newest 12.x release on 18 Nov 2026
     ports: ["3001:3000"] # local only; needs agreement (#109)
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD} # set in .env, never committed
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD} # from .env (placeholder in .env.example); never admin/admin
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
@@ -75,5 +76,5 @@ at the dashboard is on a laptop once it is in Compose.
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on: [prometheus]
 ```
-Also: `contracts/ports.md` (8011, 9090, 3001), `.env.example` (`GRAFANA_ADMIN_PASSWORD=`), and
+`contracts/ports.md` and `.env.example` come first, in their own contract pull request (Ali's order on #109). Then
 `monitoring/job-events-monitor` in the `make test` list and `scripts/changed_services.sh`.
