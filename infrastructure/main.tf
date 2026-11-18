@@ -43,9 +43,9 @@ module "database" {
   count  = var.enable_database ? 1 : 0
   source = "./modules/database"
 
-  environment                = var.environment
-  project                    = var.project
-  private_subnet_ids         = module.networking[0].private_subnet_ids
+  environment        = var.environment
+  project            = var.project
+  private_subnet_ids = module.networking[0].private_subnet_ids
   # Without our own security groups (the emulator, see enable_security_groups), the database
   # sits in the VPC's default security group, which networking locks down (no rules).
   database_security_group_id = var.enable_security_groups ? module.security[0].database_security_group_id : module.networking[0].default_security_group_id
