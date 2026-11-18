@@ -12,6 +12,9 @@ Run the end-to-end walk-through **through the gateway** against the whole system
   `skip` with the owner's name and hand-off date, and are switched on as owners deliver.
 - `test_failure_recovery.py` — a worker is killed mid-job, the heartbeat stops, the job goes FAILED,
   is retried, and succeeds.
+- `test_mlflow_route.py` — the gateway's read-only MLflow route against the real MLflow: searches
+  and reads work, MLflow's errors come back in the shared format, writes are blocked (405), and a
+  login is needed (401).
 
 Run with `make e2e` (needs `make up` first).
 
