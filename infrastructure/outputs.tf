@@ -92,13 +92,8 @@ output "worker_instance_profile_name" {
 }
 
 output "service_task_role_arns" {
-  description = "Per service: the IAM role its code runs as (Hamda: ECS task definitions; Salem: review)."
+  description = "Per service: the IAM role its code runs as (ECS taskRoleArn; Salem: PassRole in #129)."
   value       = try(module.service_roles[0].task_role_arns, null)
-}
-
-output "service_execution_role_arns" {
-  description = "Per service: the IAM role ECS uses to pull its image, write logs and read its secret."
-  value       = try(module.service_roles[0].execution_role_arns, null)
 }
 
 output "service_database_secret_names" {

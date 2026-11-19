@@ -65,7 +65,7 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `database` | RDS PostgreSQL 17 (private, encrypted, SSL forced) + master secret in Secrets Manager |
 | `iam` | worker role + instance profile: read datasets, read/write artifacts, send `job-events`; nothing else |
 | `training-compute` | GPU workers: launch template + Auto Scaling group on EC2 (decision 0012); size = `worker_desired_capacity` |
-| `service-roles` | one least-privilege IAM role per service: task role (its own buckets/queues) + execution role (its own image, logs and database secret) |
+| `service-roles` | one least-privilege task role per service: only the buckets and queues its code calls |
 | `application-services` / `monitoring` | stubs — next |
 
 ### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
@@ -103,22 +103,18 @@ set `worker_ami_id` to the Deep Learning Base GPU AMI of the region (any `ami-..
 
 ### Service roles for ECS (#35, with Salem; used in #36)
 
-`enable_service_roles = true` (on in `emulator.tfvars.example`) creates two IAM roles per service, as
-`security/DEPLOYMENT_POLICY.md` asks ("one IAM role per service"):
+`enable_service_roles = true` (on in `emulator.tfvars.example`) creates one **task role** per service
+(`service_task_role_arns`), as `security/DEPLOYMENT_POLICY.md` asks ("one IAM role per service"). The
+service's code runs as it. Only these get permissions: `dataset-service` (read/write `datasets`),
+`job-service` (send to `training-jobs` and `job-events`, read the dead-letter queue), `scheduler`
+(read `training-jobs`), `inference-service` (read `artifacts`), `mlflow` (read/write
+`artifacts/mlflow/`). `gateway`, `portal`, `project-service` and `model-registry` call no AWS API, so
+their task roles have no permissions.
 
-- **execution role** (`service_execution_role_arns`): ECS uses it to pull the service's own image from
-  ECR, write to its own log group `/ecs/<env>-cloudtrain/<service>`, and read only its own database
-  secret, which the ECS task definition passes to the container.
-- **task role** (`service_task_role_arns`): the service's code runs as it. Only these get permissions:
-  `dataset-service` (read/write `datasets`), `job-service` (send to `training-jobs` and `job-events`,
-  read the dead-letter queue), `scheduler` (read `training-jobs`), `inference-service` (read
-  `artifacts`), `mlflow` (read/write `artifacts/mlflow/`). `gateway`, `portal`, `project-service` and
-  `model-registry` call no AWS API, so their task roles have no permissions.
-
-The database secrets are not created by Terraform: `scripts/bootstrap-schemas.sh` creates
-`cloudtrain/<env>/database/<schema>` after the apply (names in `service_database_secret_names`), so no
-password is in Terraform state. Not here yet: the GitHub deploy role (Salem's pipeline) and the
-`job-events-monitor` role (#115, once it merges).
+The **execution role** (ECS pulls the image, writes logs and injects the database secret) is one shared
+role in `modules/iam/ecs.tf` (Salem, #129). The database secrets are not created by Terraform:
+`scripts/bootstrap-schemas.sh` creates `cloudtrain/<env>/database/<schema>` after the apply (names in
+`service_database_secret_names`), so no password is in Terraform state.
 
 **Emulator gap: security groups.** Right after creating a security group, Terraform removes the
 "allow all outbound" rule AWS adds, naming it with ports 0-0. Real AWS ignores ports for an

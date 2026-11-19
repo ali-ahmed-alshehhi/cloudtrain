@@ -1,21 +1,17 @@
-# One IAM role per service, least privilege (security/DEPLOYMENT_POLICY.md, with Salem).
+# One task role per service, least privilege (security/DEPLOYMENT_POLICY.md, with Salem).
 # Owners: Hamda + Fatma.
 #
-# Each service gets two roles:
-# - an execution role, used by ECS itself: pull the service's own image, write its own logs,
-#   and read ONLY its own database secret (injected into the container as DATABASE_URL);
-# - a task role, used by the service's code: only the buckets and queues it calls.
-#   Services that call no AWS API get a task role with no permissions at all.
+# The task role is what the service's CODE runs as: only the buckets and queues it calls.
+# Services that call no AWS API get a task role with no permissions at all.
 #
-# The database secrets are NOT created here: infrastructure/scripts/bootstrap-schemas.sh creates
-# cloudtrain/<env>/database/<schema> after `terraform apply`, so no password is in Terraform state.
+# Not here: the ECS execution role (pull the image, write logs, inject the database secret).
+# That is one shared role in modules/iam/ecs.tf (Salem, #129). Each service's database secret
+# is cloudtrain/<env>/database/<schema>, created by scripts/bootstrap-schemas.sh after the apply,
+# so no password is in Terraform state (see the database_secret_names output).
 # The access below was checked against each service's code on main (19 Nov 2026).
 
-data "aws_caller_identity" "current" {}
-
 locals {
-  account = data.aws_caller_identity.current.account_id
-  prefix  = "${var.environment}-cloudtrain"
+  prefix = "${var.environment}-cloudtrain"
 
   # service => database schema whose secret it reads (null = no database)
   services = {
@@ -30,7 +26,6 @@ locals {
     "mlflow"            = "mlflow"
   }
 
-  log_group = { for s, _ in local.services : s => "/ecs/${local.prefix}/${s}" }
 }
 
 data "aws_iam_policy_document" "ecs_assume" {
@@ -41,52 +36,6 @@ data "aws_iam_policy_document" "ecs_assume" {
       identifiers = ["ecs-tasks.amazonaws.com"]
     }
   }
-}
-
-# ---------- Execution roles (used by ECS to start the container) ----------
-
-resource "aws_iam_role" "execution" {
-  for_each           = local.services
-  name               = "${local.prefix}-${each.key}-exec"
-  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
-}
-
-data "aws_iam_policy_document" "execution" {
-  for_each = local.services
-
-  statement {
-    sid       = "EcrLogin"
-    actions   = ["ecr:GetAuthorizationToken"] # AWS only allows "*" for this action
-    resources = ["*"]
-  }
-
-  statement {
-    sid       = "PullOwnImage"
-    actions   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"]
-    resources = ["arn:aws:ecr:${var.aws_region}:${local.account}:repository/cloudtrain/${var.environment}/${each.key}"]
-  }
-
-  statement {
-    sid       = "WriteOwnLogs"
-    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
-    resources = ["arn:aws:logs:${var.aws_region}:${local.account}:log-group:${local.log_group[each.key]}:*"]
-  }
-
-  dynamic "statement" {
-    for_each = each.value == null ? [] : [each.value]
-    content {
-      sid       = "ReadOwnDatabaseSecret"
-      actions   = ["secretsmanager:GetSecretValue"]
-      resources = ["arn:aws:secretsmanager:${var.aws_region}:${local.account}:secret:cloudtrain/${var.environment}/database/${statement.value}-*"]
-    }
-  }
-}
-
-resource "aws_iam_role_policy" "execution" {
-  for_each = local.services
-  name     = "execution"
-  role     = aws_iam_role.execution[each.key].id
-  policy   = data.aws_iam_policy_document.execution[each.key].json
 }
 
 # ---------- Task roles (used by the service's code) ----------

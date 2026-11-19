@@ -2,10 +2,6 @@ variable "environment" {
   type = string
 }
 
-variable "aws_region" {
-  type = string
-}
-
 variable "datasets_bucket_arn" {
   type = string
 }

@@ -152,7 +152,7 @@ variable "worker_max_size" {
 }
 
 variable "enable_service_roles" {
-  description = "Create one least-privilege IAM role per service (task + execution). Needed by ECS (#36)."
+  description = "Create one least-privilege task role per service. Needed by ECS (#36)."
   type        = bool
   default     = false
 }
