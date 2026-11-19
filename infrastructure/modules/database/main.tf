@@ -1,22 +1,14 @@
 # RDS PostgreSQL — private, encrypted, one database with per-service schemas.
 # Owners: Hamda + Fatma (Student 6).
-# Schema/role bootstrap: scripts/bootstrap-schemas.sql (run once after apply).
+# Schema/role bootstrap: scripts/bootstrap-schemas.sh (run once after apply).
+# Master password: RDS-managed Secrets Manager (never in Terraform state).
 
 terraform {
   required_providers {
     aws = {
       source = "hashicorp/aws"
     }
-    random = {
-      source = "hashicorp/random"
-    }
   }
-}
-
-resource "random_password" "master" {
-  length           = 32
-  special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 resource "aws_db_subnet_group" "main" {
@@ -69,9 +61,9 @@ resource "aws_db_instance" "main" {
   storage_type          = "gp3"
   storage_encrypted     = true
 
-  db_name  = var.db_name
-  username = var.db_username
-  password = random_password.master.result
+  db_name                     = var.db_name
+  username                    = var.db_username
+  manage_master_user_password = true
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [var.database_security_group_id]
@@ -96,29 +88,4 @@ resource "aws_db_instance" "main" {
     Name    = "${var.environment}-cloudtrain-postgres"
     Purpose = "shared-postgres"
   }
-}
-
-resource "aws_secretsmanager_secret" "db" {
-  # checkov:skip=CKV2_AWS_57: Rotation added with Salem after Cognito/IAM baseline
-  # checkov:skip=CKV_AWS_149: Default AWS-managed encryption OK for lab; CMK with Salem later
-  name = "${var.project}/${var.environment}/database/master"
-
-  tags = {
-    Name    = "${var.environment}-cloudtrain-db-secret"
-    Purpose = "rds-master"
-  }
-}
-
-resource "aws_secretsmanager_secret_version" "db" {
-  secret_id = aws_secretsmanager_secret.db.id
-  secret_string = jsonencode({
-    engine   = "postgres"
-    host     = aws_db_instance.main.address
-    port     = aws_db_instance.main.port
-    dbname   = aws_db_instance.main.db_name
-    username = aws_db_instance.main.username
-    password = random_password.master.result
-    # Same logical names as .env.example — fill passwords in bootstrap step
-    schemas = ["projects", "datasets", "jobs", "scheduler", "registry", "mlflow"]
-  })
 }

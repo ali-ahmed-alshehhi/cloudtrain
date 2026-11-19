@@ -67,13 +67,19 @@ terraform apply -var-file=environments/dev/terraform.tfvars
 ### 3c. Database schemas (after first RDS apply)
 
 ```bash
-# Requires network path to private RDS + aws CLI + psql + jq
+# Requires network path to private RDS + aws CLI + psql + jq + openssl + terraform
+# Host/port come from terraform outputs (RDS-managed secret has only username/password).
+cd infrastructure
+export MASTER_SECRET_ARN="$(terraform output -raw db_master_secret_arn)"
+# Optional overrides if outputs are unavailable:
+# export DB_HOST=... DB_PORT=5432 DB_NAME=cloudtrain
 ENVIRONMENT=dev ./scripts/bootstrap-schemas.sh
 ```
 
 Creates roles/schemas: `projects`, `datasets`, `jobs`, `scheduler`, `registry`, `mlflow`
-(same as local `make up`). Store each service password in Secrets Manager for deploy.
-Service connection strings should use `?sslmode=require` because RDS forces SSL.
+(same as local `make up`). Writes each service `DATABASE_URL` to Secrets Manager as
+`cloudtrain/<env>/database/<service>` (passwords are not printed). Every URL ends with
+`?sslmode=require` because RDS forces SSL (`rds.force_ssl`).
 
 ## 4. Deploy the services
 Images → ECR, services → ECS Fargate: Salem's pipeline. Hamda + Fatma provide ECR URLs and
