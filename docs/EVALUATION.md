@@ -1,6 +1,6 @@
 # Evaluation: performance, reliability and cloud cost
 
-**Owners:** Hilal + Adel (Student 10). **Status on 18 Nov 2026 (evening): skeleton.** The methods are fixed; most
+**Owners:** Hilal + Adel (Student 10). **Status on 19 Nov 2026: skeleton, first measurements in (Tests A and B).** The methods are fixed; most
 numbers wait for the integrated system (see "Waiting on" in each table). Final version: Fri 27 Nov.
 
 **How to read the status column**
@@ -42,10 +42,10 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 |---|---|---|---|---|
 | Worker killed mid-job | Heartbeat stops → FAILED after the timeout (120 s, 6 s in the demo settings) → retried → SUCCEEDED; time to detect and time to recover | 🧪 Tested in job-service (fake clock). ⏳ Integrated run waiting on: Mariam + Maitha (Sat 21 – Tue 24) | | `job-service/tests/test_recovery.py`, `tests/integration/test_failure_recovery.py` (skipped until then) |
 | Retries used up | FAILED for good and reported to the dead-letter queue; dashboard alert `CloudTrainDeadLetters` | 🧪 Tested (job-service, alert rule) | | `test_retries_used_up_stays_failed_and_reports_to_the_dlq`, `monitoring/prometheus/alerts.test.yml` |
-| A service stopped or too slow | The gateway answers 503 in the shared error format, nothing hangs; alert `CloudTrainServiceDown` after 1 min | 🧪 Tested (gateway, alert rule). ⏳ Each service stopped in Compose: after #115 | | `gateway/tests/test_gateway.py::test_503_when_a_service_is_down_or_slow` |
+| A service stopped or too slow | The gateway answers 503 in the shared error format, nothing hangs; alert `CloudTrainServiceDown` after 1 min | ✅ Measured in Compose (Projects, 19 Nov, `f8d8dab`). 🧪 Alert rule tested; ⏳ alert in Compose after #115 | **Stopped:** 503 × 5, median 4.1 ms, `SERVICE_UNAVAILABLE` + `request_id`; gateway `/health` stays 200. **Frozen:** 503 × 3 after 10.01 s (the 10 s timeout). **Back:** 200 on the first request, 4.7 ms median, no restart. Normal: 7.2 ms median | [`docs/evaluation/test-a-service-stopped-or-frozen.md`](evaluation/test-a-service-stopped-or-frozen.md), `gateway/tests/test_gateway.py::test_503_when_a_service_is_down_or_slow` |
 | Duplicate or out-of-order job events | Counted once; durations right in any order (at-least-once SQS, confirmed by Mariam on #109) | 🧪 Tested, including a recording of what job-service sends | | `monitoring/job-events-monitor/tests/` |
 | Portal when the gateway or a service is down | Clear message, retries with back-off (alerts 10 s → 60 s), never another project's or job's data | 🧪 Tested (portal unit tests, Chrome checks with FIXTURE pages) | | `portal/test/`, #96, #98, #100, #117 |
-| Restarting containers keeps data | Datasets, models, experiments and job records still there after `make down && make up` | ⏳ Waiting on: #99, #93 | | |
+| Restarting containers keeps data | Datasets, models, experiments and job records still there after `make down && make up` | ✅ Measured locally for projects and datasets (19 Nov, `f8d8dab`). ⏳ Models, MLflow runs, jobs: waiting on #93 | **Records (PostgreSQL): kept**, project and dataset answer 200 after the restart. **Files (LocalStack S3): lost**, the download answers 503, as [decision 0005](decisions/0005-localstack-for-s3.md) says (free LocalStack keeps S3 in memory; real S3 in the cloud is not affected). The 503 says "Object storage is not reachable" although only the file is missing (#126, Faisal) | [`docs/evaluation/test-b-restart-keeps-data.md`](evaluation/test-b-restart-keeps-data.md) |
 
 ## 3. Scalability
 
@@ -93,6 +93,11 @@ All three are on `main` since 18 Nov.
   there is no measured cloud latency, cloud GPU performance or real bill.
 - **GPU numbers come from one workstation**, not from the machine types priced in `contracts/pricing.yaml`.
 - **Laptop timings** include Docker on a laptop and are not production numbers.
+- **Test A used one service (Projects).** The gateway sends every route through the same code
+  (`gateway/app/proxy.py`), so the others should behave the same, but only Projects was measured.
+  Upload routes wait up to 300 s (`GATEWAY_UPLOAD_TIMEOUT_SECONDS`) before 503; not tested.
+- **Locally, uploaded files do not survive a restart** (Test B, decision 0005): after `make down` +
+  `make up`, datasets must be uploaded again. For the demo: no restart between uploading and showing.
 - `job-events-monitor` keeps durations in memory: a restart forgets jobs in flight (counts are kept).
 - Tensor and pipeline parallelism are not evaluated (`docs/BENCHMARKS.md`: never simulated).
 - _To be completed with the results._
