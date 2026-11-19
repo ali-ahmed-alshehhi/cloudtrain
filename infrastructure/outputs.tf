@@ -78,6 +78,25 @@ output "db_master_secret_arn" {
   value       = try(module.database[0].master_secret_arn, null)
 }
 
+output "jwt_issuer" {
+  description = "JWT_ISSUER for the gateway (from Cognito / emulator)."
+  value       = try(module.identity[0].issuer, null)
+}
+
+output "jwt_audience" {
+  description = "JWT_AUDIENCE for the gateway (portal Cognito app client id)."
+  value       = try(module.identity[0].portal_client_id, null)
+}
+
+output "jwt_jwks_url" {
+  description = "JWT_JWKS_URL for the gateway (Cognito public keys)."
+  value       = try(module.identity[0].jwks_url, null)
+}
+
+output "cognito_user_pool_id" {
+  value = try(module.identity[0].user_pool_id, null)
+}
+
 output "gpu_worker_autoscaling_group" {
   description = "Auto Scaling group of GPU workers (Abdullah, Maitha)."
   value       = try(module.training_compute_gpu[0].autoscaling_group_name, null)
@@ -89,6 +108,16 @@ output "gpu_worker_launch_template_id" {
 
 output "worker_instance_profile_name" {
   value = try(module.iam[0].worker_instance_profile_name, null)
+}
+
+output "service_task_role_arns" {
+  description = "Per service: the IAM role its code runs as (ECS taskRoleArn; Salem: PassRole in #129)."
+  value       = try(module.service_roles[0].task_role_arns, null)
+}
+
+output "service_database_secret_names" {
+  description = "Per service: the database secret created by scripts/bootstrap-schemas.sh."
+  value       = try(module.service_roles[0].database_secret_names, null)
 }
 
 output "ecs_task_execution_role_arn" {

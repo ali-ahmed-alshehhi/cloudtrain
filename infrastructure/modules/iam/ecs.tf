@@ -3,12 +3,14 @@
 # Created only when enable_ecs_roles = true. Rules: security/DEPLOYMENT_POLICY.md
 #
 #   1. ecs_task_execution — what ECS itself uses to START a task: pull the image, write the logs,
-#      read the secrets the task definition injects. It is NOT the role the service code runs as.
+#      inject each service's OWN database secret. It is NOT the role the service code runs as
+#      (that is the per-service task role, modules/service-roles), and it can never read the RDS
+#      master secret.
 #   2. github_deploy      — what the GitHub Actions deploy workflow uses, through GitHub OIDC
 #      (no AWS keys stored in GitHub): push images, register task definitions, update services.
 #      It cannot create or delete infrastructure; that stays Terraform's job.
 #
-# Per-service task roles (what each service's code may touch) come with #36.
+# Per-service task roles (what each service's code may touch): modules/service-roles (Fatma, #128).
 
 data "aws_caller_identity" "current" {
   count = var.enable_ecs_roles ? 1 : 0
@@ -19,6 +21,8 @@ locals {
   # Log groups /cloudtrain/<environment>/<service> (to be created with the services in #36)
   log_groups_arn = "arn:aws:logs:${var.aws_region}:${local.account_id}:log-group:/cloudtrain/${var.environment}/*"
   services_arn   = "arn:aws:ecs:${var.aws_region}:${local.account_id}:service/${var.ecs_cluster_name}/*"
+  # A Secrets Manager ARN ends with "-" and 6 random characters, so match exactly that suffix
+  secret_arns = [for name in var.secret_names : "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${name}-??????"]
 }
 
 # ---------- 1. Task execution role ----------
@@ -67,11 +71,11 @@ data "aws_iam_policy_document" "ecs_task_execution" {
   }
 
   dynamic "statement" {
-    for_each = length(var.secret_arns) > 0 ? [1] : []
+    for_each = length(var.secret_names) > 0 ? [1] : []
     content {
-      sid       = "ReadInjectedSecretsOnly"
+      sid       = "ReadEachServicesOwnDatabaseSecretOnly"
       actions   = ["secretsmanager:GetSecretValue"]
-      resources = var.secret_arns
+      resources = local.secret_arns
     }
   }
 }

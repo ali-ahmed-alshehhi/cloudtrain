@@ -37,8 +37,8 @@ variable "ecr_repository_arns" {
   default     = []
 }
 
-variable "secret_arns" {
-  description = "Secrets the task definitions inject (e.g. the database master secret). Nothing else is readable."
+variable "secret_names" {
+  description = "Secrets Manager names the task definitions inject: each service's own database secret (cloudtrain/<env>/database/<schema>). Never the RDS master secret."
   type        = list(string)
   default     = []
 }
@@ -50,7 +50,7 @@ variable "ecs_cluster_name" {
 }
 
 variable "task_role_arns" {
-  description = "Per-service task roles (#36) the deploy role may pass to ECS, besides the execution role."
+  description = "Per-service task roles (modules/service-roles) the deploy role may pass to ECS, besides the execution role."
   type        = list(string)
   default     = []
 }
