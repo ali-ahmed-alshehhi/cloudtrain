@@ -63,8 +63,10 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `container-registry` | ECR repos per service |
 | `bootstrap/` (own folder) | S3 state bucket: versioned, encrypted, private, TLS only; locking with `use_lockfile` |
 | `database` | RDS PostgreSQL 17 (private, encrypted, SSL forced) + master secret in Secrets Manager |
-| `identity` | Cognito user pool + portal client + role groups (decision 0006; module from Salem) |
-| `iam` / `application-services` / `training-compute` / `monitoring` | stubs — next (GPU workers in #123) |
+| `identity` | Cognito user pool + portal client + role groups (decision 0006; module from Salem #121) |
+| `iam` | worker role + instance profile: read datasets, read/write artifacts, send `job-events`; nothing else |
+| `training-compute` | GPU workers: launch template + Auto Scaling group on EC2 (decision 0012); size = `worker_desired_capacity` |
+| `application-services` / `monitoring` | stubs — next |
 
 ### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
 
@@ -84,6 +86,21 @@ emulator). `terraform output` then gives each teammate what they need:
 On the emulator these addresses point at the emulator, not at AWS, so services keep using
 `make up` for their own work. The names match `.env.example`, so nothing changes in service code
 if a real AWS account appears later.
+
+### Thu 19 hand-off: the first GPU machine (#35, #70)
+
+`enable_training_compute = true` (on in `emulator.tfvars.example`) adds one Auto Scaling group of
+`g4dn.xlarge` machines (1 GPU each) and the IAM role they run as. Outputs for Abdullah and Maitha:
+`gpu_worker_autoscaling_group`, `gpu_worker_launch_template_id`, `worker_instance_profile_name`.
+On start a machine writes `JOB_EVENTS_QUEUE_URL`, `DATASETS_BUCKET` and `ARTIFACTS_BUCKET` to
+`/etc/cloudtrain-worker.env`. It has no keys: its IAM role gives it S3 and `job-events` only.
+
+**Demo 4, change worker capacity:** set `worker_desired_capacity = 2` (or `-var worker_desired_capacity=2`)
+and run `terraform apply`. The group changes in place; nothing is rebuilt. `worker_max_size` (default 2)
+caps the number of GPU machines.
+
+The emulator does not run a real GPU, so this shows the infrastructure, not training speed. On real AWS
+set `worker_ami_id` to the Deep Learning Base GPU AMI of the region (any `ami-...` works on the emulator).
 
 **Emulator gap: security groups.** Right after creating a security group, Terraform removes the
 "allow all outbound" rule AWS adds, naming it with ports 0-0. Real AWS ignores ports for an

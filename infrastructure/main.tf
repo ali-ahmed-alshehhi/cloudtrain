@@ -54,7 +54,7 @@ module "database" {
   deletion_protection        = var.db_deletion_protection
 }
 
-# Cognito login (decision 0006). Module written by Salem (#121); wired here for root apply.
+# Cognito login (decision 0006). Module lives in modules/identity (from Salem #121); wired here.
 module "identity" {
   count  = var.enable_identity ? 1 : 0
   source = "./modules/identity"
@@ -63,4 +63,38 @@ module "identity" {
   aws_region                 = var.aws_region
   issuer_base_url            = var.use_emulator ? var.emulator_endpoint : ""
   allow_admin_password_login = var.use_emulator
+  deletion_protection        = var.environment == "staging"
+}
+
+module "iam" {
+  count  = var.enable_training_compute ? 1 : 0
+  source = "./modules/iam"
+
+  environment          = var.environment
+  datasets_bucket_arn  = module.object_storage.datasets_bucket_arn
+  artifacts_bucket_arn = module.object_storage.artifacts_bucket_arn
+  job_events_queue_arn = module.message_queue.job_events_queue_arn
+}
+
+module "training_compute_gpu" {
+  count  = var.enable_training_compute ? 1 : 0
+  source = "./modules/training-compute"
+
+  environment   = var.environment
+  pool_name     = "gpu-1"
+  instance_type = var.gpu_instance_type
+  ami_id        = var.worker_ami_id
+  subnet_ids    = module.networking[0].private_subnet_ids
+  # Without our own security groups (the emulator), workers use the VPC's locked-down default group.
+  security_group_ids    = [var.enable_security_groups ? module.security[0].workers_security_group_id : module.networking[0].default_security_group_id]
+  instance_profile_name = module.iam[0].worker_instance_profile_name
+  desired_capacity      = var.worker_desired_capacity
+  min_size              = 0
+  max_size              = var.worker_max_size
+
+  worker_env = {
+    JOB_EVENTS_QUEUE_URL = module.message_queue.job_events_queue_url
+    DATASETS_BUCKET      = module.object_storage.datasets_bucket_name
+    ARTIFACTS_BUCKET     = module.object_storage.artifacts_bucket_name
+  }
 }

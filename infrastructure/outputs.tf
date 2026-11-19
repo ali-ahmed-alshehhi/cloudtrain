@@ -96,3 +96,16 @@ output "jwt_jwks_url" {
 output "cognito_user_pool_id" {
   value = try(module.identity[0].user_pool_id, null)
 }
+
+output "gpu_worker_autoscaling_group" {
+  description = "Auto Scaling group of GPU workers (Abdullah, Maitha)."
+  value       = try(module.training_compute_gpu[0].autoscaling_group_name, null)
+}
+
+output "gpu_worker_launch_template_id" {
+  value = try(module.training_compute_gpu[0].launch_template_id, null)
+}
+
+output "worker_instance_profile_name" {
+  value = try(module.iam[0].worker_instance_profile_name, null)
+}
