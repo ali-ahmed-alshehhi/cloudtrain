@@ -267,7 +267,8 @@ def test_worker_routing_uses_per_machine_url():
     os.environ["TRAINING_WORKER_URLS"] = json.dumps({"g4dn.xlarge": "http://gpu-lb:8010"})
     try:
         gpu_form = {
-            **FORM, "job_id": "job-gpu",
+            **FORM,
+            "job_id": "job-gpu",
             "resources": {"gpu_count": 1, "cpu_cores": 2, "memory_gb": 4},
         }
 
