@@ -77,3 +77,22 @@ output "db_master_secret_arn" {
   description = "RDS-managed Secrets Manager ARN for the master user (Fatma/Hamda + services)."
   value       = try(module.database[0].master_secret_arn, null)
 }
+
+output "jwt_issuer" {
+  description = "JWT_ISSUER for the gateway (from Cognito / emulator)."
+  value       = try(module.identity[0].issuer, null)
+}
+
+output "jwt_audience" {
+  description = "JWT_AUDIENCE for the gateway (portal Cognito app client id)."
+  value       = try(module.identity[0].portal_client_id, null)
+}
+
+output "jwt_jwks_url" {
+  description = "JWT_JWKS_URL for the gateway (Cognito public keys)."
+  value       = try(module.identity[0].jwks_url, null)
+}
+
+output "cognito_user_pool_id" {
+  value = try(module.identity[0].user_pool_id, null)
+}

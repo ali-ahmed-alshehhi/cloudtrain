@@ -53,3 +53,14 @@ module "database" {
   multi_az                   = var.db_multi_az
   deletion_protection        = var.db_deletion_protection
 }
+
+# Cognito login (decision 0006). Module written by Salem (#121); wired here for root apply.
+module "identity" {
+  count  = var.enable_identity ? 1 : 0
+  source = "./modules/identity"
+
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  issuer_base_url            = var.use_emulator ? var.emulator_endpoint : ""
+  allow_admin_password_login = var.use_emulator
+}

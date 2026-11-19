@@ -63,7 +63,8 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `container-registry` | ECR repos per service |
 | `bootstrap/` (own folder) | S3 state bucket: versioned, encrypted, private, TLS only; locking with `use_lockfile` |
 | `database` | RDS PostgreSQL 17 (private, encrypted, SSL forced) + master secret in Secrets Manager |
-| `iam` / `application-services` / `training-compute` / `monitoring` | stubs — next |
+| `identity` | Cognito user pool + portal client + role groups (decision 0006; module from Salem) |
+| `iam` / `application-services` / `training-compute` / `monitoring` | stubs — next (GPU workers in #123) |
 
 ### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
 
@@ -77,6 +78,7 @@ emulator). `terraform output` then gives each teammate what they need:
 | `training_jobs_queue_url`, `training_jobs_dlq_url`, `job_events_queue_url` | SQS queue URLs | Mariam (sends jobs, reads the DLQ); Maitha (only reader of `training-jobs`) |
 | `ecr_repository_urls` | one image repository per service | Salem (CI pushes the images) |
 | `db_endpoint`, `db_master_secret_arn` | Postgres address and the master user's secret | Faisal, Mariam, Majed (services with tables); Salem (deploy) |
+| `jwt_issuer`, `jwt_audience`, `jwt_jwks_url` | Cognito settings for `AUTH_MODE=jwt` | Ali (gateway); Salem (login) |
 | `vpc_id`, `private_subnet_ids`, `services_security_group_id` | the network services and workers run in (the security group is empty on the emulator, see below) | Hamda + Fatma (ECS, training machines); Maitha |
 
 On the emulator these addresses point at the emulator, not at AWS, so services keep using
