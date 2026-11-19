@@ -11,7 +11,7 @@ module "networking" {
 }
 
 module "security" {
-  count  = var.enable_networking ? 1 : 0
+  count  = var.enable_networking && var.enable_security_groups ? 1 : 0
   source = "./modules/security"
 
   environment = var.environment
@@ -43,10 +43,12 @@ module "database" {
   count  = var.enable_database ? 1 : 0
   source = "./modules/database"
 
-  environment                = var.environment
-  project                    = var.project
-  private_subnet_ids         = module.networking[0].private_subnet_ids
-  database_security_group_id = module.security[0].database_security_group_id
+  environment        = var.environment
+  project            = var.project
+  private_subnet_ids = module.networking[0].private_subnet_ids
+  # Without our own security groups (the emulator, see enable_security_groups), the database
+  # sits in the VPC's default security group, which networking locks down (no rules).
+  database_security_group_id = var.enable_security_groups ? module.security[0].database_security_group_id : module.networking[0].default_security_group_id
   instance_class             = var.db_instance_class
   multi_az                   = var.db_multi_az
   deletion_protection        = var.db_deletion_protection

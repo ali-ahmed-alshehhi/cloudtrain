@@ -46,6 +46,7 @@ resource "aws_db_parameter_group" "postgres" {
 }
 
 resource "aws_db_instance" "main" {
+  # checkov:skip=CKV_AWS_157: Single-AZ in dev for lab cost; multi_az is the db_multi_az variable (true on real AWS)
   # checkov:skip=CKV_AWS_293: Performance Insights optional for lab cost control
   # checkov:skip=CKV_AWS_353: Performance Insights KMS optional for lab
   # checkov:skip=CKV_AWS_118: Enhanced monitoring deferred for lab cost; enable with monitoring module

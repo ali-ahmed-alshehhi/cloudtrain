@@ -62,21 +62,34 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `message-queue` | SQS `training-jobs` + DLQ + `job-events` |
 | `container-registry` | ECR repos per service |
 | `bootstrap/` (own folder) | S3 state bucket: versioned, encrypted, private, TLS only; locking with `use_lockfile` |
-| `database` | RDS Postgres + Secrets Manager (enable on real AWS) |
+| `database` | RDS PostgreSQL 17 (private, encrypted, SSL forced) + master secret in Secrets Manager |
 | `iam` / `application-services` / `training-compute` / `monitoring` | stubs — next |
 
-### Next-week apply (real AWS, Wed 18 hand-off)
+### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
 
-```bash
-# In terraform.tfvars (not committed):
-enable_networking         = true
-enable_container_registry = true
-enable_database           = true
+`environments/dev/emulator.tfvars.example` turns on networking, the image registry and the
+database, so one `terraform apply` builds the whole dev environment (45 resources on the
+emulator). `terraform output` then gives each teammate what they need:
 
-terraform apply -var-file=environments/dev/terraform.tfvars
-./scripts/bootstrap-schemas.sh   # one-time schemas for Faisal/Mariam/…
-terraform output                 # share db_endpoint + buckets + queues + ecr
-```
+| Output | What it is | Who needs it |
+|---|---|---|
+| `datasets_bucket`, `artifacts_bucket` | S3 bucket names | Faisal (datasets); Abdullah, Majed (artifacts) |
+| `training_jobs_queue_url`, `training_jobs_dlq_url`, `job_events_queue_url` | SQS queue URLs | Mariam (sends jobs, reads the DLQ); Maitha (only reader of `training-jobs`) |
+| `ecr_repository_urls` | one image repository per service | Salem (CI pushes the images) |
+| `db_endpoint`, `db_master_secret_arn` | Postgres address and the master user's secret | Faisal, Mariam, Majed (services with tables); Salem (deploy) |
+| `vpc_id`, `private_subnet_ids`, `services_security_group_id` | the network services and workers run in (the security group is empty on the emulator, see below) | Hamda + Fatma (ECS, training machines); Maitha |
+
+On the emulator these addresses point at the emulator, not at AWS, so services keep using
+`make up` for their own work. The names match `.env.example`, so nothing changes in service code
+if a real AWS account appears later.
+
+**Emulator gap: security groups.** Right after creating a security group, Terraform removes the
+"allow all outbound" rule AWS adds, naming it with ports 0-0. Real AWS ignores ports for an
+all-protocols rule; the emulator compares them exactly, answers `InvalidPermission.NotFound`, and
+the apply stops. So `emulator.tfvars.example` sets `enable_security_groups = false`: the
+`security` module is skipped and the database uses the VPC's default security group, which the
+`networking` module locks down (no rules at all). On real AWS leave it `true`. Check again with
+each new emulator release, and turn it back on once groups can be created.
 
 ## Real AWS (after instructors give the account)
 
