@@ -40,9 +40,17 @@ resource "aws_security_group" "services" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description     = "From the load balancer"
-    from_port       = 0
-    to_port         = 65535
+    description     = "Gateway, from the load balancer"
+    from_port       = 5810
+    to_port         = 5810
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "Portal, from the load balancer"
+    from_port       = 3000
+    to_port         = 3000
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }

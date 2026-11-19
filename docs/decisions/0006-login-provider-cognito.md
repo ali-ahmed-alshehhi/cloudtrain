@@ -43,3 +43,9 @@ Roles later: Cognito **groups** `admin`, `data-scientist`, `viewer` arrive in th
   `client_id` check.
 - Cognito's hosted login page looks plain; the portal can use it as is.
 - Users exist only in the cloud. Local development keeps the fake login.
+
+## Update 2026-11-18: on the AWS Emulator (decision 0011)
+There is no AWS account, so the user pool runs on the AWS Emulator, which supports Cognito users,
+groups, signed RS256 tokens and the public keys (checked in CI). The issuer is the emulator's
+address (`https://127.0.0.1:9297/<pool ID>`) instead of the Cognito regional address. The module
+is `infrastructure/modules/identity`; how to run it and the tests: `security/login/README.md`.

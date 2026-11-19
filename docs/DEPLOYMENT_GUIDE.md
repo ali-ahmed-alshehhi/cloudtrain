@@ -14,36 +14,45 @@ On **real AWS**, create a dedicated S3 bucket for Terraform state (once per acco
 Enable versioning and block public access. Locking uses S3-native `use_lockfile`
 (see `infrastructure/backends/s3.backend.tf.example`).
 
-Until the AWS account exists, practice with **LocalStack** (same tool as the app —
-decisions [0005](decisions/0005-localstack-for-s3.md) /
-[0009](decisions/0009-terraform-local-uses-localstack.md)) — local state in `backend.tf`.
+We have no AWS account: the **AWS Emulator** stands in for it
+(decision [0011](decisions/0011-aws-emulator-instead-of-aws-account.md)). `infrastructure/bootstrap/`
+creates the state bucket on the emulator (versioned, encrypted, private, TLS only), and
+`infrastructure/backends/emulator.s3.backend.hcl.example` points the root module at it.
+Steps: [infrastructure/bootstrap/README.md](../infrastructure/bootstrap/README.md).
 
 ## 3. Create an environment (`dev`, `staging`)
 
-### 3a. LocalStack practice (Student 6 — today)
+### 3a. AWS Emulator (our stand-in for an AWS account — decision 0011)
 
 ```bash
 cd infrastructure
-docker compose -f docker-compose.localstack.yml up -d
-export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
+./scripts/emulator-up.sh
+source ./scripts/emulator-env.sh        # every new terminal needs this again
 terraform init
-terraform plan  -var-file=environments/dev/localstack.tfvars.example
-terraform apply -var-file=environments/dev/localstack.tfvars.example
+terraform plan  -var-file=environments/dev/emulator.tfvars.example
+terraform apply -var-file=environments/dev/emulator.tfvars.example
 terraform output
 ```
 
-Creates: S3 `datasets` + `artifacts`, SQS `training-jobs` (+ DLQ) + `job-events`.
+Creates the whole dev environment: VPC with public and private subnets and NAT (our security
+groups are skipped on the emulator because of an emulator gap, see `infrastructure/README.md`);
+S3 `datasets` + `artifacts`; SQS `training-jobs` (+ DLQ) + `job-events`; one ECR repository per
+service; RDS PostgreSQL 17 with its master secret in Secrets Manager. `terraform output` lists
+what each teammate needs (see the hand-off table in `infrastructure/README.md`).
+
+Skip `scripts/bootstrap-schemas.sh` on the emulator: the database endpoint lives inside the
+emulator container and is not published to your laptop. Services keep using `make up`
+(LocalStack + local Postgres) for their own work.
 
 Stop when done:
 
 ```bash
-terraform destroy -var-file=environments/dev/localstack.tfvars.example
-docker compose -f docker-compose.localstack.yml down
+terraform destroy -var-file=environments/dev/emulator.tfvars.example
+./scripts/emulator-down.sh
 ```
 
-> Same LocalStack product/image as root `docker-compose.yml` (`localstack/localstack:4.14`).
-> The infra compose file only publishes host port `4568` for Terraform. RDS/ECS/GPU still need
-> real AWS (see decision 0007).
+> LocalStack still works for Terraform (`docker-compose.localstack.yml` +
+> `environments/dev/localstack.tfvars.example`), but the team uses the emulator.
 
 ### 3b. Real AWS
 
@@ -60,6 +69,23 @@ terraform init -migrate-state -backend-config=backends/dev.s3.backend.hcl
 terraform plan  -var-file=environments/dev/terraform.tfvars
 terraform apply -var-file=environments/dev/terraform.tfvars
 ```
+
+### 3c. Database schemas (after first RDS apply)
+
+```bash
+# Requires network path to private RDS + aws CLI + psql + jq + openssl + terraform
+# Host/port come from terraform outputs (RDS-managed secret has only username/password).
+cd infrastructure
+export MASTER_SECRET_ARN="$(terraform output -raw db_master_secret_arn)"
+# Optional overrides if outputs are unavailable:
+# export DB_HOST=... DB_PORT=5432 DB_NAME=cloudtrain
+ENVIRONMENT=dev ./scripts/bootstrap-schemas.sh
+```
+
+Creates roles/schemas: `projects`, `datasets`, `jobs`, `scheduler`, `registry`, `mlflow`
+(same as local `make up`). Writes each service `DATABASE_URL` to Secrets Manager as
+`cloudtrain/<env>/database/<service>` (passwords are not printed). Every URL ends with
+`?sslmode=require` because RDS forces SSL (`rds.force_ssl`).
 
 ## 4. Deploy the services
 Images → ECR, services → ECS Fargate: Salem's pipeline. Hamda + Fatma provide ECR URLs and
@@ -101,3 +127,5 @@ Keep the **state bucket** on real AWS. Destroy disposable `dev` resources after 
 | `job_events_queue_url` | Mariam / notifications |
 | `ecr_repository_urls` | Salem |
 | `vpc_id` / subnet IDs / security groups | Maitha, Salem, Majed |
+| `db_endpoint` | Service owners (DATABASE_URL) |
+| `db_master_secret_arn` | Hamda/Fatma + deploy pipeline |

@@ -1,6 +1,6 @@
 # 0009 — Terraform local practice uses LocalStack (not AWS Emulator)
 
-- **Status:** accepted
+- **Status:** superseded by [0011](0011-aws-emulator-instead-of-aws-account.md)
 - **Date:** 2026-11-15
 - **Decided by:** Hamda + Fatma (Student 6), following Ali’s review on PR #92
 

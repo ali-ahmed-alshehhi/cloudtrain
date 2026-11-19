@@ -15,4 +15,6 @@ or make a choice others must live with. Copy the shape of `0001-microservices-an
 | 0005 | LocalStack S3 instead of MinIO on laptops | accepted |
 | 0006 | Amazon Cognito as the login provider | accepted |
 | 0007 | How the Training Jobs service stays correct when things fail | accepted (contract change #89) |
-| 0009 | Terraform local practice uses LocalStack (not AWS Emulator) | accepted |
+| 0009 | Terraform local practice uses LocalStack (not AWS Emulator) | superseded by 0011 |
+| 0010 | How models are saved, served and deployed | proposed |
+| 0011 | The AWS Emulator stands in for an AWS account | accepted |

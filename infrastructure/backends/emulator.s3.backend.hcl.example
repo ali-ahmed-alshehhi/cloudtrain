@@ -1,0 +1,22 @@
+# Remote state on the AWS Emulator (decision 0011). Used with backends/s3.backend.tf.example.
+#
+# Needs the state bucket from infrastructure/bootstrap/ and `source scripts/emulator-env.sh`
+# (that script sets the emulator's credentials file and CA certificate for Terraform).
+#
+#   cp backends/s3.backend.tf.example backend.tf
+#   terraform init -migrate-state -backend-config=backends/emulator.s3.backend.hcl.example
+
+bucket       = "cloudtrain-tfstate"
+key          = "cloudtrain/dev/terraform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true # S3-native locking: a <key>.tflock file exists while a plan or apply runs
+
+endpoints = {
+  s3 = "https://127.0.0.1:9297"
+}
+use_path_style              = true # the emulator only answers path-style S3 addresses
+skip_credentials_validation = true
+skip_requesting_account_id  = true
+skip_metadata_api_check     = true
+skip_region_validation      = true

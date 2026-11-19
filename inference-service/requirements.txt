@@ -1,4 +1,13 @@
+# PyTorch for CPU only: inference runs on Fargate (no GPU), and the CPU build is ~10x smaller.
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi==0.162.5
 uvicorn[standard]==0.54.0
 python-multipart==0.0.33
 prometheus-client==0.26.0
+httpx==0.28.1
+boto3==1.44.1
+mlflow-skinny==3.18.0  # same version as the MLflow server (mlflow/Dockerfile)
+pandas==3.1.1  # imported by mlflow.pytorch
+torch==2.14.1
+torchvision==0.29.1  # ResNet-18 and the other models the training worker saves
+pillow==13.0.0

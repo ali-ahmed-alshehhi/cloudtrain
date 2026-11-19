@@ -22,3 +22,22 @@ resource "aws_ecr_repository" "services" {
     Purpose = "container-image"
   }
 }
+
+# Keep the last 20 images per repository, so a rollback still has the previous images.
+resource "aws_ecr_lifecycle_policy" "services" {
+  for_each   = aws_ecr_repository.services
+  repository = each.value.name
+
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Keep the last 20 images"
+      selection = {
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 20
+      }
+      action = { type = "expire" }
+    }]
+  })
+}
