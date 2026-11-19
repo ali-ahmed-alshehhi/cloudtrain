@@ -40,9 +40,10 @@ S3 `datasets` + `artifacts`; SQS `training-jobs` (+ DLQ) + `job-events`; one ECR
 service; RDS PostgreSQL 17 with its master secret in Secrets Manager. `terraform output` lists
 what each teammate needs (see the hand-off table in `infrastructure/README.md`).
 
-Skip `scripts/bootstrap-schemas.sh` on the emulator: the database endpoint lives inside the
-emulator container and is not published to your laptop. Services keep using `make up`
-(LocalStack + local Postgres) for their own work.
+Skip `scripts/bootstrap-schemas.sh` on the emulator: its RDS cannot create schemas (`CREATE SCHEMA`
+gives a syntax error, see "Emulator gap: database schemas" in `infrastructure/README.md`), so the
+script only works on real AWS. Services keep using `make up` (LocalStack + local Postgres) for their
+own work.
 
 Stop when done:
 
