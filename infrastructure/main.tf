@@ -55,13 +55,20 @@ module "database" {
 }
 
 module "iam" {
-  count  = var.enable_training_compute ? 1 : 0
+  count  = var.enable_training_compute || var.enable_ecs_roles ? 1 : 0
   source = "./modules/iam"
 
   environment          = var.environment
   datasets_bucket_arn  = module.object_storage.datasets_bucket_arn
   artifacts_bucket_arn = module.object_storage.artifacts_bucket_arn
   job_events_queue_arn = module.message_queue.job_events_queue_arn
+
+  # ECS task execution role + GitHub OIDC deploy role (modules/iam/ecs.tf, Salem)
+  enable_ecs_roles    = var.enable_ecs_roles
+  aws_region          = var.aws_region
+  ecr_repository_arns = var.enable_container_registry ? values(module.container_registry[0].repository_arns) : []
+  secret_arns         = var.enable_database ? [module.database[0].master_secret_arn] : []
+  ecs_cluster_name    = "${var.environment}-cloudtrain"
 }
 
 module "training_compute_gpu" {

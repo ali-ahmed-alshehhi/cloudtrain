@@ -90,3 +90,13 @@ output "gpu_worker_launch_template_id" {
 output "worker_instance_profile_name" {
   value = try(module.iam[0].worker_instance_profile_name, null)
 }
+
+output "ecs_task_execution_role_arn" {
+  description = "executionRoleArn for every ECS task definition (Hamda + Fatma, #36)."
+  value       = try(module.iam[0].ecs_task_execution_role_arn, null)
+}
+
+output "github_deploy_role_arn" {
+  description = "Repository variable AWS_DEPLOY_ROLE_ARN for the deploy workflow (Salem, #54)."
+  value       = try(module.iam[0].github_deploy_role_arn, null)
+}
