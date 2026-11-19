@@ -66,6 +66,7 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `identity` | Cognito user pool + portal client + role groups (decision 0006; module from Salem #121) |
 | `iam` | worker role + instance profile: read datasets, read/write artifacts, send `job-events`; nothing else |
 | `training-compute` | GPU workers: launch template + Auto Scaling group on EC2 (decision 0012); size = `worker_desired_capacity` |
+| `service-roles` | one least-privilege task role per service: only the buckets and queues its code calls |
 | `application-services` / `monitoring` | stubs — next |
 
 ### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
@@ -101,6 +102,21 @@ caps the number of GPU machines.
 
 The emulator does not run a real GPU, so this shows the infrastructure, not training speed. On real AWS
 set `worker_ami_id` to the Deep Learning Base GPU AMI of the region (any `ami-...` works on the emulator).
+
+### Service roles for ECS (#35, with Salem; used in #36)
+
+`enable_service_roles = true` (on in `emulator.tfvars.example`) creates one **task role** per service
+(`service_task_role_arns`), as `security/DEPLOYMENT_POLICY.md` asks ("one IAM role per service"). The
+service's code runs as it. Only these get permissions: `dataset-service` (read/write `datasets`),
+`job-service` (send to `training-jobs` and `job-events`, read the dead-letter queue), `scheduler`
+(read `training-jobs`), `inference-service` (read `artifacts`), `mlflow` (read/write
+`artifacts/mlflow/`). `gateway`, `portal`, `project-service` and `model-registry` call no AWS API, so
+their task roles have no permissions.
+
+The **execution role** (ECS pulls the image, writes logs and injects the database secret) is one shared
+role in `modules/iam/ecs.tf` (Salem, #129). The database secrets are not created by Terraform:
+`scripts/bootstrap-schemas.sh` creates `cloudtrain/<env>/database/<schema>` after the apply (names in
+`service_database_secret_names`), so no password is in Terraform state.
 
 **Emulator gap: security groups.** Right after creating a security group, Terraform removes the
 "allow all outbound" rule AWS adds, naming it with ports 0-0. Real AWS ignores ports for an

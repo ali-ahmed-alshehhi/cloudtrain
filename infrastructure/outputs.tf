@@ -109,3 +109,13 @@ output "gpu_worker_launch_template_id" {
 output "worker_instance_profile_name" {
   value = try(module.iam[0].worker_instance_profile_name, null)
 }
+
+output "service_task_role_arns" {
+  description = "Per service: the IAM role its code runs as (ECS taskRoleArn; Salem: PassRole in #129)."
+  value       = try(module.service_roles[0].task_role_arns, null)
+}
+
+output "service_database_secret_names" {
+  description = "Per service: the database secret created by scripts/bootstrap-schemas.sh."
+  value       = try(module.service_roles[0].database_secret_names, null)
+}
