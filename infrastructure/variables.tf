@@ -120,3 +120,33 @@ variable "availability_zones" {
   type    = list(string)
   default = ["us-east-1a", "us-east-1b"]
 }
+
+variable "enable_training_compute" {
+  description = "Create the worker IAM role and the GPU Auto Scaling group. Requires networking."
+  type        = bool
+  default     = false
+}
+
+variable "gpu_instance_type" {
+  description = "GPU worker machine type, a key of contracts/pricing.yaml."
+  type        = string
+  default     = "g4dn.xlarge"
+}
+
+variable "worker_ami_id" {
+  description = "Machine image for workers (Deep Learning Base GPU AMI on real AWS; any ami-... on the emulator)."
+  type        = string
+  default     = "ami-00000000"
+}
+
+variable "worker_desired_capacity" {
+  description = "How many GPU workers run. Change it and re-apply to scale (demo 4). 0 = none."
+  type        = number
+  default     = 0
+}
+
+variable "worker_max_size" {
+  description = "Upper limit of GPU workers."
+  type        = number
+  default     = 2
+}

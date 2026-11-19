@@ -29,3 +29,9 @@ artifacts_bucket_name = "artifacts"
 
 sqs_visibility_timeout_seconds = 300
 sqs_max_receive_count          = 3
+
+# GPU workers (#35): one Auto Scaling group of g4dn.xlarge machines. The emulator starts no real
+# GPU, so this shows the infrastructure and the demo-4 variable, not training speed.
+enable_training_compute = true
+gpu_instance_type       = "g4dn.xlarge"
+worker_desired_capacity = 1

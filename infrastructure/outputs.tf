@@ -77,3 +77,16 @@ output "db_master_secret_arn" {
   description = "RDS-managed Secrets Manager ARN for the master user (Fatma/Hamda + services)."
   value       = try(module.database[0].master_secret_arn, null)
 }
+
+output "gpu_worker_autoscaling_group" {
+  description = "Auto Scaling group of GPU workers (Abdullah, Maitha)."
+  value       = try(module.training_compute_gpu[0].autoscaling_group_name, null)
+}
+
+output "gpu_worker_launch_template_id" {
+  value = try(module.training_compute_gpu[0].launch_template_id, null)
+}
+
+output "worker_instance_profile_name" {
+  value = try(module.iam[0].worker_instance_profile_name, null)
+}
