@@ -33,6 +33,9 @@ still needed for the graded demos, and that we would revisit it if the AWS Emula
   on AWS.
 - Some behaviours differ from AWS. Known gaps are listed in the emulator repository under
   `issues/things-that-do-not-work/`. Check there before blaming our code.
+- The emulator's RDS has no schemas (found by Mariam on #66, 19 Nov 2026): `CREATE SCHEMA` and
+  schema-qualified tables answer a syntax error, so `infrastructure/scripts/bootstrap-schemas.sh`
+  only works on real AWS. Services keep the real PostgreSQL from `make up` for their tables.
 - Everyone who runs Terraform needs Docker and about 2 GB of free memory for the emulator container.
 
 ## Upgrade path
