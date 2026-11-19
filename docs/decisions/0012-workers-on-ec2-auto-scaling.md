@@ -1,8 +1,8 @@
 # 0012 — Training workers run on EC2 in an Auto Scaling group
 
-- **Status:** proposed (waiting for Maitha and Hamda)
+- **Status:** accepted (Hamda on #123, Maitha on #70, 19 Nov 2026)
 - **Date:** 2026-11-18
-- **Decided by:** Fatma (Student 6)
+- **Decided by:** Fatma and Hamda (Student 6), with Maitha (Scheduler)
 
 ## Context
 The training workers need machines with GPUs. The choice was plain EC2 machines in an Auto Scaling
