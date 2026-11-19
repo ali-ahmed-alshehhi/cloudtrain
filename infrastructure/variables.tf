@@ -28,6 +28,18 @@ variable "aws_region" {
   type        = string
 }
 
+variable "use_emulator" {
+  description = "Point Terraform at the AWS Emulator instead of a real AWS account (decision 0011)."
+  type        = bool
+  default     = false
+}
+
+variable "emulator_endpoint" {
+  description = "AWS Emulator HTTPS endpoint when use_emulator=true."
+  type        = string
+  default     = "https://127.0.0.1:9297"
+}
+
 variable "use_localstack" {
   description = "Point Terraform at LocalStack (same tool as the app — decisions 0005, 0009)."
   type        = bool
@@ -66,6 +78,17 @@ variable "enable_networking" {
   default     = true
 }
 
+variable "enable_security_groups" {
+  description = <<-EOT
+    Create our own security groups (ALB, services, workers, database). Off on the AWS Emulator:
+    its RevokeSecurityGroupEgress does not match the all-protocols rule Terraform removes right
+    after creating a group (ports 0-0), so every aws_security_group fails there. The database
+    then uses the VPC's locked-down default group. See infrastructure/README.md.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "enable_container_registry" {
   description = "Create ECR repositories. Off for LocalStack practice; on for real AWS."
   type        = bool
@@ -96,4 +119,34 @@ variable "db_deletion_protection" {
 variable "availability_zones" {
   type    = list(string)
   default = ["us-east-1a", "us-east-1b"]
+}
+
+variable "enable_training_compute" {
+  description = "Create the worker IAM role and the GPU Auto Scaling group. Requires networking."
+  type        = bool
+  default     = false
+}
+
+variable "gpu_instance_type" {
+  description = "GPU worker machine type, a key of contracts/pricing.yaml."
+  type        = string
+  default     = "g4dn.xlarge"
+}
+
+variable "worker_ami_id" {
+  description = "Machine image for workers (Deep Learning Base GPU AMI on real AWS; any ami-... on the emulator)."
+  type        = string
+  default     = "ami-00000000"
+}
+
+variable "worker_desired_capacity" {
+  description = "How many GPU workers run. Change it and re-apply to scale (demo 4). 0 = none."
+  type        = number
+  default     = 0
+}
+
+variable "worker_max_size" {
+  description = "Upper limit of GPU workers."
+  type        = number
+  default     = 2
 }
