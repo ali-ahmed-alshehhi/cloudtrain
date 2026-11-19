@@ -48,6 +48,7 @@ provider "aws" {
       logs           = local.practice_endpoint
       cloudwatch     = local.practice_endpoint
       s3control      = local.practice_endpoint
+      cognitoidp     = local.practice_endpoint
     }
   }
 

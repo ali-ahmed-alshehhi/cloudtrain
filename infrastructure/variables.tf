@@ -101,6 +101,12 @@ variable "enable_database" {
   default     = false
 }
 
+variable "enable_identity" {
+  description = "Create Cognito user pool + portal client + role groups (decision 0006). On for emulator/real AWS; off for LocalStack."
+  type        = bool
+  default     = false
+}
+
 variable "db_instance_class" {
   type    = string
   default = "db.t4g.micro"

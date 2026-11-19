@@ -54,6 +54,18 @@ module "database" {
   deletion_protection        = var.db_deletion_protection
 }
 
+# Cognito login (decision 0006). Module lives in modules/identity (from Salem #121); wired here.
+module "identity" {
+  count  = var.enable_identity ? 1 : 0
+  source = "./modules/identity"
+
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  issuer_base_url            = var.use_emulator ? var.emulator_endpoint : ""
+  allow_admin_password_login = var.use_emulator
+  deletion_protection        = var.environment == "staging"
+}
+
 module "iam" {
   count  = var.enable_training_compute ? 1 : 0
   source = "./modules/iam"
