@@ -35,3 +35,6 @@ sqs_max_receive_count          = 3
 enable_training_compute = true
 gpu_instance_type       = "g4dn.xlarge"
 worker_desired_capacity = 1
+
+# One least-privilege IAM role per service (task + execution), for ECS in #36.
+enable_service_roles = true

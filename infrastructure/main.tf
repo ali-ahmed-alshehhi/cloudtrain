@@ -86,3 +86,17 @@ module "training_compute_gpu" {
     ARTIFACTS_BUCKET     = module.object_storage.artifacts_bucket_name
   }
 }
+
+# One IAM role per service (security/DEPLOYMENT_POLICY.md). Used by the ECS services in #36.
+module "service_roles" {
+  count  = var.enable_service_roles ? 1 : 0
+  source = "./modules/service-roles"
+
+  environment             = var.environment
+  aws_region              = var.aws_region
+  datasets_bucket_arn     = module.object_storage.datasets_bucket_arn
+  artifacts_bucket_arn    = module.object_storage.artifacts_bucket_arn
+  training_jobs_queue_arn = module.message_queue.training_jobs_queue_arn
+  training_jobs_dlq_arn   = module.message_queue.training_jobs_dlq_arn
+  job_events_queue_arn    = module.message_queue.job_events_queue_arn
+}
