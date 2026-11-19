@@ -10,6 +10,7 @@ use_localstack            = false
 enable_networking         = true
 enable_container_registry = true
 enable_database           = true
+enable_identity           = true
 
 # S3 names must be globally unique on real AWS.
 datasets_bucket_name  = "cloudtrain-dev-datasets-CHANGE-ME"
