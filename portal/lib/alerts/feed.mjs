@@ -152,6 +152,17 @@ export function createAlertFeed({
   };
 }
 
+/**
+ * The feed state to show for the current project and connection, or null ("loading") when the stored
+ * state belongs to another project or another fetchEvents (for example the previous project, just
+ * after switching, before the new feed has answered). `stored` is { projectId, fetchEvents, state }.
+ */
+export function stateForFeed(stored, projectId, fetchEvents) {
+  if (!stored) return null;
+  if (stored.projectId !== (projectId ?? null) || stored.fetchEvents !== fetchEvents) return null;
+  return stored.state;
+}
+
 /** Builds the query string for GET /api/v1/jobs/events from the feed's query. */
 export function eventsQueryString({ after, project_id, limit }) {
   const params = new URLSearchParams();
