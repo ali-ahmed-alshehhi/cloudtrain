@@ -26,7 +26,7 @@ variable "db_name" {
 variable "db_username" {
   description = "Master username (schemas get their own roles via bootstrap SQL)."
   type        = string
-  default     = "cloudtrain_admin"
+  default     = "cloudtrainadmin"
 }
 
 variable "instance_class" {

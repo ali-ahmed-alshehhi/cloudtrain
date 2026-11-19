@@ -12,10 +12,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.6"
-    }
   }
 }
 
@@ -45,6 +41,7 @@ provider "aws" {
       iam            = local.practice_endpoint
       sts            = local.practice_endpoint
       ec2            = local.practice_endpoint
+      autoscaling    = local.practice_endpoint
       rds            = local.practice_endpoint
       secretsmanager = local.practice_endpoint
       kms            = local.practice_endpoint

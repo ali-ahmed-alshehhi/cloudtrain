@@ -58,7 +58,35 @@ output "db_endpoint" {
   value       = try(module.database[0].db_endpoint, null)
 }
 
+output "db_address" {
+  description = "RDS hostname (for bootstrap / DATABASE_URLs)."
+  value       = try(module.database[0].db_address, null)
+}
+
+output "db_port" {
+  description = "RDS port (for bootstrap / DATABASE_URLs)."
+  value       = try(module.database[0].db_port, null)
+}
+
+output "db_name" {
+  description = "Postgres database name."
+  value       = try(module.database[0].db_name, null)
+}
+
 output "db_master_secret_arn" {
-  description = "Secrets Manager ARN for the RDS master user (Fatma/Hamda + services)."
+  description = "RDS-managed Secrets Manager ARN for the master user (Fatma/Hamda + services)."
   value       = try(module.database[0].master_secret_arn, null)
+}
+
+output "gpu_worker_autoscaling_group" {
+  description = "Auto Scaling group of GPU workers (Abdullah, Maitha)."
+  value       = try(module.training_compute_gpu[0].autoscaling_group_name, null)
+}
+
+output "gpu_worker_launch_template_id" {
+  value = try(module.training_compute_gpu[0].launch_template_id, null)
+}
+
+output "worker_instance_profile_name" {
+  value = try(module.iam[0].worker_instance_profile_name, null)
 }

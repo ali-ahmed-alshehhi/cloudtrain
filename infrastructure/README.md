@@ -62,21 +62,51 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `message-queue` | SQS `training-jobs` + DLQ + `job-events` |
 | `container-registry` | ECR repos per service |
 | `bootstrap/` (own folder) | S3 state bucket: versioned, encrypted, private, TLS only; locking with `use_lockfile` |
-| `database` | RDS Postgres + Secrets Manager (enable on real AWS) |
-| `iam` / `application-services` / `training-compute` / `monitoring` | stubs — next |
+| `database` | RDS PostgreSQL 17 (private, encrypted, SSL forced) + master secret in Secrets Manager |
+| `iam` | worker role + instance profile: read datasets, read/write artifacts, send `job-events`; nothing else |
+| `training-compute` | GPU workers: launch template + Auto Scaling group on EC2 (decision 0012); size = `worker_desired_capacity` |
+| `application-services` / `monitoring` | stubs — next |
 
-### Next-week apply (real AWS, Wed 18 hand-off)
+### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
 
-```bash
-# In terraform.tfvars (not committed):
-enable_networking         = true
-enable_container_registry = true
-enable_database           = true
+`environments/dev/emulator.tfvars.example` turns on networking, the image registry and the
+database, so one `terraform apply` builds the whole dev environment (45 resources on the
+emulator). `terraform output` then gives each teammate what they need:
 
-terraform apply -var-file=environments/dev/terraform.tfvars
-./scripts/bootstrap-schemas.sh   # one-time schemas for Faisal/Mariam/…
-terraform output                 # share db_endpoint + buckets + queues + ecr
-```
+| Output | What it is | Who needs it |
+|---|---|---|
+| `datasets_bucket`, `artifacts_bucket` | S3 bucket names | Faisal (datasets); Abdullah, Majed (artifacts) |
+| `training_jobs_queue_url`, `training_jobs_dlq_url`, `job_events_queue_url` | SQS queue URLs | Mariam (sends jobs, reads the DLQ); Maitha (only reader of `training-jobs`) |
+| `ecr_repository_urls` | one image repository per service | Salem (CI pushes the images) |
+| `db_endpoint`, `db_master_secret_arn` | Postgres address and the master user's secret | Faisal, Mariam, Majed (services with tables); Salem (deploy) |
+| `vpc_id`, `private_subnet_ids`, `services_security_group_id` | the network services and workers run in (the security group is empty on the emulator, see below) | Hamda + Fatma (ECS, training machines); Maitha |
+
+On the emulator these addresses point at the emulator, not at AWS, so services keep using
+`make up` for their own work. The names match `.env.example`, so nothing changes in service code
+if a real AWS account appears later.
+
+### Thu 19 hand-off: the first GPU machine (#35, #70)
+
+`enable_training_compute = true` (on in `emulator.tfvars.example`) adds one Auto Scaling group of
+`g4dn.xlarge` machines (1 GPU each) and the IAM role they run as. Outputs for Abdullah and Maitha:
+`gpu_worker_autoscaling_group`, `gpu_worker_launch_template_id`, `worker_instance_profile_name`.
+On start a machine writes `JOB_EVENTS_QUEUE_URL`, `DATASETS_BUCKET` and `ARTIFACTS_BUCKET` to
+`/etc/cloudtrain-worker.env`. It has no keys: its IAM role gives it S3 and `job-events` only.
+
+**Demo 4, change worker capacity:** set `worker_desired_capacity = 2` (or `-var worker_desired_capacity=2`)
+and run `terraform apply`. The group changes in place; nothing is rebuilt. `worker_max_size` (default 2)
+caps the number of GPU machines.
+
+The emulator does not run a real GPU, so this shows the infrastructure, not training speed. On real AWS
+set `worker_ami_id` to the Deep Learning Base GPU AMI of the region (any `ami-...` works on the emulator).
+
+**Emulator gap: security groups.** Right after creating a security group, Terraform removes the
+"allow all outbound" rule AWS adds, naming it with ports 0-0. Real AWS ignores ports for an
+all-protocols rule; the emulator compares them exactly, answers `InvalidPermission.NotFound`, and
+the apply stops. So `emulator.tfvars.example` sets `enable_security_groups = false`: the
+`security` module is skipped and the database uses the VPC's default security group, which the
+`networking` module locks down (no rules at all). On real AWS leave it `true`. Check again with
+each new emulator release, and turn it back on once groups can be created.
 
 ## Real AWS (after instructors give the account)
 

@@ -34,9 +34,15 @@ terraform apply -var-file=environments/dev/emulator.tfvars.example
 terraform output
 ```
 
-Creates: S3 `datasets` + `artifacts`, SQS `training-jobs` (+ DLQ) + `job-events`. Turn on
-`enable_networking`, `enable_container_registry` and `enable_database` in your own copy of the
-tfvars as those modules are tested on the emulator.
+Creates the whole dev environment: VPC with public and private subnets and NAT (our security
+groups are skipped on the emulator because of an emulator gap, see `infrastructure/README.md`);
+S3 `datasets` + `artifacts`; SQS `training-jobs` (+ DLQ) + `job-events`; one ECR repository per
+service; RDS PostgreSQL 17 with its master secret in Secrets Manager. `terraform output` lists
+what each teammate needs (see the hand-off table in `infrastructure/README.md`).
+
+Skip `scripts/bootstrap-schemas.sh` on the emulator: the database endpoint lives inside the
+emulator container and is not published to your laptop. Services keep using `make up`
+(LocalStack + local Postgres) for their own work.
 
 Stop when done:
 
@@ -67,13 +73,19 @@ terraform apply -var-file=environments/dev/terraform.tfvars
 ### 3c. Database schemas (after first RDS apply)
 
 ```bash
-# Requires network path to private RDS + aws CLI + psql + jq
+# Requires network path to private RDS + aws CLI + psql + jq + openssl + terraform
+# Host/port come from terraform outputs (RDS-managed secret has only username/password).
+cd infrastructure
+export MASTER_SECRET_ARN="$(terraform output -raw db_master_secret_arn)"
+# Optional overrides if outputs are unavailable:
+# export DB_HOST=... DB_PORT=5432 DB_NAME=cloudtrain
 ENVIRONMENT=dev ./scripts/bootstrap-schemas.sh
 ```
 
 Creates roles/schemas: `projects`, `datasets`, `jobs`, `scheduler`, `registry`, `mlflow`
-(same as local `make up`). Store each service password in Secrets Manager for deploy.
-Service connection strings should use `?sslmode=require` because RDS forces SSL.
+(same as local `make up`). Writes each service `DATABASE_URL` to Secrets Manager as
+`cloudtrain/<env>/database/<service>` (passwords are not printed). Every URL ends with
+`?sslmode=require` because RDS forces SSL (`rds.force_ssl`).
 
 ## 4. Deploy the services
 Images → ECR, services → ECS Fargate: Salem's pipeline. Hamda + Fatma provide ECR URLs and
