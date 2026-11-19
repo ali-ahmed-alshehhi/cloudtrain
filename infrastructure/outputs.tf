@@ -58,8 +58,23 @@ output "db_endpoint" {
   value       = try(module.database[0].db_endpoint, null)
 }
 
+output "db_address" {
+  description = "RDS hostname (for bootstrap / DATABASE_URLs)."
+  value       = try(module.database[0].db_address, null)
+}
+
+output "db_port" {
+  description = "RDS port (for bootstrap / DATABASE_URLs)."
+  value       = try(module.database[0].db_port, null)
+}
+
+output "db_name" {
+  description = "Postgres database name."
+  value       = try(module.database[0].db_name, null)
+}
+
 output "db_master_secret_arn" {
-  description = "Secrets Manager ARN for the RDS master user (Fatma/Hamda + services)."
+  description = "RDS-managed Secrets Manager ARN for the master user (Fatma/Hamda + services)."
   value       = try(module.database[0].master_secret_arn, null)
 }
 
