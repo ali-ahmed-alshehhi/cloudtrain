@@ -2,7 +2,8 @@
 # Owner: Ali. Changing this file needs Ali's approval (CODEOWNERS).
 #
 # Rules followed here (docs/ARCHITECTURE.md):
-#   - only TWO ports reach the laptop: 5810 (gateway) and 3000 (portal)
+#   - only THREE ports reach the laptop: 5810 (gateway), 3000 (portal) and 3001 (Grafana, local only;
+#     contracts/ports.md, #109)
 #   - every container has a health check, and starts only after what it needs is healthy
 #   - every setting comes from .env (copied from .env.example by `make up`)
 # Container names are the addresses services use to call each other, e.g. http://job-service:8003.
@@ -183,6 +184,52 @@ services:
       gateway: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+
+  # ---------- Monitoring (Hilal + Adel; contracts/ports.md, monitoring/README.md) ----------
+
+  job-events-monitor: # Hilal + Adel; the only reader of the job-events queue
+    build:
+      context: ./monitoring/job-events-monitor
+      additional_contexts:
+        contracts: ./contracts
+    env_file: .env
+    depends_on:
+      localstack: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8011/health', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+
+  prometheus: # Hilal + Adel
+    image: prom/prometheus:v3.5.5 # pinned (#109); alert rules also checked with promtool 3.5.5
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+
+  grafana: # Hilal + Adel
+    image: grafana/grafana:12.4.15 # pinned (#109)
+    ports:
+      - "3001:3000" # local only (contracts/ports.md)
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-grafana-local-only} # from .env; same local placeholder if an older .env lacks it; never admin/admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
       interval: 5s
       timeout: 4s
       retries: 20

@@ -2,7 +2,7 @@
 # Owner: Ali. Python services use Python 3.11 (change with `make test PYTHON=python3.11`).
 
 PYTHON ?= python3.11
-PYTHON_SERVICES := gateway project-service dataset-service job-service scheduler training model-registry inference-service
+PYTHON_SERVICES := gateway project-service dataset-service job-service scheduler training model-registry inference-service monitoring/job-events-monitor
 TOOLS := .venv/bin
 
 .PHONY: help up down reset logs test tools lint contract e2e e2e-login check
