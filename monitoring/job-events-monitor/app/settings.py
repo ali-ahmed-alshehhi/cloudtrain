@@ -6,11 +6,23 @@ from pathlib import Path
 
 # Inside the image the schema is copied to /contracts (see Dockerfile); in the repo it is ../../contracts.
 _IMAGE_SCHEMA = Path("/contracts/events/job-event.schema.json")
-_REPO_SCHEMA = Path(__file__).resolve().parents[3] / "contracts" / "events" / "job-event.schema.json"
 
 
-def _default_schema() -> str:
-    return str(_IMAGE_SCHEMA if _IMAGE_SCHEMA.exists() else _REPO_SCHEMA)
+def _repo_schema(here: Path) -> Path | None:
+    """contracts/ at the repo root, four folders above this file; None when there is no such folder.
+
+    Inside the image this file is /service/app/settings.py, only three folders deep, so asking for
+    parents[3] at import time crashed the container (exit 1) before it could start.
+    """
+    parents = here.resolve().parents
+    return parents[3] / "contracts" / "events" / "job-event.schema.json" if len(parents) > 3 else None
+
+
+def _default_schema(here: Path = Path(__file__)) -> str:
+    if _IMAGE_SCHEMA.exists():
+        return str(_IMAGE_SCHEMA)
+    repo = _repo_schema(here)
+    return str(repo if repo is not None else _IMAGE_SCHEMA)
 
 
 def _flag(name: str, default: str) -> bool:
