@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.db import Dataset, DatasetVersion, LineageRecord
+from app.db import AuditEvent, Dataset, DatasetVersion, LineageRecord
 from app.errors import ApiError
 from app.idempotency import create_once, fingerprint
 from app.projects import ProjectsClient
@@ -81,6 +81,21 @@ def require_dataset_member(
     projects.require_member(dataset.project_id, user_id, request.state.request_id)
 
 
+def record_audit(
+    session: Session, action: str, dataset: Dataset, version: int, actor: str, request: Request
+) -> None:
+    """Add one audit row. It is saved with the next commit, together with the change it describes."""
+    session.add(
+        AuditEvent(
+            action=action,
+            dataset_id=dataset.id,
+            version=version,
+            actor=actor,
+            request_id=request.state.request_id,
+        )
+    )
+
+
 def add_version(
     session: Session,
     storage: ObjectStorage,
@@ -101,7 +116,7 @@ def add_version(
         number=number,
         checksum_sha256=hashlib.sha256(data).hexdigest(),
         size_bytes=len(data),
-        storage_uri=storage_uri(dataset_id, number),
+        storage_uri=storage_uri(storage.bucket, dataset_id, number),
         object_key=key,
         note=note,
         created_by=user_id,
@@ -138,7 +153,8 @@ async def create_dataset(
             created_by=user_id,
         )
         session.add(dataset)
-        add_version(session, storage, dataset, data, None, user_id)
+        version = add_version(session, storage, dataset, data, None, user_id)
+        record_audit(session, "upload", dataset, version.number, user_id, request)
         return 201, dataset_json(dataset)
 
     request_fingerprint = fingerprint(
@@ -202,6 +218,7 @@ async def create_version(
         dataset = load_dataset(session, dataset_id)
         require_dataset_member(projects, dataset, user_id, request)
         version = add_version(session, storage, dataset, data, note, user_id)
+        record_audit(session, "new_version", dataset, version.number, user_id, request)
         return 201, version_json(dataset, version)
 
     request_fingerprint = fingerprint(
@@ -239,15 +256,25 @@ def download(
 ) -> Response:
     dataset, found = load_version(session, dataset_id, version)
     require_dataset_member(projects, dataset, user_id, request)
-    return Response(content=storage.get(found.object_key), media_type="application/octet-stream")
+    content = storage.get(found.object_key)
+    record_audit(session, "download", dataset, found.number, user_id, request)
+    session.commit()
+    return Response(content=content, media_type="application/octet-stream")
 
 
 @router.get("/internal/datasets/{dataset_id}/versions/{version}/download-url")
 def download_url(
-    dataset_id: DatasetIdPath, version: VersionPath, session: SessionDep, storage: StorageDep
+    request: Request,
+    dataset_id: DatasetIdPath,
+    version: VersionPath,
+    session: SessionDep,
+    storage: StorageDep,
+    x_user_id: Annotated[str | None, Header(max_length=128)] = None,
 ) -> dict:
-    _, found = load_version(session, dataset_id, version)
+    dataset, found = load_version(session, dataset_id, version)
     link = storage.presigned_get(found.object_key)
+    record_audit(session, "download_url", dataset, found.number, x_user_id or "internal", request)
+    session.commit()
     return {
         "url": link.url,
         "expires_at": iso(link.expires_at),
@@ -305,6 +332,28 @@ def list_lineage(dataset_id: DatasetIdPath, version: VersionPath, session: Sessi
                 "version": row.version,
                 "job_id": row.job_id,
                 "recorded_at": iso(row.recorded_at),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.get("/internal/datasets/{dataset_id}/audit")
+def list_audit(dataset_id: DatasetIdPath, session: SessionDep) -> dict:
+    """Every upload, new version, download and download link for one dataset, oldest first."""
+    dataset = load_dataset(session, dataset_id)
+    rows = session.scalars(
+        select(AuditEvent).where(AuditEvent.dataset_id == dataset.id).order_by(AuditEvent.id)
+    )
+    return {
+        "items": [
+            {
+                "dataset_id": dataset.public_id,
+                "version": row.version,
+                "action": row.action,
+                "actor": row.actor,
+                "request_id": row.request_id,
+                "at": iso(row.at),
             }
             for row in rows
         ]
