@@ -14,7 +14,9 @@ DS = {"type": "prometheus", "uid": "prometheus"}
 # Shared expressions. Every service's request counter is <service>_requests_total with a `status` label
 # (gateway: `route` instead of `endpoint`), so the regex covers all of them. `service` comes from prometheus.yml.
 REQ = '{__name__=~".+_requests_total"}'
-REQ_5XX = '{__name__=~".+_requests_total", status=~"5.."}'
+REQ_5XX = '{__name__=~".+_requests_total", endpoint!="/health", status=~"5.."}'
+# For the 5xx share: /health is left out (its 503 means "not ready yet" at start-up, not a server error).
+REQ_WORK = '{__name__=~".+_requests_total", endpoint!="/health"}'
 DUR = '{__name__=~".+_request_duration_seconds_bucket"}'
 
 panels: list[dict] = []
@@ -145,10 +147,10 @@ timeseries(
 )
 timeseries(
     "Server errors (5xx)",
-    "Share of answers with status 5xx, by service. Alert above 5% for 5 min.",
+    "Share of answers with status 5xx, by service (/health left out: its 503 means not ready yet). Alert above 5% for 5 min.",
     [
         (
-            f"sum by (service) (rate({REQ_5XX}[$__rate_interval])) / (sum by (service) (rate({REQ}[$__rate_interval])) > 0)",
+            f"sum by (service) (rate({REQ_5XX}[$__rate_interval])) / (sum by (service) (rate({REQ_WORK}[$__rate_interval])) > 0)",
             "{{service}}",
         )
     ],

@@ -30,6 +30,11 @@ tests:
         values: "0+1x15"
       - series: 'gateway_requests_total{service="gateway", status="200"}'
         values: "0+10x15"
+      # scheduler: /health answers 503 "not ready" (start-up), which is not a server error: no alert.
+      - series: 'scheduler_requests_total{service="scheduler", endpoint="/metrics", status="200"}'
+        values: "0+10x15"
+      - series: 'scheduler_requests_total{service="scheduler", endpoint="/health", status="503"}'
+        values: "0+5x15"
     alert_rule_test:
       - eval_time: 12m
         alertname: CloudTrainHighErrorRate

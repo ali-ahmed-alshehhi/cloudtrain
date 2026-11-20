@@ -243,7 +243,7 @@
       "type": "timeseries",
       "id": 6,
       "title": "Server errors (5xx)",
-      "description": "Share of answers with status 5xx, by service. Alert above 5% for 5 min.",
+      "description": "Share of answers with status 5xx, by service (/health left out: its 503 means not ready yet). Alert above 5% for 5 min.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -261,7 +261,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service) (rate({__name__=~\".+_requests_total\", status=~\"5..\"}[$__rate_interval])) / (sum by (service) (rate({__name__=~\".+_requests_total\"}[$__rate_interval])) > 0)",
+          "expr": "sum by (service) (rate({__name__=~\".+_requests_total\", endpoint!=\"/health\", status=~\"5..\"}[$__rate_interval])) / (sum by (service) (rate({__name__=~\".+_requests_total\", endpoint!=\"/health\"}[$__rate_interval])) > 0)",
           "legendFormat": "{{service}}"
         }
       ],
