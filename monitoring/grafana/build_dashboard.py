@@ -147,10 +147,11 @@ timeseries(
 )
 timeseries(
     "Server errors (5xx)",
-    "Share of answers with status 5xx, by service (/health left out: its 503 means not ready yet). Alert above 5% for 5 min.",
+    "Share of answers with status 5xx, by service (/health left out: its 503 means not ready yet). 0% when there is traffic but no error; no data when there is no traffic. Alert above 5% for 5 min.",
     [
         (
-            f"sum by (service) (rate({REQ_5XX}[$__rate_interval])) / (sum by (service) (rate({REQ_WORK}[$__rate_interval])) > 0)",
+            f"(sum by (service) (rate({REQ_5XX}[$__rate_interval])) or 0 * sum by (service) (rate({REQ_WORK}[$__rate_interval])))"
+            f" / (sum by (service) (rate({REQ_WORK}[$__rate_interval])) > 0)",
             "{{service}}",
         )
     ],
