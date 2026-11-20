@@ -1,6 +1,6 @@
 # Evaluation: performance, reliability and cloud cost
 
-**Owners:** Hilal + Adel (Student 10). **Status on 19 Nov 2026: skeleton, first measurements in (Tests A and B).** The methods are fixed; most
+**Owners:** Hilal + Adel (Student 10). **Status on 19 Nov 2026: skeleton, first measurements in (Tests A and B, dashboard on a laptop).** The methods are fixed; most
 numbers wait for the integrated system (see "Waiting on" in each table). Final version: Fri 27 Nov.
 
 **How to read the status column**
@@ -83,9 +83,9 @@ All three are on `main` since 18 Nov.
 | What | Status | Evidence |
 |---|---|---|
 | Every service serves `/health` and `/metrics` | ✅ On `main` (shared service helper) | `*/app/common.py` |
-| `job-events` read by exactly one reader, metrics per attempt | 🧪 Tested; ⏳ in Compose after #109 order is agreed | #115 |
-| Dashboard "CloudTrain overview", 5 alert rules | 🧪 Every query run against a live Prometheus 3.5.0; alert rules unit-tested. ⏳ First visual check after #115 is in Compose | `monitoring/README.md` |
-| AWS side: CloudWatch dashboard and alarms in Terraform | ⏳ Waiting on: Hamda + Fatma (#109 item 2). On the emulator: setup only, no live data | |
+| `job-events` read by exactly one reader, metrics per attempt | 🧪 Tested (24 tests). ✅ Runs in Compose on #115 (not merged yet): Healthy in CI (`make up`, and the Real login job) and on a laptop, 20 Nov | #115 |
+| Dashboard "CloudTrain overview", 5 alert rules | ✅ Seen working on a laptop (20 Nov, #115 at `3fbdf42`): all 10 services UP, 0 alerts firing, time since the last `job-events` read 0–20 s (the 20 s long poll; alert at 120 s). Job, queue and GPU panels say "No data yet" until a training job runs (#93). This first run found two display bugs (a "56 years" spike before the first read, a 10000% axis), fixed in `3fbdf42`. 🧪 Alert rules unit-tested with promtool | `monitoring/README.md` |
+| AWS side: CloudWatch dashboard and alarms in Terraform | ⏳ #134 (Fatma): log groups and 3 alarms, which match `monitoring/aws/README.md` (reviewed 20 Nov); the dashboard and the monitor-down alarm follow #115. On the emulator: setup only, no live data | #134 |
 
 ## 6. Limitations
 
