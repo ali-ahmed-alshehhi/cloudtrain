@@ -1,7 +1,8 @@
 """Object storage for dataset files: LocalStack S3 locally, real S3 in the cloud.
 
-Object key layout: `<dataset_id>/v<version>/data` inside the `datasets` bucket
-(shown outside as `s3://datasets/<dataset_id>/v<version>/`).
+Object key layout: `<dataset_id>/v<version>/data` inside the datasets bucket
+(shown outside as `s3://<bucket>/<dataset_id>/v<version>/`). The bucket is `datasets` locally; on AWS
+it has a globally unique name (DATASETS_BUCKET), so the URI always uses the real bucket name.
 """
 
 from __future__ import annotations
@@ -20,8 +21,8 @@ class StorageUnavailable(Exception):
     """Raised when object storage cannot be reached or fails a read/write."""
 
 
-def storage_uri(dataset_id: str, version: int) -> str:
-    return f"s3://datasets/{dataset_id}/v{version}/"
+def storage_uri(bucket: str, dataset_id: str, version: int) -> str:
+    return f"s3://{bucket}/{dataset_id}/v{version}/"
 
 
 def object_key(dataset_id: str, version: int) -> str:
@@ -35,6 +36,8 @@ class PresignedDownload:
 
 
 class ObjectStorage(Protocol):
+    bucket: str
+
     def put(self, key: str, data: bytes) -> None: ...
 
     def get(self, key: str) -> bytes: ...
@@ -48,6 +51,7 @@ class MemoryStorage:
 
     objects: dict[str, bytes] = field(default_factory=dict)
     fail: bool = False
+    bucket: str = "datasets"
 
     def _maybe_fail(self) -> None:
         if self.fail:
