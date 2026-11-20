@@ -67,6 +67,8 @@ resource "aws_autoscaling_group" "worker" {
   max_size            = var.max_size
   desired_capacity    = var.desired_capacity
   vpc_zone_identifier = var.subnet_ids
+  # New machines join the load balancer by themselves; removed ones leave it.
+  target_group_arns = aws_lb_target_group.worker[*].arn
 
   launch_template {
     id      = aws_launch_template.worker.id
@@ -77,5 +79,53 @@ resource "aws_autoscaling_group" "worker" {
     key                 = "Name"
     value               = local.name
     propagate_at_launch = true
+  }
+}
+
+# ---------- Internal load balancer: one address per pool for the Scheduler ----------
+# The Scheduler posts a job to http://<this address>:8010. A busy worker answers 409 and the
+# Scheduler retries, which then reaches another machine of the same pool.
+
+resource "aws_lb" "worker" {
+  # checkov:skip=CKV_AWS_91: Access logs not needed for an internal, lab-only worker endpoint
+  # checkov:skip=CKV_AWS_150: Disposable dev load balancer; terraform destroy must be able to remove it
+  count              = var.enable_load_balancer ? 1 : 0
+  name               = local.name
+  internal           = true
+  load_balancer_type = "network"
+  subnets            = var.subnet_ids
+
+  enable_cross_zone_load_balancing = true
+
+  tags = {
+    Name    = local.name
+    Purpose = "training-worker-endpoint"
+  }
+}
+
+resource "aws_lb_target_group" "worker" {
+  count       = var.enable_load_balancer ? 1 : 0
+  name        = local.name
+  port        = var.worker_port
+  protocol    = "TCP"
+  vpc_id      = var.vpc_id
+  target_type = "instance"
+
+  health_check {
+    protocol = "HTTP"
+    path     = "/health"
+    port     = "traffic-port"
+  }
+}
+
+resource "aws_lb_listener" "worker" {
+  count             = var.enable_load_balancer ? 1 : 0
+  load_balancer_arn = aws_lb.worker[0].arn
+  port              = var.worker_port
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.worker[0].arn
   }
 }
