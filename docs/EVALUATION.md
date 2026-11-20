@@ -76,7 +76,7 @@ All three are on `main` since 18 Nov.
 | Cost per job and per project | 🧪 Portal views on `main` (#117), tested with FIXTURE jobs. ⏳ Real numbers waiting on: machine types from the scheduler (#105) and real jobs (#93) | | `portal/components/usage/`, `portal/test/usage.test.mjs` |
 | Cost of the 1 GPU vs 2 GPU benchmark | ⏳ Waiting on: Ahmed + Abdulla | | `docs/BENCHMARKS.md` |
 | Total cloud spend | **$0: no AWS account.** The team uses the AWS Emulator (decision 0011), so all costs in this report are **estimates of what the same work would cost on AWS**, not bills | | [decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md) |
-| Keeping cost down (as designed) | GPU machines only while a job runs (scheduler frees the slot), smallest machine that fits the GPU count, `terraform destroy` after use | ⏳ Confirm once #105 is merged | |
+| Keeping cost down | ✅ Checked in the code (20 Nov, `main` at `474a732`). **1. Smallest machine that fits:** the scheduler picks 0 GPU → `c6i.2xlarge`, 1 → `g4dn.xlarge`, 2–4 → `g4dn.12xlarge`, 5–8 → `g4dn.metal` (`scheduler/app/machines.py`, #105); locally always `local-cpu` ($0). **2. Machines are not started and stopped per job:** each GPU pool has a fixed size set in Terraform (`worker_desired_capacity`, 1 in the dev settings; the 4-GPU pool 0; min 0), with no autoscaling, so a machine costs money while idle: one idle `g4dn.xlarge` ≈ **$12.62 a day** (24 h × $0.526). Saving money is manual: set the capacity to 0 when nobody trains, `terraform destroy` after use. **3.** The scheduler frees a job's slot only when the next job needs one ("Busy workers" stays 1 after a job); that affects placement, not the bill | | `scheduler/app/machines.py`, `infrastructure/main.tf`, `infrastructure/README.md` ("Demo 4"), `contracts/pricing.yaml` |
 
 ## 5. Observability (monitoring)
 
@@ -98,6 +98,9 @@ All three are on `main` since 18 Nov.
   Upload routes wait up to 300 s (`GATEWAY_UPLOAD_TIMEOUT_SECONDS`) before 503; not tested.
 - **Locally, uploaded files do not survive a restart** (Test B, decision 0005): after `make down` +
   `make up`, datasets must be uploaded again. For the demo: no restart between uploading and showing.
+- **LocalStack serves both S3 and SQS on the laptop.** During the 500 MB uploads (Test C) the time since the
+  last `job-events` read rose to about 55 s on the dashboard (normally 0–20 s), still under the 120 s alert.
+  In the cloud, S3 and SQS are separate services.
 - `job-events-monitor` keeps durations in memory: a restart forgets jobs in flight (counts are kept).
 - Tensor and pipeline parallelism are not evaluated (`docs/BENCHMARKS.md`: never simulated).
 - _To be completed with the results._
