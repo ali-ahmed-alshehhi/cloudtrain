@@ -40,3 +40,6 @@ worker_desired_capacity = 1
 
 # One least-privilege task role per service, for ECS in #36.
 enable_service_roles = true
+
+# CloudWatch log groups (one per ECS service) and alarms (#36). No live data on the emulator.
+enable_monitoring = true
