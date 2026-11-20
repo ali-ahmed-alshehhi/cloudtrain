@@ -16,6 +16,7 @@ module "security" {
 
   environment = var.environment
   vpc_id      = module.networking[0].vpc_id
+  vpc_cidr    = module.networking[0].vpc_cidr
 }
 
 module "object_storage" {
@@ -101,6 +102,8 @@ module "training_compute_gpu" {
   desired_capacity      = var.worker_desired_capacity
   min_size              = 0
   max_size              = var.worker_max_size
+  enable_load_balancer  = var.enable_worker_load_balancers
+  vpc_id                = module.networking[0].vpc_id
 
   worker_env = {
     JOB_EVENTS_QUEUE_URL = module.message_queue.job_events_queue_url
@@ -120,4 +123,30 @@ module "service_roles" {
   training_jobs_queue_arn = module.message_queue.training_jobs_queue_arn
   training_jobs_dlq_arn   = module.message_queue.training_jobs_dlq_arn
   job_events_queue_arn    = module.message_queue.job_events_queue_arn
+}
+
+# Multi-GPU workers (#36): the same module, a machine with 4 GPUs for Ahmed + Abdulla's DDP runs.
+# contracts/pricing.yaml has no 2-GPU machine, so a 2-GPU job runs here (and pays for the machine).
+module "training_compute_multi_gpu" {
+  count  = var.enable_training_compute ? 1 : 0
+  source = "./modules/training-compute"
+
+  environment           = var.environment
+  pool_name             = "gpu-4"
+  instance_type         = var.multi_gpu_instance_type
+  ami_id                = var.worker_ami_id
+  subnet_ids            = module.networking[0].private_subnet_ids
+  security_group_ids    = [var.enable_security_groups ? module.security[0].workers_security_group_id : module.networking[0].default_security_group_id]
+  instance_profile_name = module.iam[0].worker_instance_profile_name
+  desired_capacity      = var.multi_gpu_desired_capacity
+  min_size              = 0
+  max_size              = var.multi_gpu_max_size
+  enable_load_balancer  = var.enable_worker_load_balancers
+  vpc_id                = module.networking[0].vpc_id
+
+  worker_env = {
+    JOB_EVENTS_QUEUE_URL = module.message_queue.job_events_queue_url
+    DATASETS_BUCKET      = module.object_storage.datasets_bucket_name
+    ARTIFACTS_BUCKET     = module.object_storage.artifacts_bucket_name
+  }
 }
