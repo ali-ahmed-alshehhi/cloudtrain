@@ -17,3 +17,7 @@ output "job_events_queue_url" {
 output "job_events_queue_arn" {
   value = aws_sqs_queue.job_events.arn
 }
+
+output "training_jobs_dlq_arn" {
+  value = aws_sqs_queue.training_jobs_dlq.arn
+}
