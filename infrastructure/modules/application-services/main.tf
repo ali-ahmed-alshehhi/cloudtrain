@@ -47,7 +47,7 @@ resource "aws_ecs_cluster" "this" {
 
   setting {
     name  = "containerInsights"
-    value = "disabled"
+    value = "enabled"
   }
 
   tags = {
@@ -73,7 +73,7 @@ resource "aws_cloudwatch_log_group" "service" {
   for_each = local.create_log_groups ? local.services : {}
 
   name              = "/cloudtrain/${var.environment}/${each.key}"
-  retention_in_days = 14
+  retention_in_days = 365
 
   tags = {
     Name = each.key
@@ -116,13 +116,15 @@ resource "aws_service_discovery_service" "this" {
 resource "aws_lb" "public" {
   # checkov:skip=CKV_AWS_91: Access logs deferred to monitoring
   # checkov:skip=CKV2_AWS_28: WAF out of lab scope
-  name               = "${var.environment}-cloudtrain-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [local.alb_sg_id]
-  subnets            = var.public_subnet_ids
-
+  # checkov:skip=CKV_AWS_150: Dev/emulator must allow terraform destroy; enable on staging later
+  # checkov:skip=CKV2_AWS_20: No ACM on emulator; HTTP only until real cert (contracts/ports.md)
+  name                       = "${var.environment}-cloudtrain-alb"
+  internal                   = false
+  load_balancer_type         = "application"
+  security_groups            = [local.alb_sg_id]
+  subnets                    = var.public_subnet_ids
   drop_invalid_header_fields = true
+  enable_deletion_protection = false
 
   tags = {
     Name = "${var.environment}-cloudtrain-alb"
@@ -130,6 +132,7 @@ resource "aws_lb" "public" {
 }
 
 resource "aws_lb_target_group" "gateway" {
+  # checkov:skip=CKV_AWS_378: Targets are HTTP containers (gateway :5810); TLS terminates later with ACM
   name        = "${var.environment}-ct-gateway"
   port        = 5810
   protocol    = "HTTP"
@@ -151,6 +154,7 @@ resource "aws_lb_target_group" "gateway" {
 }
 
 resource "aws_lb_target_group" "portal" {
+  # checkov:skip=CKV_AWS_378: Targets are HTTP containers (portal :3000); TLS terminates later with ACM
   name        = "${var.environment}-ct-portal"
   port        = 3000
   protocol    = "HTTP"
@@ -171,20 +175,11 @@ resource "aws_lb_target_group" "portal" {
   }
 }
 
-# HTTP for lab/emulator (no ACM certificate yet). Real AWS can add HTTPS later.
-# Published ports match contracts/ports.md: gateway 5810, portal 3000. :80 also hits the gateway.
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.public.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.gateway.arn
-  }
-}
-
+# HTTP listeners: contracts/ports.md publishes gateway :5810 and portal :3000.
+# No ACM certificate on the emulator (decision 0011); HTTPS comes with a real account.
 resource "aws_lb_listener" "gateway" {
+  # checkov:skip=CKV_AWS_2: HTTP until ACM exists; published port 5810 per contracts/ports.md
+  # checkov:skip=CKV_AWS_103: TLS policy N/A for HTTP listener on the emulator
   load_balancer_arn = aws_lb.public.arn
   port              = 5810
   protocol          = "HTTP"
@@ -196,6 +191,8 @@ resource "aws_lb_listener" "gateway" {
 }
 
 resource "aws_lb_listener" "portal" {
+  # checkov:skip=CKV_AWS_2: HTTP until ACM exists; published port 3000 per contracts/ports.md
+  # checkov:skip=CKV_AWS_103: TLS policy N/A for HTTP listener on the emulator
   load_balancer_arn = aws_lb.public.arn
   port              = 3000
   protocol          = "HTTP"
@@ -349,7 +346,6 @@ resource "aws_ecs_service" "service" {
   }
 
   depends_on = [
-    aws_lb_listener.http,
     aws_lb_listener.gateway,
     aws_lb_listener.portal,
     aws_cloudwatch_log_group.service,

@@ -19,17 +19,9 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Lab / emulator: HTTP until we have an ACM certificate. Ports match contracts/ports.md.
+  # Lab / emulator: HTTP on the contract ports until ACM exists (decision 0011).
   ingress {
-    description = "HTTP from the internet (gateway default)"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Gateway published port"
+    description = "Gateway published port (contracts/ports.md)"
     from_port   = 5810
     to_port     = 5810
     protocol    = "tcp"
@@ -37,7 +29,7 @@ resource "aws_security_group" "alb" {
   }
 
   ingress {
-    description = "Portal published port"
+    description = "Portal published port (contracts/ports.md)"
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"

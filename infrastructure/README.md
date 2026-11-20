@@ -122,7 +122,8 @@ role in `modules/iam/ecs.tf` (Salem, #129). The database secrets are not created
 ### Sun 22 hand-off: services on ECS Fargate (#36, #75)
 
 `enable_application_services = true` creates the ECS cluster **`dev-cloudtrain`**, one Fargate
-service per app container (not the training worker), and a public ALB. Outputs for Salem and the team:
+service per app container (not the training worker), and a public ALB on ports **5810** / **3000**
+(HTTP until an ACM certificate exists). Outputs for Salem and the team:
 
 | Output | Who needs it |
 |---|---|
