@@ -126,6 +126,13 @@ the apply stops. So `emulator.tfvars.example` sets `enable_security_groups = fal
 `networking` module locks down (no rules at all). On real AWS leave it `true`. Check again with
 each new emulator release, and turn it back on once groups can be created.
 
+**Emulator gap: database schemas.** The emulator's RDS answers like PostgreSQL 17, but it cannot
+create schemas: `CREATE SCHEMA` (every form) and schema-qualified tables such as `public.t1` give a
+syntax error, and `current_schemas()` does not exist (it looks like SQLite behind a PostgreSQL front).
+So `scripts/bootstrap-schemas.sh` stops at its first `CREATE SCHEMA` there and only works on real AWS.
+The database outputs (`db_endpoint`, `db_port`, `db_name`, `db_master_secret_arn`) still work, and
+services keep using the real PostgreSQL from `make up` for their tables. Found by Mariam on #66.
+
 ## Real AWS (after instructors give the account)
 
 ```bash
