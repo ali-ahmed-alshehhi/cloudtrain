@@ -18,6 +18,12 @@ computing and DevOps each fix part of that.
 
 ## 1. Architecture diagram
 
+![CloudTrain architecture](diagrams/architecture.svg)
+
+The numbered steps follow the walk-through in section 18. The picture is drawn by
+`diagrams/build.py`; change a box there, run `python docs/diagrams/build.py`, and commit both.
+The same view as text:
+
 ```mermaid
 flowchart LR
   browser([Browser])
@@ -62,6 +68,11 @@ flowchart LR
 Every service also has its own schema in PostgreSQL (lines omitted for clarity).
 
 ## 2. Deployment diagram (which AWS piece runs what)
+
+![CloudTrain on AWS](diagrams/deployment.svg)
+
+Dashed boxes are not in the Terraform on `main` yet. When one is merged, remove its name from
+`PLANNED` in `diagrams/build.py` and run the script again. The same view as text:
 
 ```mermaid
 flowchart TB
@@ -187,6 +198,7 @@ containing `/internal/` gives **404**. CORS allows `http://localhost:3000` and t
 | Training Jobs | `GET dataset-service:8002/datasets/{id}/versions/{v}` | Confirm the dataset version exists before accepting a job |
 | Training worker | `GET dataset-service:8002/internal/datasets/{id}/versions/{v}/download-url` | Time-limited S3 link to download the data |
 | Scheduler | `POST job-service:8003/internal/jobs/{id}/status` | Report Scheduled / Running / Failed / Succeeded, machine type, start and end times |
+| Scheduler | `GET job-service:8003/internal/jobs/{id}` | Know when a job ended or was retried, to free its machine slot; checked when a slot is needed, not on a timer (#102) |
 | Scheduler | `POST training-worker:8010/internal/run` (local); starts an EC2 instance with the job form (cloud) | Hand one job to one worker |
 | Training worker | `POST job-service:8003/internal/jobs/{id}/heartbeat` | "I am still alive", every `HEARTBEAT_INTERVAL_SECONDS` (default 30) |
 | Training worker | `POST job-service:8003/internal/jobs/{id}/status` | Report Succeeded or Failed when training ends |
