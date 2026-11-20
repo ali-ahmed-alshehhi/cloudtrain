@@ -2,12 +2,13 @@
   "name": "cloudtrain-portal",
   "version": "0.1.0",
   "private": true,
-  "description": "STAND-IN for the CloudTrain web portal (owners: Hilal + Adel).",
+  "description": "CloudTrain web portal (owners: Hilal + Adel).",
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "test": "node --test \"test/**/*.test.mjs\""
+    "test": "node --test \"test/**/*.test.mjs\" tests/*.test.mjs",
+    "test:e2e": "node --test tests/e2e/*.test.cjs"
   },
   "engines": {
     "node": ">=24"
@@ -16,5 +17,8 @@
     "next": "16.4.6",
     "react": "19.3.1",
     "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
   }
 }
