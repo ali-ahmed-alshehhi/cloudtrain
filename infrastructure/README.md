@@ -65,7 +65,7 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `database` | RDS PostgreSQL 17 (private, encrypted, SSL forced) + master secret in Secrets Manager |
 | `identity` | Cognito user pool + portal client + role groups (decision 0006; module from Salem #121) |
 | `iam` | worker role + instance profile: read datasets, read/write artifacts, send `job-events`; nothing else |
-| `training-compute` | GPU workers: launch template + Auto Scaling group on EC2 (decision 0012); size = `worker_desired_capacity` |
+| `training-compute` | GPU worker pools: launch template + Auto Scaling group on EC2 (decision 0012), optional internal load balancer; `gpu-1` (1 GPU) and `gpu-4` (4 GPUs) |
 | `service-roles` | one least-privilege task role per service: only the buckets and queues its code calls |
 | `application-services` | ECS Fargate cluster `<env>-cloudtrain`, services, public ALB (gateway :5810, portal :3000) |
 | `monitoring` | stub — Fatma (#36): log groups / alarms; app-services creates log groups until then |
@@ -103,6 +103,26 @@ caps the number of GPU machines.
 
 The emulator does not run a real GPU, so this shows the infrastructure, not training speed. On real AWS
 set `worker_ami_id` to the Deep Learning Base GPU AMI of the region (any `ami-...` works on the emulator).
+
+### Multi-GPU pool and worker addresses (#36)
+
+`enable_training_compute = true` now builds **two worker pools** with the same module:
+
+| Pool | Machine | GPUs | Size variable | Max variable |
+|---|---|---|---|---|
+| `gpu-1` | `gpu_instance_type` (`g4dn.xlarge`) | 1 | `worker_desired_capacity` | `worker_max_size` (2) |
+| `gpu-4` | `multi_gpu_instance_type` (`g4dn.12xlarge`) | 4 | `multi_gpu_desired_capacity` | `multi_gpu_max_size` (1) |
+
+`contracts/pricing.yaml` has no 2-GPU machine, so Ahmed and Abdulla's 2-GPU runs use `gpu-4` (a job pays
+for the whole machine). Demo 4 works for both pools: change the size variable and run `terraform apply`.
+
+**Worker addresses for the Scheduler.** With `enable_worker_load_balancers = true` (on in
+`emulator.tfvars.example`) each pool gets an internal network load balancer on port 8010 that
+health-checks `/health`. New machines join it by themselves. The output `worker_urls` maps machine type
+to address, for example `{"g4dn.xlarge": "http://dev-cloudtrain-gpu-1-….elb.amazonaws.com:8010"}`.
+Maitha reads it as `TRAINING_WORKER_URLS` (JSON); `TRAINING_WORKER_URL` stays for `local-cpu`, so
+`make up` doesn't change (#70). The workers' security group now only accepts port 8010: from the
+services, and from inside the VPC for the load balancer's health checks.
 
 ### Service roles for ECS (#35, with Salem; used in #36)
 

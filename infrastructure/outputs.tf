@@ -130,6 +130,19 @@ output "github_deploy_role_arn" {
   value       = try(module.iam[0].github_deploy_role_arn, null)
 }
 
+output "multi_gpu_worker_autoscaling_group" {
+  description = "Auto Scaling group of multi-GPU workers (Ahmed + Abdulla)."
+  value       = try(module.training_compute_multi_gpu[0].autoscaling_group_name, null)
+}
+
+output "worker_urls" {
+  description = "Machine type to worker address, for the Scheduler's TRAINING_WORKER_URLS (JSON). Maitha, #70."
+  value = var.enable_training_compute && var.enable_worker_load_balancers ? {
+    (var.gpu_instance_type)       = module.training_compute_gpu[0].worker_url
+    (var.multi_gpu_instance_type) = module.training_compute_multi_gpu[0].worker_url
+  } : {}
+}
+
 output "ecs_cluster_name" {
   description = "ECS cluster for Salem's deploy (#54). Always <environment>-cloudtrain."
   value       = try(module.application_services[0].ecs_cluster_name, null)

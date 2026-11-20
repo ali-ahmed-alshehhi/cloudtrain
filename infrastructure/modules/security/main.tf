@@ -101,11 +101,19 @@ resource "aws_security_group" "workers" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description     = "From services (scheduler / job control)"
-    from_port       = 0
-    to_port         = 65535
+    description     = "Worker port, from services (the scheduler hands jobs over)"
+    from_port       = var.worker_port
+    to_port         = var.worker_port
     protocol        = "tcp"
     security_groups = [aws_security_group.services.id]
+  }
+
+  ingress {
+    description = "Worker port, for the internal load balancer's health checks (inside the VPC)"
+    from_port   = var.worker_port
+    to_port     = var.worker_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   egress {
