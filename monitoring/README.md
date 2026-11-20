@@ -39,42 +39,19 @@ backends were stopped, scheduler shown DOWN and its alert firing).
 Grafana itself was not started (its download is blocked in the build environment): the first real look
 at the dashboard is on a laptop once it is in Compose.
 
-## To add after #109 is agreed (Ali: shared files)
-`docker-compose.yml`, next to the other services:
-```yaml
-  job-events-monitor: # Hilal + Adel
-    build:
-      context: ./monitoring/job-events-monitor
-      additional_contexts:
-        contracts: ./contracts
-    env_file: .env
-    environment:
-      JOB_EVENTS_QUEUE: job-events
-    depends_on:
-      localstack: { condition: service_healthy }
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8011/health', timeout=3)"]
-      interval: 5s
-      timeout: 4s
-      retries: 20
+## In Compose (#109 agreed, contract #125 merged)
+`make up` starts the three containers with everything else (`docker-compose.yml`, Ali's file: he reviews
+it as code owner). Ports: `contracts/ports.md`. Settings: `.env` (`GRAFANA_ADMIN_PASSWORD`,
+`JOB_EVENTS_WAIT_SECONDS`, `JOB_EVENTS_HEALTHY_WITHIN_SECONDS`).
 
-  prometheus: # Hilal + Adel
-    image: prom/prometheus:v3.5.5 # pinned (#109); alert rules also checked with promtool 3.5.5
-    volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+| Container | Image | Published | Health check |
+|---|---|---|---|
+| `job-events-monitor` | built from `monitoring/job-events-monitor` | no (8011 inside) | `GET /health` |
+| `prometheus` | `prom/prometheus:v3.5.5` (pinned) | no (9090 inside) | `GET /-/ready` |
+| `grafana` | `grafana/grafana:12.4.15` (pinned) | **3001, local only** | `GET /api/health` |
 
-  grafana: # Hilal + Adel
-    image: grafana/grafana:12.4.15 # pinned (#109): newest 12.x release on 18 Nov 2026
-    ports: ["3001:3000"] # local only; needs agreement (#109)
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD} # from .env (placeholder in .env.example); never admin/admin
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-    volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on: [prometheus]
-```
-`contracts/ports.md` and `.env.example` come first, in their own contract pull request (Ali's order on #109). Then
-`monitoring/job-events-monitor` in the `make test` list and `scripts/changed_services.sh`.
+Open the dashboard at http://localhost:3001 (viewers read only; admin password from `.env`, never
+`admin/admin`). No end-to-end test uses Grafana.
+
+`monitoring/job-events-monitor` is in the `make test` list (`Makefile`) and in `scripts/changed_services.sh`,
+so CI lints and tests it; `pip-audit` also checks `monitoring/*/requirements.txt` (`security.yml`).
