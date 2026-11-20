@@ -129,3 +129,12 @@ output "github_deploy_role_arn" {
   description = "Repository variable AWS_DEPLOY_ROLE_ARN for the deploy workflow (Salem, #54)."
   value       = try(module.iam[0].github_deploy_role_arn, null)
 }
+
+output "log_group_names" {
+  description = "Per service: its CloudWatch log group (Hamda: awslogs-group in the ECS task definitions)."
+  value       = try(module.monitoring[0].log_group_names, null)
+}
+
+output "alarm_names" {
+  value = try(module.monitoring[0].alarm_names, null)
+}

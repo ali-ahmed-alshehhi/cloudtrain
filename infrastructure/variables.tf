@@ -168,3 +168,15 @@ variable "enable_service_roles" {
   type        = bool
   default     = false
 }
+
+variable "enable_monitoring" {
+  description = "Create the CloudWatch log groups (one per ECS service) and alarms."
+  type        = bool
+  default     = false
+}
+
+variable "log_retention_days" {
+  description = "How long CloudWatch keeps service logs."
+  type        = number
+  default     = 14
+}
