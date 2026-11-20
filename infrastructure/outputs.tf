@@ -129,3 +129,26 @@ output "github_deploy_role_arn" {
   description = "Repository variable AWS_DEPLOY_ROLE_ARN for the deploy workflow (Salem, #54)."
   value       = try(module.iam[0].github_deploy_role_arn, null)
 }
+
+output "ecs_cluster_name" {
+  description = "ECS cluster for Salem's deploy (#54). Always <environment>-cloudtrain."
+  value       = try(module.application_services[0].ecs_cluster_name, null)
+}
+
+output "ecs_service_names" {
+  description = "Per service: ECS service name in the cluster."
+  value       = try(module.application_services[0].ecs_service_names, null)
+}
+
+output "alb_dns_name" {
+  description = "Public load balancer DNS (gateway and portal)."
+  value       = try(module.application_services[0].alb_dns_name, null)
+}
+
+output "gateway_url" {
+  value = try(module.application_services[0].gateway_url, null)
+}
+
+output "portal_url" {
+  value = try(module.application_services[0].portal_url, null)
+}

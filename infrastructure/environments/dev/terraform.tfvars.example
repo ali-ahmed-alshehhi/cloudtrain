@@ -25,3 +25,9 @@ db_multi_az            = false
 db_deletion_protection = false
 
 availability_zones = ["us-east-1a", "us-east-1b"]
+
+enable_service_roles         = true
+enable_application_services  = true
+enable_ecs_service_discovery = true
+ecs_desired_count            = 1
+# ecs_image_tag = "<commit sha from images.yml>"

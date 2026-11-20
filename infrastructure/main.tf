@@ -121,3 +121,43 @@ module "service_roles" {
   training_jobs_dlq_arn   = module.message_queue.training_jobs_dlq_arn
   job_events_queue_arn    = module.message_queue.job_events_queue_arn
 }
+
+# ECS Fargate + public ALB (#36). Cluster name <environment>-cloudtrain matches #129.
+module "application_services" {
+  count  = var.enable_application_services ? 1 : 0
+  source = "./modules/application-services"
+
+  environment        = var.environment
+  aws_region         = var.aws_region
+  vpc_id             = module.networking[0].vpc_id
+  public_subnet_ids  = module.networking[0].public_subnet_ids
+  private_subnet_ids = module.networking[0].private_subnet_ids
+
+  alb_security_group_id      = var.enable_security_groups ? module.security[0].alb_security_group_id : ""
+  services_security_group_id = var.enable_security_groups ? module.security[0].services_security_group_id : ""
+  default_security_group_id  = module.networking[0].default_security_group_id
+
+  execution_role_arn  = module.iam[0].ecs_task_execution_role_arn
+  task_role_arns      = module.service_roles[0].task_role_arns
+  ecr_repository_urls = module.container_registry[0].repository_urls
+  image_tag           = var.ecs_image_tag
+  desired_count       = var.ecs_desired_count
+
+  database_secret_names = module.service_roles[0].database_secret_names
+
+  datasets_bucket         = module.object_storage.datasets_bucket_name
+  artifacts_bucket        = module.object_storage.artifacts_bucket_name
+  training_jobs_queue_url = module.message_queue.training_jobs_queue_url
+  training_jobs_dlq_url   = module.message_queue.training_jobs_dlq_url
+  job_events_queue_url    = module.message_queue.job_events_queue_url
+
+  jwt_issuer   = try(module.identity[0].issuer, "")
+  jwt_audience = try(module.identity[0].portal_client_id, "")
+  jwt_jwks_url = try(module.identity[0].jwks_url, "")
+
+  # Fatma's worker LBs (#36) will fill this; empty until then.
+  worker_urls_json = var.worker_urls_json
+
+  # Emulator may lack Cloud Map; real AWS keeps it on.
+  enable_service_discovery = var.enable_ecs_service_discovery
+}

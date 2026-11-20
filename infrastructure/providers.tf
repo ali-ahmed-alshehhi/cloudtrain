@@ -33,22 +33,23 @@ provider "aws" {
   dynamic "endpoints" {
     for_each = local.practice_aws ? [1] : []
     content {
-      s3             = local.practice_endpoint
-      sqs            = local.practice_endpoint
-      ecr            = local.practice_endpoint
-      ecs            = local.practice_endpoint
-      elbv2          = local.practice_endpoint
-      iam            = local.practice_endpoint
-      sts            = local.practice_endpoint
-      ec2            = local.practice_endpoint
-      autoscaling    = local.practice_endpoint
-      rds            = local.practice_endpoint
-      secretsmanager = local.practice_endpoint
-      kms            = local.practice_endpoint
-      logs           = local.practice_endpoint
-      cloudwatch     = local.practice_endpoint
-      s3control      = local.practice_endpoint
-      cognitoidp     = local.practice_endpoint
+      s3               = local.practice_endpoint
+      sqs              = local.practice_endpoint
+      ecr              = local.practice_endpoint
+      ecs              = local.practice_endpoint
+      elbv2            = local.practice_endpoint
+      iam              = local.practice_endpoint
+      sts              = local.practice_endpoint
+      ec2              = local.practice_endpoint
+      autoscaling      = local.practice_endpoint
+      rds              = local.practice_endpoint
+      secretsmanager   = local.practice_endpoint
+      kms              = local.practice_endpoint
+      logs             = local.practice_endpoint
+      cloudwatch       = local.practice_endpoint
+      s3control        = local.practice_endpoint
+      cognitoidp       = local.practice_endpoint
+      servicediscovery = local.practice_endpoint
     }
   }
 
