@@ -133,6 +133,12 @@ variable "enable_training_compute" {
   default     = false
 }
 
+variable "enable_ecs_roles" {
+  description = "Create the ECS task execution role and the GitHub OIDC deploy role (modules/iam/ecs.tf)."
+  type        = bool
+  default     = false
+}
+
 variable "gpu_instance_type" {
   description = "GPU worker machine type, a key of contracts/pricing.yaml."
   type        = string
