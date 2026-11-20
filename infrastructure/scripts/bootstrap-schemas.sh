@@ -5,6 +5,10 @@
 #
 # RDS-managed master secrets only contain username/password (no host/port), so host/port
 # come from terraform outputs (or DB_HOST / DB_PORT / DB_NAME env overrides).
+#
+# Order matters: run all CREATE ROLE / CREATE SCHEMA in one transaction first; write
+# Secrets Manager values only after that succeeds (so a failed SQL run never leaves
+# secrets pointing at missing roles).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -61,15 +65,29 @@ put_service_secret() {
   echo "Wrote Secrets Manager secret: ${secret_name}"
 }
 
+# Build SQL + remember URLs; do not touch Secrets Manager yet.
+declare -a SERVICE_NAMES=()
+declare -a SERVICE_URLS=()
+
 for name in "${SCHEMAS[@]}"; do
   pw=$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)
   printf "CREATE ROLE %s LOGIN PASSWORD '%s';\n" "$name" "$pw" >>"$SQL_FILE"
   printf "CREATE SCHEMA %s AUTHORIZATION %s;\n" "$name" "$name" >>"$SQL_FILE"
   url="postgresql+psycopg://${name}:${pw}@${HOST}:${PORT}/${DB}?sslmode=require"
-  put_service_secret "$name" "$url"
+  SERVICE_NAMES+=("$name")
+  SERVICE_URLS+=("$url")
 done
 
-echo "Applying schemas on ${HOST}:${PORT}/${DB} ..."
-psql "host=${HOST} port=${PORT} dbname=${DB} user=${USER} sslmode=require" -v ON_ERROR_STOP=1 -f "$SQL_FILE"
+echo "Applying schemas on ${HOST}:${PORT}/${DB} (single transaction) ..."
+psql "host=${HOST} port=${PORT} dbname=${DB} user=${USER} sslmode=require" \
+  -v ON_ERROR_STOP=1 \
+  --single-transaction \
+  -f "$SQL_FILE"
+
+echo "SQL succeeded; writing service DATABASE_URLs to Secrets Manager ..."
+for i in "${!SERVICE_NAMES[@]}"; do
+  put_service_secret "${SERVICE_NAMES[$i]}" "${SERVICE_URLS[$i]}"
+done
+
 echo "Done. Service DATABASE_URLs are in Secrets Manager under cloudtrain/${ENVIRONMENT}/database/<service>."
 echo "SQL template also at: ${ROOT}/scripts/bootstrap-schemas.sql"
