@@ -1,17 +1,27 @@
 """The final-demo walk-through (docs/ARCHITECTURE.md, section 18), run through the gateway.
 
-Steps 2-5 and 7 run for real now (against the stand-ins where owners have not delivered yet).
-The other steps are written but SKIPPED, with the owner and the hand-off date: when you deliver,
-remove the `skip` line of your step and make it pass.
+Steps 2-5, 7 and 12 run for real now (against the stand-ins where owners have not delivered yet).
+Step 1 runs with the real login (`make e2e-login`, and the Login workflow in CI); `make e2e` uses
+the laptop dev token and skips it. The other steps are written but SKIPPED, with the owner and
+the hand-off date: when you deliver, remove the `skip` line of your step and make it pass.
 
 The steps share what they create (project -> dataset -> job), so run the whole file, in order.
 """
 
+import base64
+import json
 import re
 
 import pytest
 
-from tests.integration.conftest import events_of, small_job, tiny_image_dataset, wait_for
+from tests.integration.conftest import (
+    events_of,
+    real_login,
+    setting,
+    small_job,
+    tiny_image_dataset,
+    wait_for,
+)
 
 
 @pytest.fixture(scope="module")
@@ -53,13 +63,24 @@ def finished_job(gateway, job) -> dict:
 # ---------- 1. Log in (Salem) ----------
 
 
-@pytest.mark.skip(reason="Salem: real login in the gateway — hand-off Fri 20 Nov")
 def test_step_01_log_in(gateway):
-    """Sign in with the real login provider and use its token for every step below."""
+    """Alice signs in with the real login (Cognito) and every step below uses her ID token.
+    Salem's security/tests check the token rules in depth; this checks the demo uses the real login."""
+    if not real_login():
+        pytest.skip("`make up` uses the dev token; `make e2e-login` runs this step with the real login")
+    token = gateway.headers["Authorization"].removeprefix("Bearer ")
+    payload = token.split(".")[1]
+    claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+
+    assert claims["token_use"] == "id"
+    assert claims["cognito:username"] == "alice"
+    assert gateway.get("/api/v1/projects").status_code == 200
+    dev = {"Authorization": f"Bearer {setting('DEV_AUTH_TOKEN')}"}
+    assert gateway.get("/api/v1/projects", headers=dev).status_code == 401, "dev token must be off"
 
 
 def test_requests_without_login_are_refused(gateway):
-    """Until Salem's step works: the gateway already refuses requests with no valid token."""
+    """With either login, the gateway refuses requests with no valid token."""
     response = gateway.get("/api/v1/projects", headers={"Authorization": "Bearer wrong"})
 
     assert response.status_code == 401
