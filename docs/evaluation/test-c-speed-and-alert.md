@@ -78,6 +78,8 @@ d500.zip download 3: 200 1.981179s 524288158 bytes
 MB = 10^6 bytes, file size ÷ total time. Every download returned exactly the file's size. Upload includes the
 format check and the write to S3. Memory after the 500 MB runs: LocalStack 265 MiB, dataset-service 96 MiB.
 Everything stays on one laptop (no network), so these are upper bounds, not cloud numbers.
+Seen on the dashboard during the 500 MB runs: the time since the last `job-events` read rose to about 55 s
+(normally 0–20 s), because LocalStack serves S3 and SQS at once on the laptop. Below the 120 s alert.
 
 ## 3. Alert `CloudTrainServiceDown` (Projects stopped)
 
