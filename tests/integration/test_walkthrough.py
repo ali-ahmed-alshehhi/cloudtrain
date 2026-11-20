@@ -1,6 +1,7 @@
 """The final-demo walk-through (docs/ARCHITECTURE.md, section 18), run through the gateway.
 
-Steps 2-5 and 7 run for real now (against the stand-ins where owners have not delivered yet).
+Steps 2-5 run for real now (against the stand-ins where owners have not delivered yet).
+Steps 6-7 wait on Faisal's working dataset download-url (PR #91) before SUCCEEDED/MLflow can be asserted.
 The other steps are written but SKIPPED, with the owner and the hand-off date: when you deliver,
 remove the `skip` line of your step and make it pass.
 
@@ -11,7 +12,7 @@ import re
 
 import pytest
 
-from tests.integration.conftest import events_of, small_job, tiny_image_dataset, wait_for
+from tests.integration.conftest import events_of, small_job, tiny_tabular_dataset, wait_for
 
 
 @pytest.fixture(scope="module")
@@ -25,8 +26,12 @@ def project(gateway) -> dict:
 def dataset(gateway, project) -> dict:
     response = gateway.post(
         "/api/v1/datasets",
-        data={"project_id": project["project_id"], "name": "cifar-10 (tiny sample)", "format": "tar_gz"},
-        files={"file": ("cifar10-sample.tar.gz", tiny_image_dataset(), "application/gzip")},
+        data={
+            "project_id": project["project_id"],
+            "name": "wisconsin-breast-cancer (tiny sample)",
+            "format": "csv",
+        },
+        files={"file": ("wisconsin.csv", tiny_tabular_dataset(), "text/csv")},
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -94,13 +99,16 @@ def test_step_05_queued_then_scheduled_then_running(gateway, job, finished_job):
 
 
 @pytest.mark.skip(
-    reason="Abdullah; Ahmed + Abdulla: real training with live MLflow metrics, model in S3 — Fri 20 Nov"
+    reason="Abdullah: needs Faisal's working download-url (PR #91); then assert live MLflow metrics"
 )
 def test_step_06_training_tracked_in_mlflow(gateway, finished_job):
     """The job's MLflow run has parameters and metrics (GET /api/v1/experiments/runs/search),
     and its model files are in the artifacts bucket."""
 
 
+@pytest.mark.skip(
+    reason="Abdullah: SUCCEEDED needs Faisal's working download-url (PR #91)"
+)
 def test_step_07_job_succeeded_and_alert_is_in_the_feed(gateway, finished_job):
     assert finished_job["status"] == "SUCCEEDED"
     assert [h["status"] for h in finished_job["history"]] == ["QUEUED", "SCHEDULED", "RUNNING", "SUCCEEDED"]

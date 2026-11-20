@@ -105,6 +105,7 @@ services:
   training-worker: # Abdullah; DDP by Ahmed + Abdulla
     build: ./training
     env_file: .env
+    shm_size: ${TRAINING_SHM_SIZE}
     depends_on:
       job-service: { condition: service_healthy }
       dataset-service: { condition: service_healthy }
