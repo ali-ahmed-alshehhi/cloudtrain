@@ -66,10 +66,12 @@ def panel(kind, title, description, exprs, x, w, h, unit="short", options=None, 
     return item
 
 
-def timeseries(title, description, exprs, x, w, h=8, unit="short", min0=True):
+def timeseries(title, description, exprs, x, w, h=8, unit="short", min0=True, max_=None):
     field = {"custom": {"lineWidth": 2, "fillOpacity": 0, "showPoints": "auto", "pointSize": 6}}
     if min0:
         field["min"] = 0
+    if max_ is not None:  # a share can never pass 100%: keeps the axis at 0-100% instead of auto (10000%)
+        field["max"] = max_
     opts = {
         "legend": {"displayMode": "list", "placement": "bottom", "showLegend": True},
         "tooltip": {"mode": "multi", "sort": "desc"},
@@ -153,6 +155,7 @@ timeseries(
     8,
     8,
     unit="percentunit",
+    max_=1,
 )
 timeseries(
     "Slowest 5% of answers (p95)",
@@ -267,7 +270,8 @@ timeseries(
             "histogram_quantile(0.95, sum by (le) (rate(cloudtrain_job_event_lag_seconds_bucket[$__rate_interval]))) >= 0",
             "event delay p95",
         ),
-        ("time() - cloudtrain_job_events_last_poll_timestamp_seconds", "since last read"),
+        # > 0: before the first read the timestamp is 0 (1970), which would show as "56 years"
+        ("time() - (cloudtrain_job_events_last_poll_timestamp_seconds > 0)", "since last read"),
     ],
     16,
     8,

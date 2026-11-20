@@ -275,7 +275,8 @@
             "showPoints": "auto",
             "pointSize": 6
           },
-          "min": 0
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -910,7 +911,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "time() - cloudtrain_job_events_last_poll_timestamp_seconds",
+          "expr": "time() - (cloudtrain_job_events_last_poll_timestamp_seconds > 0)",
           "legendFormat": "since last read"
         }
       ],
