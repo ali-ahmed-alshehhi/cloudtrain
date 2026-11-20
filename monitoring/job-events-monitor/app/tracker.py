@@ -23,6 +23,7 @@ from jsonschema import Draft202012Validator
 
 TERMINAL = {"job.succeeded": "SUCCEEDED", "job.failed": "FAILED", "job.cancelled": "CANCELLED"}
 QUEUED_EVENTS = {"job.queued", "job.retrying"}
+INVALID_REASONS = ("not_json", "schema", "bad_time")
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ class Tracker:
         forget_after: timedelta = timedelta(hours=24),
     ) -> None:
         self.validator = Draft202012Validator(schema)
+        self.event_types = tuple(schema["properties"]["event_type"]["enum"])  # from the contract
         self.seen: OrderedDict[str, None] = OrderedDict()
         self.attempts: OrderedDict[tuple[str, int], _Attempt] = OrderedDict()
         self.remember_events = remember_events

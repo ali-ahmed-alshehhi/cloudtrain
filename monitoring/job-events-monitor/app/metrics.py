@@ -9,7 +9,7 @@ from datetime import datetime
 
 from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histogram
 
-from app.tracker import Outcome
+from app.tracker import INVALID_REASONS, TERMINAL, Outcome
 
 WAIT_BUCKETS = (1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600)
 RUN_BUCKETS = (10, 30, 60, 300, 600, 1800, 3600, 7200, 14400, 28800)
@@ -70,6 +70,20 @@ class Metrics:
             "Job attempts whose timings are kept in memory",
             registry=registry,
         )
+
+    def start_at_zero(self, event_types) -> None:
+        """Create every labelled series at 0 before the first event.
+
+        A labelled series only appears at its first .inc(). If Prometheus first sees it at 3, increase()
+        counts from 3 and the dashboard shows 1 success instead of 3 (seen on a laptop, 20 Nov), and a
+        type that never happened shows "No data" instead of 0.
+        """
+        for event_type in event_types:
+            self.events.labels(event_type)
+        for result in TERMINAL.values():
+            self.run.labels(result)
+        for reason in INVALID_REASONS:
+            self.invalid.labels(reason)
 
     def record(self, outcome: Outcome) -> None:
         if outcome.kind == "duplicate":

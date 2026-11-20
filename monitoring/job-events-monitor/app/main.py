@@ -39,6 +39,7 @@ def create_app(
     metrics = metrics or shared_metrics()
     queue = queue or JobEventsQueue(settings.queue_name, settings.sqs_endpoint, settings.aws_region)
     tracker = Tracker.from_file(settings.schema_path)
+    metrics.start_at_zero(tracker.event_types)
     holder: dict = {}
 
     @asynccontextmanager
