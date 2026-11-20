@@ -47,3 +47,9 @@ enable_worker_load_balancers = true
 
 # One least-privilege task role per service, for ECS in #36.
 enable_service_roles = true
+
+# ECS Fargate + public ALB (#36). desired_count 0: define services without pulling images
+# (emulator ECR refuses uploads; images stay on ghcr.io until a real account).
+enable_application_services    = true
+ecs_desired_count              = 0
+enable_ecs_service_discovery   = false
