@@ -18,3 +18,5 @@ or make a choice others must live with. Copy the shape of `0001-microservices-an
 | 0009 | Terraform local practice uses LocalStack (not AWS Emulator) | superseded by 0011 |
 | 0010 | How models are saved, served and deployed | proposed |
 | 0011 | The AWS Emulator stands in for an AWS account | accepted |
+| 0012 | Training workers run on EC2 in an Auto Scaling group | accepted |
+| 0013 | Monitoring: one job-events reader, Prometheus and Grafana, the same alarms in CloudWatch | proposed |
