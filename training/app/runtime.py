@@ -106,6 +106,15 @@ class Worker:
 
     def _execute(self, job: TrainingJob, stop_event: threading.Event) -> dict[str, float]:
         dataset_dir = self.dataset_client.download(job.dataset_id, job.dataset_version)
+        record_lineage = getattr(self.dataset_client, "record_lineage", None)
+        if record_lineage:
+            try:
+                record_lineage(job.dataset_id, job.dataset_version, job.job_id)
+            except Exception as error:
+                self.logger.warning(
+                    "dataset lineage record failed",
+                    extra={"job_id": job.job_id, "error": str(error)},
+                )
         try:
             with self.tracker_factory(job) as tracker:
                 from app.trainer import _dataset_checksum

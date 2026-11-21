@@ -1,4 +1,4 @@
-# CloudTrain Training Jobs service image (stand-in).
+# CloudTrain Training Jobs service image.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,7 +10,11 @@ WORKDIR /service
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY alembic.ini .
+COPY migrations ./migrations
 COPY app ./app
+# The prices for GPU-hours and cost (PRICING_FILE). Built in, because nothing is mounted in the cloud.
+COPY --from=contracts pricing.yaml /contracts/pricing.yaml
 
 # Run as a normal user, not root.
 RUN useradd --create-home --uid 10001 appuser
@@ -18,4 +22,5 @@ USER appuser
 
 # 8003 is this service's port in the contract (contracts/ports.md).
 EXPOSE 8003
-CMD ["uvicorn", "--factory", "app.main:create_app", "--host", "0.0.0.0", "--port", "8003"]
+# Bring the database tables up to date, then start the web server.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8003"]

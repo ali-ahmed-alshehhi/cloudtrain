@@ -1,6 +1,8 @@
 import hashlib
 import io
+import json
 import zipfile
+from pathlib import Path
 
 import httpx
 import pytest
@@ -110,3 +112,48 @@ def test_single_csv_file_is_extracted(tmp_path):
     extracted = client.download("dataset-01", 1)
     assert (extracted / "dataset.csv").read_bytes() == csv_bytes
     client.cleanup(extracted)
+
+
+def test_empty_csv_is_rejected(tmp_path):
+    digest = hashlib.sha256(b"").hexdigest()
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/download-url"):
+            return httpx.Response(
+                200,
+                json={
+                    "url": "http://datasets.test/file",
+                    "expires_at": "2026-11-15T00:00:00Z",
+                    "checksum_sha256": digest,
+                },
+            )
+        return httpx.Response(200, content=b"")
+
+    client = DatasetClient(
+        httpx.Client(transport=httpx.MockTransport(handle)),
+        "http://dataset-service.test",
+        storage_root=tmp_path,
+    )
+    with pytest.raises(DatasetError, match="CSV header"):
+        client.download("dataset-01", 1)
+
+
+def test_record_lineage_posts_job_id():
+    calls = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, request.url.path, request.content))
+        return httpx.Response(201, json={"job_id": "job-01"})
+
+    client = DatasetClient(
+        httpx.Client(transport=httpx.MockTransport(handle)),
+        "http://dataset-service.test",
+        storage_root=Path("/tmp"),
+    )
+    client.record_lineage("dataset-01", 1, "job-01")
+
+    assert len(calls) == 1
+    method, path, body = calls[0]
+    assert method == "POST"
+    assert path == "/internal/datasets/dataset-01/versions/1/lineage"
+    assert json.loads(body) == {"job_id": "job-01"}

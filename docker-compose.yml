@@ -83,12 +83,15 @@ services:
       retries: 20
 
   job-service: # Mariam
-    build: ./job-service
+    build:
+      context: ./job-service
+      # contracts/pricing.yaml is copied INTO the image (the cost of each job), so the same image runs
+      # in the cloud, where nothing is mounted. Outside Compose: --build-context contracts=contracts
+      additional_contexts:
+        contracts: ./contracts
     env_file: .env
     environment:
       DATABASE_URL: ${JOBS_DATABASE_URL}
-    volumes:
-      - ./contracts:/contracts:ro # contracts/pricing.yaml, for the cost of each job (PRICING_FILE)
     depends_on:
       localstack: { condition: service_healthy }
       project-service: { condition: service_healthy }
@@ -102,7 +105,7 @@ services:
   training-worker: # Abdullah; DDP by Ahmed + Abdulla
     build: ./training
     env_file: .env
-    shm_size: ${TRAINING_SHM_SIZE}
+    shm_size: ${TRAINING_SHM_SIZE:-2gb}
     depends_on:
       job-service: { condition: service_healthy }
       dataset-service: { condition: service_healthy }

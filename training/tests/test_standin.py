@@ -195,3 +195,10 @@ def test_training_failure_reports_failed_once():
 def test_bad_form_is_422():
     with TestClient(make_app(FakeJobService())) as client:
         assert client.post("/internal/run", json={**FORM, "job_id": "104"}).status_code == 422
+
+
+def test_boolean_dataset_version_is_422():
+    with TestClient(make_app(FakeJobService())) as client:
+        response = client.post("/internal/run", json={**FORM, "dataset_version": True})
+
+    assert response.status_code == 422

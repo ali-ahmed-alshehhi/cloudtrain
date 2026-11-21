@@ -1,0 +1,49 @@
+# Practice apply against the official AWS Emulator (Student 6).
+# Same resource NAMES as .env.example so teammates can integrate.
+#
+#   cd infrastructure
+#   ./scripts/emulator-up.sh
+#   source ./scripts/emulator-env.sh
+#   terraform init
+#   terraform apply -var-file=environments/dev/emulator.tfvars.example
+
+environment = "dev"
+owner       = "hamda-fatma"
+aws_region  = "us-east-1"
+
+use_emulator      = true
+emulator_endpoint = "https://127.0.0.1:9297"
+
+# The full dev environment (#34): every API these modules call is implemented in the
+# emulator. Set any of them to false in your own copy if you only need storage + queues.
+enable_networking         = true
+enable_container_registry = true
+enable_database           = true
+enable_identity           = true
+enable_ecs_roles          = true
+
+# Emulator gap: it can't remove the default outbound rule the way Terraform asks, so creating
+# a security group fails. Skip ours; the database uses the VPC's locked-down default group.
+enable_security_groups = false
+
+datasets_bucket_name  = "datasets"
+artifacts_bucket_name = "artifacts"
+
+sqs_visibility_timeout_seconds = 300
+sqs_max_receive_count          = 3
+
+# GPU workers (#35): one Auto Scaling group of g4dn.xlarge machines. The emulator starts no real
+# GPU, so this shows the infrastructure and the demo-4 variable, not training speed.
+enable_training_compute = true
+gpu_instance_type       = "g4dn.xlarge"
+worker_desired_capacity = 1
+
+# Multi-GPU workers (#36): g4dn.12xlarge (4 GPUs). 0 machines unless you scale it (demo 4).
+multi_gpu_instance_type    = "g4dn.12xlarge"
+multi_gpu_desired_capacity = 0
+
+# One internal load balancer per pool: worker_urls gives the Scheduler one address per machine type.
+enable_worker_load_balancers = true
+
+# One least-privilege task role per service, for ECS in #36.
+enable_service_roles = true

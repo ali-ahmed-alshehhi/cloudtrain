@@ -1,0 +1,4 @@
+# Login tests (security/tests/test_login.py). Same versions as the rest of the repository.
+pytest==9.2.0
+httpx==0.28.1
+pyjwt[crypto]==2.15.1

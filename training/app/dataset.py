@@ -53,6 +53,16 @@ class DatasetClient:
         if extracted.name == "extracted" and extracted.parent.parent == self.storage_root:
             shutil.rmtree(extracted.parent, ignore_errors=True)
 
+    def record_lineage(self, dataset_id: str, version: int, job_id: str) -> None:
+        """Tell Datasets which job used this version (idempotent on Faisal's service)."""
+        url = f"{self.base_url}/internal/datasets/{dataset_id}/versions/{version}/lineage"
+        try:
+            response = self.http.post(url, json={"job_id": job_id})
+            if response.status_code not in {200, 201}:
+                raise DatasetError(f"dataset lineage dependency failed with status {response.status_code}")
+        except httpx.HTTPError as error:
+            raise DatasetError(f"dataset lineage dependency failed: {error}") from error
+
     def _metadata(self, dataset_id: str, version: int) -> dict[str, str]:
         url = f"{self.base_url}/internal/datasets/{dataset_id}/versions/{version}/download-url"
         try:
@@ -103,7 +113,8 @@ class DatasetClient:
                     raise DatasetError(
                         "single-file dataset must be a UTF-8 CSV or a zip/tar archive"
                     ) from error
-                if "," not in sample.splitlines()[0]:
+                lines = sample.splitlines()
+                if not lines or "," not in lines[0]:
                     raise DatasetError("single-file dataset is not a CSV header row")
         except DatasetError:
             raise

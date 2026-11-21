@@ -77,6 +77,7 @@ starts an EC2 instance with the job form instead. Plus `GET /health`, `GET /metr
 
 **Calls (internal):**
 - `GET dataset-service:8002/internal/datasets/{id}/versions/{v}/download-url` — get the data
+- `POST dataset-service:8002/internal/datasets/{id}/versions/{v}/lineage` — record which job used the version
 - `POST job-service:8003/internal/jobs/{id}/heartbeat` — every `HEARTBEAT_INTERVAL_SECONDS` (default 30);
   stop if the answer says `CANCELLED`
 - `POST job-service:8003/internal/jobs/{id}/status` — SUCCEEDED or FAILED when training ends
