@@ -106,21 +106,36 @@ All three are on `main` since 18 Nov.
 
 ## 7. How to reproduce
 
+Everything goes through the gateway (port 5810) with the local dev login, read from `.env`:
+
 ```bash
-make up && make e2e                      # integrated run; Prometheus and Grafana collect the numbers
-open http://localhost:3001               # dashboard "CloudTrain overview" (after #115 is in Compose)
-cd monitoring/job-events-monitor && python -m pytest
-cd monitoring/prometheus && promtool test rules alerts.test.yml
-cd portal && npm test
+make up                                   # 15 containers with #115 (12 without monitoring)
+TOKEN=$(grep '^DEV_AUTH_TOKEN=' .env | cut -d= -f2); H="Authorization: Bearer $TOKEN"
+open http://localhost:3001                # Grafana, dashboard "CloudTrain overview" (needs #115)
 ```
-Exact commands and result files for each measurement are added next to its row when it is measured.
+
+| Test | What it shows | Commands and raw output |
+|---|---|---|
+| A | A service stopped or frozen: the gateway answers 503 at once or after 10 s, and recovers; the alert fires | [`evaluation/test-a-service-stopped-or-frozen.md`](evaluation/test-a-service-stopped-or-frozen.md), [`evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) (part 3) |
+| B | What survives `make down` + `make up` (records yes, local S3 files no) | [`evaluation/test-b-restart-keeps-data.md`](evaluation/test-b-restart-keeps-data.md) |
+| C | Gateway p50/p95, dataset upload and download speed | [`evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) |
+
+The automatic checks behind the "🧪 Tested" lines:
+
+```bash
+make e2e                                                    # the walk-through, through the gateway
+cd monitoring/job-events-monitor && python -m pytest        # 25 tests (#115)
+cd monitoring/prometheus && promtool test rules alerts.test.yml
+cd portal && npm test                                       # portal unit tests
+```
 
 ## 8. Contributions
 
 | Who | Part of this evaluation |
 |---|---|
-| Adel | Methods, monitoring (`monitoring/`), cost views, reliability tests of the portal and job-events reader, this report |
+| Adel | This report and its methods; Tests A, B and C on a laptop; the job-events reader, Prometheus alerts and Grafana dashboard (#115, contract #125); live job status and alerts (#96, #100), MLflow results (#98), cost views (#117) and the 1-GPU vs multi-GPU comparison (#124) in the portal. Problems found and reported while measuring: #126 (Faisal), #138 (Maitha, fixed in #139) |
 | Hilal | Portal pages and the browser walk-through used for the end-to-end timings |
 | Ahmed + Abdulla | GPU benchmarks (`docs/BENCHMARKS.md`) |
 | Mariam | Job timings, retries and cost fields (Training Jobs) |
+| Fatma + Hamda | The CloudWatch alarms and dashboard in Terraform (#134) |
 | Everyone | `/metrics` in every service; the integrated runs |
