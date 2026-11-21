@@ -69,3 +69,64 @@ No gateway restart was needed: the first request after `unpause` already succeed
 | Recovered | 200 × 3 | 4.7 ms | 3.9–5.8 ms |
 
 The first request of a series is the slowest (new connection). Laptop numbers, not production numbers.
+
+## Part 2: four more services (Sat 21 Nov 2026, 18:10, UTC+4)
+
+**Versions:** branch `adel/job-events-monitor` at `b404125` (`main` at `474a732` + #115), Docker Compose v5.6.1,
+all 15 containers healthy. Same laptop and settings. The login is read from `.env` (`$H`), `P=project-11`.
+
+```bash
+testsvc() {
+  echo "=== $1 ==="
+  curl -s -o /dev/null -w "normal:  %{http_code} in %{time_total}s\n" -H "$H" "http://localhost:5810$2"
+  docker compose stop $1 >/dev/null 2>&1
+  curl -s -w "\nstopped: %{http_code} in %{time_total}s\n" -H "$H" "http://localhost:5810$2"
+  docker compose up -d --wait $1 >/dev/null 2>&1
+  docker compose pause $1 >/dev/null 2>&1
+  curl -s -o /dev/null -w "frozen:  %{http_code} in %{time_total}s\n" -H "$H" "http://localhost:5810$2"
+  docker compose unpause $1 >/dev/null 2>&1
+  curl -s -o /dev/null -w "back:    %{http_code} in %{time_total}s\n" -H "$H" "http://localhost:5810$2"
+}
+testsvc dataset-service "/api/v1/datasets?project_id=$P"
+testsvc job-service "/api/v1/jobs?project_id=$P"
+testsvc model-registry "/api/v1/models"
+testsvc mlflow "/api/v1/experiments/experiments/get-by-name?experiment_name=Default"
+```
+
+```
+=== dataset-service ===
+normal:  200 in 0.040327s
+{"error":{"code":"SERVICE_UNAVAILABLE","message":"datasets is not reachable","request_id":"req-9746a203"}}
+stopped: 503 in 0.029078s
+frozen:  503 in 10.004096s
+back:    200 in 0.008355s
+=== job-service ===
+normal:  200 in 0.017384s
+{"error":{"code":"SERVICE_UNAVAILABLE","message":"jobs is not reachable","request_id":"req-dfa388c0"}}
+stopped: 503 in 0.020777s
+frozen:  503 in 10.006903s
+back:    200 in 0.009311s
+=== model-registry ===
+normal:  200 in 0.013585s
+{"error":{"code":"SERVICE_UNAVAILABLE","message":"models is not reachable","request_id":"req-d534aa8d"}}
+stopped: 503 in 0.006006s
+frozen:  503 in 10.006122s
+back:    200 in 0.004454s
+=== mlflow ===
+normal:  200 in 0.077688s
+{"error":{"code":"SERVICE_UNAVAILABLE","message":"experiments is not reachable","request_id":"req-9e9292d3"}}
+stopped: 503 in 0.028607s
+frozen:  503 in 10.004247s
+back:    200 in 0.102170s
+```
+
+| Service (route) | Stopped | Frozen | Back |
+|---|---|---|---|
+| projects (Thu 19) | 503 in 4 ms (median of 5) | 503 after 10.01 s | 200, 4.7 ms |
+| datasets | 503 in 29 ms | 503 after 10.004 s | 200, 8 ms |
+| jobs | 503 in 21 ms | 503 after 10.007 s | 200, 9 ms |
+| models | 503 in 6 ms | 503 after 10.006 s | 200, 4 ms |
+| experiments (MLflow) | 503 in 29 ms | 503 after 10.004 s | 200, 102 ms |
+
+One request per case here (5 and 3 on Thursday). Not tested: `predict` (inference, Majed: real model
+loading still to come) and the upload routes, which wait up to 300 s.
