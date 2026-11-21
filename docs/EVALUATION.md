@@ -18,12 +18,13 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 
 | | Value |
 |---|---|
-| Where everything runs | Docker Compose on a laptop (`make up`): 12 containers, i.e. the 9 CloudTrain services plus Postgres, LocalStack (S3, SQS) and MLflow |
+| Where everything runs | Docker Compose on a laptop (`make up`): 12 containers, i.e. the 9 CloudTrain services plus Postgres, LocalStack (S3, SQS) and MLflow; 15 with the monitoring stack (#115) |
+| Laptop used for Tests A, B and C | MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM, macOS 27.2.1; Docker Engine 29.9.2 and Docker Compose v5.6.1, with 7.7 GiB of memory for the containers |
 | "Cloud" | The AWS Emulator with the same Terraform ([decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md), merged in #112): checks the infrastructure, runs no real machines |
 | GPUs | Real GPU runs only on a team workstation (Ahmed + Abdulla, `docs/BENCHMARKS.md`). No cloud GPU |
 | Monitoring | Prometheus + Grafana dashboard "CloudTrain overview" and `job-events-monitor` (`monitoring/`, #115, #109) |
 | Versions | Recorded with each measurement (Git commit, `docker compose version`, Python, Node 24, PyTorch for GPU runs) |
-| Repeats | Every timing is repeated at least 3 times; the report gives the median and the spread |
+| Repeats | Timings are repeated at least 3 times, with the median and the spread, except where a row says otherwise (Test A on datasets, jobs, models and MLflow: one request per case) |
 
 ## 1. Performance
 
