@@ -20,7 +20,7 @@ locals {
     job-service       = { port = 8003, cpu = "256", memory = "512", public = false }
     scheduler         = { port = 8004, cpu = "256", memory = "512", public = false }
     model-registry    = { port = 8006, cpu = "256", memory = "512", public = false }
-    inference-service = { port = 8007, cpu = "256", memory = "512", public = false }
+    inference-service = { port = 8007, cpu = "512", memory = "1024", public = false }
     mlflow            = { port = 5000, cpu = "256", memory = "512", public = false }
   }
 
