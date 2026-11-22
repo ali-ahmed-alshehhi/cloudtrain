@@ -68,6 +68,7 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `training-compute` | GPU worker pools: launch template + Auto Scaling group on EC2 (decision 0012), optional internal load balancer; `gpu-1` (1 GPU) and `gpu-4` (4 GPUs) |
 | `service-roles` | one least-privilege task role per service: only the buckets and queues its code calls |
 | `monitoring` | CloudWatch log group per ECS service (`/cloudtrain/<env>/<service>`) and alarms (dead letters, job events not read; 5xx once the ALB exists) |
+| `pulumi/` (own folder) | Pulumi layer above Terraform: reads its outputs, creates the CloudWatch dashboard only (decision 0013) |
 | `application-services` | ECS Fargate cluster `<env>-cloudtrain`, services, public ALB (gateway :5810, portal :3000); uses monitoring log groups when enabled |
 
 ### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
