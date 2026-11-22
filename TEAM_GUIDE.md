@@ -464,7 +464,7 @@ choices, integrate reliably, justify trade-offs with measurements, and deliver a
 4. **Events, not polling:** status changes are published as events; where a client must poll, it waits at least 5 seconds and backs off.
 5. **Idempotent:** a queue message can arrive twice and must not do the work twice; create requests accept an `Idempotency-Key`.
 6. **Persistent state:** datasets, models, experiment metadata and job records survive container restarts (in the cloud; locally LocalStack loses files on restart — see §11).
-7. **Cloud-native, infrastructure as code:** services and training run in AWS; Terraform creates all cloud resources, with remote state, locking and restricted access; nothing by hand.
+7. **Cloud-native, infrastructure as code:** services and training run in AWS; Terraform creates all cloud resources, with remote state, locking and restricted access; a small Pulumi program above it (`infrastructure/pulumi/`) only reads Terraform's outputs and creates the CloudWatch dashboard (decision 0013); nothing by hand.
 8. **Observable:** JSON logs with `request_id`; `/health` and `/metrics` (Prometheus) everywhere.
 9. **Automated:** every change goes through a pull request, CI checks and a review before `main`.
 
