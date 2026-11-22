@@ -1,0 +1,5 @@
+fastapi==0.162.5
+uvicorn[standard]==0.54.0
+boto3==1.44.1
+prometheus-client==0.26.0
+jsonschema==4.26.0
