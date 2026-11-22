@@ -6,6 +6,9 @@ from app.db import Dataset, DatasetVersion
 
 
 def iso(moment: datetime) -> str:
+    # All times are stored in UTC; a database that drops the zone (SQLite in tests) gives them back naive.
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
     return moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 

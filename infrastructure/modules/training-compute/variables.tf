@@ -61,3 +61,21 @@ variable "worker_env" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_load_balancer" {
+  description = "Put an internal network load balancer in front of this pool, so the Scheduler has one address per machine type."
+  type        = bool
+  default     = false
+}
+
+variable "vpc_id" {
+  description = "Needed for the load balancer's target group."
+  type        = string
+  default     = null
+}
+
+variable "worker_port" {
+  description = "The training worker's port (contracts/ports.md)."
+  type        = number
+  default     = 8010
+}

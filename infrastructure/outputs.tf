@@ -119,3 +119,26 @@ output "service_database_secret_names" {
   description = "Per service: the database secret created by scripts/bootstrap-schemas.sh."
   value       = try(module.service_roles[0].database_secret_names, null)
 }
+
+output "ecs_task_execution_role_arn" {
+  description = "executionRoleArn for every ECS task definition (Hamda + Fatma, #36)."
+  value       = try(module.iam[0].ecs_task_execution_role_arn, null)
+}
+
+output "github_deploy_role_arn" {
+  description = "Repository variable AWS_DEPLOY_ROLE_ARN for the deploy workflow (Salem, #54)."
+  value       = try(module.iam[0].github_deploy_role_arn, null)
+}
+
+output "multi_gpu_worker_autoscaling_group" {
+  description = "Auto Scaling group of multi-GPU workers (Ahmed + Abdulla)."
+  value       = try(module.training_compute_multi_gpu[0].autoscaling_group_name, null)
+}
+
+output "worker_urls" {
+  description = "Machine type to worker address, for the Scheduler's TRAINING_WORKER_URLS (JSON). Maitha, #70."
+  value = var.enable_training_compute && var.enable_worker_load_balancers ? {
+    (var.gpu_instance_type)       = module.training_compute_gpu[0].worker_url
+    (var.multi_gpu_instance_type) = module.training_compute_multi_gpu[0].worker_url
+  } : {}
+}

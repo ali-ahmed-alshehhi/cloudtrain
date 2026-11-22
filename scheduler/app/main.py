@@ -251,4 +251,5 @@ def create_app(
     )
     holder["scheduler"] = scheduler
     app.state.scheduler = scheduler
+    _scheduler_metrics()  # initialise at 0 so Prometheus sees them from startup
     return app

@@ -65,6 +65,9 @@ jobs:
           python -m pip install --quiet -r security/tests/requirements.txt
           python -m pytest security/tests -v -p no:warnings
 
+      - name: 5. The demo walk-through with the real login (Ali, task 5)
+        run: LOGIN=real python -m pytest tests/integration -q -p no:warnings -rs
+
       - name: Why a real token is refused (only when something failed)
         if: failure()
         run: |
