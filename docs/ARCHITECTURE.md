@@ -71,8 +71,9 @@ Every service also has its own schema in PostgreSQL (lines omitted for clarity).
 
 ![CloudTrain on AWS](diagrams/deployment.svg)
 
-Dashed boxes are not in the Terraform on `main` yet. When one is merged, remove its name from
-`PLANNED` in `diagrams/build.py` and run the script again. The same view as text:
+Since 22 Nov every box is in the Terraform on `main`, and CI applies it to the AWS Emulator
+(decision 0011). To draw a piece that isn't built yet, add its name to `PLANNED` in
+`diagrams/build.py` (it shows dashed) and run the script again. The same view as text:
 
 ```mermaid
 flowchart TB
@@ -80,13 +81,13 @@ flowchart TB
   subgraph aws["AWS account — created only by Terraform"]
     subgraph vpc["VPC"]
       subgraph public["Public subnets"]
-        alb["Application Load Balancer"]
-        gwT["ECS Fargate: gateway"]
-        portalT["ECS Fargate: portal"]
+        alb["Application Load Balancer<br/>(listeners 5810 and 3000)"]
       end
       subgraph private["Private subnets"]
+        gwT["ECS Fargate: gateway"]
+        portalT["ECS Fargate: portal"]
         svc["ECS Fargate: projects, datasets, jobs,<br/>scheduler, model registry, inference, MLflow"]
-        gpu["EC2 CPU/GPU workers (or AWS Batch)<br/>started per job, stopped after"]
+        gpu["EC2 GPU workers: Auto Scaling pools<br/>(1 GPU, 4 GPUs), internal load balancer each"]
         rds[("RDS PostgreSQL")]
       end
     end
@@ -103,7 +104,7 @@ flowchart TB
   svc --> rds
   svc --> sqs
   svc --> s3
-  svc -->|"start / stop"| gpu
+  svc -->|"run a job"| gpu
   gpu --> s3
   gpu --> svc
   gwT -.->|"verify token"| cognito
@@ -332,7 +333,7 @@ least-privilege IAM everywhere. Folder layout and the 7 mandatory Terraform demo
   throughput is the limit and several GPUs are available; model parallelism when the model does not fit on
   one GPU; parallel trials for independent experiments. It weighs GPU availability, memory, model size,
   dataset size, communication overhead and budget.
-- Two use cases: image classification (CIFAR-10 + ResNet-18) and one tabular classification dataset (open decision).
+- Two use cases: image classification (CIFAR-10 + ResNet-18) and one tabular classification dataset (Wisconsin Breast Cancer, decided on #93).
 
 ## 17. Minimum vs advanced (build the minimum first)
 
@@ -354,17 +355,21 @@ least-privilege IAM everywhere. Folder layout and the 7 mandatory Terraform demo
 | # | Step | Owner |
 |---|---|---|
 | 1 | Log in | Salem |
-| 2 | Create project "Image Classification": `POST /api/v1/projects` → 201 `project-01` | Ali |
-| 3 | Upload CIFAR-10: `POST /api/v1/datasets` → 201 `dataset-07` v1 | Faisal |
-| 4 | Submit job (ResNet-18, settings, resources, strategy): `POST /api/v1/jobs` → 202 `job-104` | Mariam |
+| 2 | Create project "Wisconsin Breast Cancer": `POST /api/v1/projects` → 201 `project-01` | Ali |
+| 3 | Upload the Wisconsin CSV: `POST /api/v1/datasets` → 201 `dataset-07` v1 | Faisal |
+| 4 | Submit job (`tabular_mlp`, settings, resources, strategy): `POST /api/v1/jobs` → 202 `job-104` | Mariam |
 | 5 | Queued, then Scheduled on the right machine, then Running | Maitha |
 | 6 | Training with live metrics in MLflow and the model saved to S3 | Abdullah; Ahmed + Abdulla |
 | 7 | Job Succeeded, alert shown in the portal, machine released | Mariam, Maitha, Hilal + Adel |
 | 8 | Compare a single-GPU run with a DDP run | Hilal + Adel; Ahmed + Abdulla |
 | 9 | Register the best model: `POST /api/v1/models` → 201 v1 | Majed |
 | 10 | Promote v1; inference passes `/health` before taking traffic | Majed |
-| 11 | Send an image: `POST /api/v1/predict` → 200 prediction | Majed |
+| 11 | Send one row of features: `POST /api/v1/predict` → 200 prediction | Majed |
 | 12 | View compute usage, GPU-hours and estimated cost | Hilal + Adel |
+
+The walk-through uses the tabular use case (Wisconsin Breast Cancer, `tabular_mlp`) because it trains
+in seconds on a laptop and in CI; agreed on #93 (22 Nov). Image classification (CIFAR-10 + ResNet-18)
+stays in the training worker for longer runs.
 
 The final demo also shows the Terraform-provisioned infrastructure, the CI/CD pipeline, and **one
 failure-recovery scenario**: a worker is killed mid-job, the heartbeat stops, the job is retried and finishes.

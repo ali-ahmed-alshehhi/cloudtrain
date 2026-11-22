@@ -4,7 +4,7 @@
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#334155"/></marker><marker id="a-steel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#5B8DB8"/></marker><marker id="a-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M10,1 L1,5 L10,9 z" fill="#334155"/></marker></defs>
 <rect width="1500" height="1260" fill="#F7FBFE"/>
 <text x="40" y="48" font-size="24" font-weight="900" fill="#334155" text-anchor="start">CloudTrain on AWS</text>
-<text x="40" y="72" font-size="13" font-weight="600" fill="#64748B" text-anchor="start">Every resource is created by Terraform and tagged Project, Environment, Owner.</text>
+<text x="40" y="72" font-size="13" font-weight="600" fill="#64748B" text-anchor="start">Every resource is created by Terraform (applied to the AWS Emulator in CI, decision 0011).</text>
 <rect x="40" y="217" width="140" height="60" rx="10" fill="#E6F3FC" stroke="#5B8DB8" stroke-width="1.6"/>
 <text x="54" y="244.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">Browser</text>
 <text x="54" y="262.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">the user</text>
@@ -19,24 +19,25 @@
 <rect x="290" y="215" width="120" height="64" rx="10" fill="#E6F3FC" stroke="#5B8DB8" stroke-width="1.6"/>
 <text x="304" y="244.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">Internet</text>
 <text x="304" y="262.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">gateway</text>
-<rect x="450" y="205" width="170" height="84" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6" stroke-dasharray="6 4"/>
-<text x="464" y="244.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">Load balancer</text>
-<text x="464" y="262.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">HTTPS 443 only</text>
-<rect x="680" y="190" width="170" height="58" rx="10" fill="#BFE3FA" stroke="#5B8DB8" stroke-width="1.6" stroke-dasharray="6 4"/>
-<text x="694" y="216.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">ECS: gateway</text>
-<text x="694" y="234.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">:5810</text>
-<rect x="680" y="272" width="170" height="58" rx="10" fill="#BFE3FA" stroke="#5B8DB8" stroke-width="1.6" stroke-dasharray="6 4"/>
-<text x="694" y="298.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">ECS: portal</text>
-<text x="694" y="316.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">:3000</text>
+<rect x="450" y="205" width="170" height="84" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
+<text x="464" y="236.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">Load balancer</text>
+<text x="464" y="254.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">listeners 5810, 3000</text>
+<text x="464" y="270.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">HTTPS 443: real account</text>
+<rect x="680" y="190" width="170" height="58" rx="10" fill="#BFE3FA" stroke="#5B8DB8" stroke-width="1.6"/>
+<text x="694" y="216.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">To gateway</text>
+<text x="694" y="234.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">:5810, private subnet</text>
+<rect x="680" y="272" width="170" height="58" rx="10" fill="#BFE3FA" stroke="#5B8DB8" stroke-width="1.6"/>
+<text x="694" y="298.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">To portal</text>
+<text x="694" y="316.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">:3000, private subnet</text>
 <rect x="895" y="215" width="135" height="64" rx="10" fill="#E6F3FC" stroke="#5B8DB8" stroke-width="1.6"/>
 <text x="909" y="244.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">NAT gateway</text>
 <text x="909" y="262.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">outbound only</text>
 <path d="M180,247 L290,247" fill="none" stroke="#334155" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#a)"/>
-<text x="230" y="239" font-size="11.5" font-weight="700" fill="#64748B" text-anchor="start" paint-order="stroke" stroke="#F7FBFE" stroke-width="5" stroke-linejoin="round">HTTPS</text>
+<text x="230" y="239" font-size="11.5" font-weight="700" fill="#64748B" text-anchor="start" paint-order="stroke" stroke="#F7FBFE" stroke-width="5" stroke-linejoin="round">HTTP(S)</text>
 <path d="M410,247 L450,247" fill="none" stroke="#334155" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#a)"/>
 <path d="M620,230 L650,230 L650,219 L680,219" fill="none" stroke="#334155" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#a)"/>
 <path d="M620,265 L660,265 L660,301 L680,301" fill="none" stroke="#334155" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#a)"/>
-<rect x="290" y="448" width="420" height="262" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6" stroke-dasharray="6 4"/>
+<rect x="290" y="448" width="420" height="262" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
 <text x="304" y="474" font-size="15" font-weight="800" fill="#334155" text-anchor="start">ECS Fargate services</text>
 <text x="304" y="492" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">stateless, one image each, one security group</text>
 <rect x="304" y="510" width="188" height="36" rx="8" fill="#E6F3FC" stroke="#5B8DB8" stroke-width="1.2"/>
@@ -53,15 +54,15 @@
 <text x="516" y="625" font-size="13" font-weight="800" fill="#334155" text-anchor="start">Inference</text>
 <rect x="304" y="648" width="188" height="36" rx="8" fill="#E6F3FC" stroke="#5B8DB8" stroke-width="1.2"/>
 <text x="316" y="671" font-size="13" font-weight="800" fill="#334155" text-anchor="start">MLflow</text>
-<rect x="760" y="448" width="270" height="112" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6" stroke-dasharray="6 4"/>
+<rect x="760" y="448" width="270" height="112" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
 <text x="774" y="493.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">EC2 CPU / GPU workers</text>
-<text x="774" y="511.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">started per job, stopped after</text>
-<text x="774" y="527.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">GPU training never on Fargate</text>
-<path d="M760,625 v76 a135.0,9 0 0 0 270,0 v-76 a135.0,9 0 0 0 -270,0 z" fill="#E6F3FC" stroke="#334155" stroke-width="1.6" stroke-dasharray="6 4"/>
-<path d="M760,625 a135.0,9 0 0 0 270,0" fill="none" stroke="#334155" stroke-width="1.6" stroke-dasharray="6 4"/>
+<text x="774" y="511.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">pools: 1 GPU and 4 GPUs</text>
+<text x="774" y="527.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">internal load balancer per pool</text>
+<path d="M760,625 v76 a135.0,9 0 0 0 270,0 v-76 a135.0,9 0 0 0 -270,0 z" fill="#E6F3FC" stroke="#334155" stroke-width="1.6"/>
+<path d="M760,625 a135.0,9 0 0 0 270,0" fill="none" stroke="#334155" stroke-width="1.6"/>
 <text x="774" y="659.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">RDS PostgreSQL</text>
 <text x="774" y="677.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">one schema per service</text>
-<text x="774" y="693.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">Hamda's #95 (in review)</text>
+<text x="774" y="693.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">password kept by Secrets Manager</text>
 <path d="M850,219 L870,219 L870,420 L560,420 L560,448" fill="none" stroke="#334155" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#a)"/>
 <text x="578" y="413" font-size="11.5" font-weight="700" fill="#64748B" text-anchor="start" paint-order="stroke" stroke="#F7FBFE" stroke-width="5" stroke-linejoin="round">API calls to services</text>
 <path d="M710,520 L760,520" fill="none" stroke="#334155" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#a)"/>
@@ -73,7 +74,7 @@
 <rect x="290" y="742" width="740" height="132" rx="10" fill="#E6F3FC" stroke="#5B8DB8" stroke-width="1.2"/>
 <text x="304" y="768" font-size="14" font-weight="800" fill="#334155" text-anchor="start">Security groups (in Terraform)</text>
 <text x="304" y="792" font-size="12.5" font-weight="800" fill="#5B8DB8" text-anchor="start">alb</text>
-<text x="384" y="792" font-size="12.5" font-weight="600" fill="#334155" text-anchor="start">HTTPS 443 from the internet</text>
+<text x="384" y="792" font-size="12.5" font-weight="600" fill="#334155" text-anchor="start">443, 5810, 3000 from the internet</text>
 <text x="304" y="813" font-size="12.5" font-weight="800" fill="#5B8DB8" text-anchor="start">services</text>
 <text x="384" y="813" font-size="12.5" font-weight="600" fill="#334155" text-anchor="start">from the load balancer and from each other</text>
 <text x="304" y="834" font-size="12.5" font-weight="800" fill="#5B8DB8" text-anchor="start">workers</text>
@@ -98,13 +99,13 @@
 <rect x="1112" y="334" width="330" height="74" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
 <text x="1126" y="368.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">ECR</text>
 <text x="1126" y="386.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">one image repository per service</text>
-<rect x="1112" y="428" width="330" height="74" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6" stroke-dasharray="6 4"/>
+<rect x="1112" y="428" width="330" height="74" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
 <text x="1126" y="462.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">Cognito user pool</text>
 <text x="1126" y="480.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">login tokens for the gateway</text>
-<rect x="1112" y="522" width="330" height="74" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6" stroke-dasharray="6 4"/>
+<rect x="1112" y="522" width="330" height="74" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
 <text x="1126" y="556.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">Secrets Manager</text>
 <text x="1126" y="574.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">passwords and keys</text>
-<rect x="1112" y="616" width="330" height="74" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6" stroke-dasharray="6 4"/>
+<rect x="1112" y="616" width="330" height="74" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
 <text x="1126" y="650.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">CloudWatch</text>
 <text x="1126" y="668.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">logs and metrics</text>
 <rect x="1112" y="716" width="330" height="84" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
@@ -123,11 +124,11 @@
 <rect x="40" y="958" width="230" height="74" rx="10" fill="#FFFFFF" stroke="#334155" stroke-width="1.6"/>
 <text x="54" y="984.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start">GitHub Actions</text>
 <text x="54" y="1002.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">tests every pull request</text>
-<text x="54" y="1018.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">deploy steps still to add</text>
+<text x="54" y="1018.0" font-size="12" font-weight="600" fill="#64748B" text-anchor="start">builds, scans, pushes images</text>
 <path d="M270,995 L1456,995 L1456,371 L1442,371" fill="none" stroke="#334155" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#a)"/>
 <path d="M1277,995 L1277,800" fill="none" stroke="#334155" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#a)"/>
 <circle cx="1277" cy="995" r="3.5" fill="#334155"/>
-<text x="300" y="987" font-size="11.5" font-weight="700" fill="#64748B" text-anchor="start" paint-order="stroke" stroke="#F7FBFE" stroke-width="5" stroke-linejoin="round">to add: terraform apply (state) · push images (ECR)</text>
+<text x="300" y="987" font-size="11.5" font-weight="700" fill="#64748B" text-anchor="start" paint-order="stroke" stroke="#F7FBFE" stroke-width="5" stroke-linejoin="round">terraform apply on the emulator · deploy role (#129)</text>
 <circle cx="450" cy="205" r="12" fill="#5B8DB8" stroke="#F7FBFE" stroke-width="2.5"/>
 <text x="450" y="209.5" font-size="12.5" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
 <circle cx="680" cy="190" r="12" fill="#5B8DB8" stroke="#F7FBFE" stroke-width="2.5"/>
@@ -145,22 +146,20 @@
 <rect x="40" y="1059" width="26" height="16" rx="4" fill="#BFE3FA" stroke="#5B8DB8" stroke-width="1.4"/>
 <text x="74" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">gateway and portal</text>
 <rect x="218" y="1059" width="26" height="16" rx="4" fill="#FFFFFF" stroke="#334155" stroke-width="1.4"/>
-<text x="252" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">in Terraform on main today</text>
-<rect x="449" y="1059" width="26" height="16" rx="4" fill="#FFFFFF" stroke="#334155" stroke-width="1.4" stroke-dasharray="6 4"/>
-<text x="483" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">still to build (16 Nov)</text>
-<path d="M660,1065 v4 a13.0,9 0 0 0 26,0 v-4 a13.0,9 0 0 0 -26,0 z" fill="#E6F3FC" stroke="#334155" stroke-width="1.6"/>
-<path d="M660,1065 a13.0,9 0 0 0 26,0" fill="none" stroke="#334155" stroke-width="1.6"/>
-<text x="674" y="1079.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start"></text>
-<text x="694" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">data store</text>
-<rect x="786" y="1059" width="26" height="16" rx="4" fill="#FFFFFF" stroke="#5B8DB8" stroke-width="1.4"/>
-<text x="820" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">SQS queues</text>
-<circle cx="925" cy="1067" r="12" fill="#5B8DB8" stroke="#F7FBFE" stroke-width="2.5"/>
-<text x="925" y="1071.5" font-size="12.5" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
-<text x="946" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">note below</text>
+<text x="252" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">in Terraform on main (22 Nov)</text>
+<path d="M469,1065 v4 a13.0,9 0 0 0 26,0 v-4 a13.0,9 0 0 0 -26,0 z" fill="#E6F3FC" stroke="#334155" stroke-width="1.6"/>
+<path d="M469,1065 a13.0,9 0 0 0 26,0" fill="none" stroke="#334155" stroke-width="1.6"/>
+<text x="483" y="1079.0" font-size="15" font-weight="800" fill="#334155" text-anchor="start"></text>
+<text x="503" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">data store</text>
+<rect x="595" y="1059" width="26" height="16" rx="4" fill="#FFFFFF" stroke="#5B8DB8" stroke-width="1.4"/>
+<text x="629" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">SQS queues</text>
+<circle cx="734" cy="1067" r="12" fill="#5B8DB8" stroke="#F7FBFE" stroke-width="2.5"/>
+<text x="734" y="1071.5" font-size="12.5" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+<text x="755" y="1071" font-size="12" font-weight="700" fill="#334155" text-anchor="start">note below</text>
 <circle cx="52" cy="1114" r="12" fill="#5B8DB8" stroke="#F7FBFE" stroke-width="2.5"/>
 <text x="52" y="1118.5" font-size="12.5" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
-<text x="72" y="1118" font-size="12" font-weight="600" fill="#334155" text-anchor="start">Only port 443 on the load balancer is open to the</text>
-<text x="72" y="1133" font-size="12" font-weight="600" fill="#334155" text-anchor="start">internet.</text>
+<text x="72" y="1118" font-size="12" font-weight="600" fill="#334155" text-anchor="start">The load balancer is the only way in: 5810 and 3000</text>
+<text x="72" y="1133" font-size="12" font-weight="600" fill="#334155" text-anchor="start">(443 with a real account).</text>
 <circle cx="52" cy="1154" r="12" fill="#5B8DB8" stroke="#F7FBFE" stroke-width="2.5"/>
 <text x="52" y="1158.5" font-size="12.5" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 <text x="72" y="1158" font-size="12" font-weight="600" fill="#334155" text-anchor="start">The gateway and the portal sit behind it. Every API</text>
@@ -171,8 +170,8 @@
 <text x="72" y="1213" font-size="12" font-weight="600" fill="#334155" text-anchor="start">call each other directly.</text>
 <circle cx="492" cy="1114" r="12" fill="#5B8DB8" stroke="#F7FBFE" stroke-width="2.5"/>
 <text x="492" y="1118.5" font-size="12.5" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
-<text x="512" y="1118" font-size="12" font-weight="600" fill="#334155" text-anchor="start">Training runs on EC2 machines started for each job</text>
-<text x="512" y="1133" font-size="12" font-weight="600" fill="#334155" text-anchor="start">and stopped after it.</text>
+<text x="512" y="1118" font-size="12" font-weight="600" fill="#334155" text-anchor="start">Training runs on EC2 GPU workers; the Scheduler</text>
+<text x="512" y="1133" font-size="12" font-weight="600" fill="#334155" text-anchor="start">sends each job to its pool.</text>
 <circle cx="492" cy="1154" r="12" fill="#5B8DB8" stroke="#F7FBFE" stroke-width="2.5"/>
 <text x="492" y="1158.5" font-size="12.5" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
 <text x="512" y="1158" font-size="12" font-weight="600" fill="#334155" text-anchor="start">Only services and workers can reach PostgreSQL.</text>

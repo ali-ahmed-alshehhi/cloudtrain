@@ -353,8 +353,9 @@ def _yh(row, w):
 # 2. Deployment: which AWS piece runs what
 # =====================================================================================
 
-# What Terraform on main does not create yet (16 Nov). Remove a name when its Terraform is merged.
-PLANNED = {"alb", "gateway", "portal", "services", "workers", "rds", "cognito", "secrets", "cloudwatch"}
+# What Terraform on main does not create yet. Empty since 22 Nov: ECS (#135), RDS (#95), Cognito (#127),
+# GPU workers (#123, #133), Secrets Manager (#110) and CloudWatch (#134) are all merged.
+PLANNED: set[str] = set()
 
 
 def deployment() -> Svg:
@@ -363,7 +364,7 @@ def deployment() -> Svg:
     s.text(
         40,
         72,
-        "Every resource is created by Terraform and tagged Project, Environment, Owner.",
+        "Every resource is created by Terraform (applied to the AWS Emulator in CI, decision 0011).",
         size=13,
         color=MUTED,
     )
@@ -387,12 +388,20 @@ def deployment() -> Svg:
 
     # public subnets
     s.box(290, 215, 120, 64, "Internet", ["gateway"], kind="external")
-    s.box(450, 205, 170, 84, "Load balancer", ["HTTPS 443 only"], planned=p("alb"))
-    s.box(680, 190, 170, 58, "ECS: gateway", [":5810"], kind="published", planned=p("gateway"))
-    s.box(680, 272, 170, 58, "ECS: portal", [":3000"], kind="published", planned=p("portal"))
+    s.box(
+        450,
+        205,
+        170,
+        84,
+        "Load balancer",
+        ["listeners 5810, 3000", "HTTPS 443: real account"],
+        planned=p("alb"),
+    )
+    s.box(680, 190, 170, 58, "To gateway", [":5810, private subnet"], kind="published", planned=p("gateway"))
+    s.box(680, 272, 170, 58, "To portal", [":3000, private subnet"], kind="published", planned=p("portal"))
     s.box(895, 215, 135, 64, "NAT gateway", ["outbound only"], kind="external")
     s.line((180, 247), (290, 247))
-    s.label(230, 239, "HTTPS")
+    s.label(230, 239, "HTTP(S)")
     s.line((410, 247), (450, 247))
     s.line((620, 230), (650, 230), (650, 219), (680, 219))
     s.line((620, 265), (660, 265), (660, 301), (680, 301))
@@ -413,7 +422,7 @@ def deployment() -> Svg:
         270,
         112,
         "EC2 CPU / GPU workers",
-        ["started per job, stopped after", "GPU training never on Fargate"],
+        ["pools: 1 GPU and 4 GPUs", "internal load balancer per pool"],
         planned=p("workers"),
     )
     s.store(
@@ -422,7 +431,7 @@ def deployment() -> Svg:
         270,
         94,
         "RDS PostgreSQL",
-        ["one schema per service", "Hamda's #95 (in review)"],
+        ["one schema per service", "password kept by Secrets Manager"],
         planned=p("rds"),
     )
 
@@ -440,7 +449,7 @@ def deployment() -> Svg:
     s.rect(290, 742, 740, 132, TINT, STEEL, width=1.2)
     s.text(304, 768, "Security groups (in Terraform)", size=14, weight=800)
     rules = [
-        ("alb", "HTTPS 443 from the internet"),
+        ("alb", "443, 5810, 3000 from the internet"),
         ("services", "from the load balancer and from each other"),
         ("workers", "only from services (scheduler, job control)"),
         ("database", "PostgreSQL 5432 only from services and workers"),
@@ -473,11 +482,11 @@ def deployment() -> Svg:
         s.line((bus, cy), (r, cy))
 
     # CI and Terraform from outside
-    s.box(40, 958, 230, 74, "GitHub Actions", ["tests every pull request", "deploy steps still to add"])
+    s.box(40, 958, 230, 74, "GitHub Actions", ["tests every pull request", "builds, scans, pushes images"])
     s.line((270, 995), (1456, 995), (1456, 371), (r + 330, 371))
     s.line((1277, 995), (1277, 800))
     s.dot(1277, 995)
-    s.label(300, 987, "to add: terraform apply (state) · push images (ECR)")
+    s.label(300, 987, "terraform apply on the emulator · deploy role (#129)")
 
     for n, (x, y) in enumerate(
         [(450, 205), (680, 190), (290, 448), (760, 448), (760, 616), (895, 215), (40, 958)], start=1
@@ -490,8 +499,7 @@ def deployment() -> Svg:
         1070,
         [
             ("published", "gateway and portal"),
-            ("service", "in Terraform on main today"),
-            ("planned", "still to build (16 Nov)"),
+            ("service", "in Terraform on main (22 Nov)"),
             ("store", "data store"),
             ("queue", "SQS queues"),
             ("step", "note below"),
@@ -501,10 +509,10 @@ def deployment() -> Svg:
         40,
         1110,
         [
-            "Only port 443 on the load balancer is open to the internet.",
+            "The load balancer is the only way in: 5810 and 3000 (443 with a real account).",
             "The gateway and the portal sit behind it. Every API call goes through the gateway.",
             "The other services run privately on ECS Fargate and call each other directly.",
-            "Training runs on EC2 machines started for each job and stopped after it.",
+            "Training runs on EC2 GPU workers; the Scheduler sends each job to its pool.",
             "Only services and workers can reach PostgreSQL.",
             "Private subnets reach S3, SQS and other AWS services through the NAT gateway.",
             "CI tests every change. Terraform creates everything; its state is locked in S3.",
