@@ -11,8 +11,10 @@ from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histo
 
 from app.tracker import INVALID_REASONS, TERMINAL, Outcome
 
-WAIT_BUCKETS = (1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600)
-RUN_BUCKETS = (10, 30, 60, 300, 600, 1800, 3600, 7200, 14400, 28800)
+# Small buckets too: laptop jobs wait about 0.04 s and train about 3 s (Test D, 22 Nov). With 1 s and 10 s as
+# the smallest buckets, every such job fell in the first one and p50/p95 said only "under 1 s" / "under 10 s".
+WAIT_BUCKETS = (0.1, 0.25, 0.5, 1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600)
+RUN_BUCKETS = (1, 2.5, 5, 10, 30, 60, 300, 600, 1800, 3600, 7200, 14400, 28800)
 LAG_BUCKETS = (0.1, 0.5, 1, 2, 5, 10, 30, 60, 300)
 
 
