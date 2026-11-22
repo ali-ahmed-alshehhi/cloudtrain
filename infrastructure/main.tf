@@ -160,8 +160,9 @@ module "monitoring" {
   training_jobs_dlq_arn = module.message_queue.training_jobs_dlq_arn
   job_events_queue_arn  = module.message_queue.job_events_queue_arn
   log_retention_days    = var.log_retention_days
-  # ALB 5xx alarm once application-services exists (no cycle: log names are a static map below).
-  alb_arn_suffix = length(module.application_services) > 0 ? module.application_services[0].alb_arn_suffix : null
+  # Plan-time switch (alb_arn_suffix is only known after apply, so it cannot drive count).
+  create_server_errors_alarm = var.enable_application_services
+  alb_arn_suffix             = length(module.application_services) > 0 ? module.application_services[0].alb_arn_suffix : null
 }
 
 # Same paths monitoring creates — pass by name so ECS does not create the groups twice.
