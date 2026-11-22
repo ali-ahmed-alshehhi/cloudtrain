@@ -202,3 +202,12 @@ def test_boolean_dataset_version_is_422():
         response = client.post("/internal/run", json={**FORM, "dataset_version": True})
 
     assert response.status_code == 422
+
+
+def test_extra_hyperparameter_must_be_a_plain_value():
+    """The contract allows extra settings as a number, string or boolean only (found by the contract test)."""
+    with TestClient(make_app(FakeJobService())) as client:
+        for bad in (None, [1, 2], {"a": 1}):
+            hyperparameters = {**FORM["hyperparameters"], "k": bad}
+            response = client.post("/internal/run", json={**FORM, "hyperparameters": hyperparameters})
+            assert response.status_code == 422, bad
