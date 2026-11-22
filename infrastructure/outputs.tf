@@ -48,3 +48,106 @@ output "alb_security_group_id" {
 output "services_security_group_id" {
   value = try(module.security[0].services_security_group_id, null)
 }
+
+output "database_security_group_id" {
+  value = try(module.security[0].database_security_group_id, null)
+}
+
+output "db_endpoint" {
+  description = "RDS endpoint for service DATABASE_URLs (after enable_database=true)."
+  value       = try(module.database[0].db_endpoint, null)
+}
+
+output "db_address" {
+  description = "RDS hostname (for bootstrap / DATABASE_URLs)."
+  value       = try(module.database[0].db_address, null)
+}
+
+output "db_port" {
+  description = "RDS port (for bootstrap / DATABASE_URLs)."
+  value       = try(module.database[0].db_port, null)
+}
+
+output "db_name" {
+  description = "Postgres database name."
+  value       = try(module.database[0].db_name, null)
+}
+
+output "db_master_secret_arn" {
+  description = "RDS-managed Secrets Manager ARN for the master user (Fatma/Hamda + services)."
+  value       = try(module.database[0].master_secret_arn, null)
+}
+
+output "jwt_issuer" {
+  description = "JWT_ISSUER for the gateway (from Cognito / emulator)."
+  value       = try(module.identity[0].issuer, null)
+}
+
+output "jwt_audience" {
+  description = "JWT_AUDIENCE for the gateway (portal Cognito app client id)."
+  value       = try(module.identity[0].portal_client_id, null)
+}
+
+output "jwt_jwks_url" {
+  description = "JWT_JWKS_URL for the gateway (Cognito public keys)."
+  value       = try(module.identity[0].jwks_url, null)
+}
+
+output "cognito_user_pool_id" {
+  value = try(module.identity[0].user_pool_id, null)
+}
+
+output "gpu_worker_autoscaling_group" {
+  description = "Auto Scaling group of GPU workers (Abdullah, Maitha)."
+  value       = try(module.training_compute_gpu[0].autoscaling_group_name, null)
+}
+
+output "gpu_worker_launch_template_id" {
+  value = try(module.training_compute_gpu[0].launch_template_id, null)
+}
+
+output "worker_instance_profile_name" {
+  value = try(module.iam[0].worker_instance_profile_name, null)
+}
+
+output "service_task_role_arns" {
+  description = "Per service: the IAM role its code runs as (ECS taskRoleArn; Salem: PassRole in #129)."
+  value       = try(module.service_roles[0].task_role_arns, null)
+}
+
+output "service_database_secret_names" {
+  description = "Per service: the database secret created by scripts/bootstrap-schemas.sh."
+  value       = try(module.service_roles[0].database_secret_names, null)
+}
+
+output "ecs_task_execution_role_arn" {
+  description = "executionRoleArn for every ECS task definition (Hamda + Fatma, #36)."
+  value       = try(module.iam[0].ecs_task_execution_role_arn, null)
+}
+
+output "github_deploy_role_arn" {
+  description = "Repository variable AWS_DEPLOY_ROLE_ARN for the deploy workflow (Salem, #54)."
+  value       = try(module.iam[0].github_deploy_role_arn, null)
+}
+
+output "multi_gpu_worker_autoscaling_group" {
+  description = "Auto Scaling group of multi-GPU workers (Ahmed + Abdulla)."
+  value       = try(module.training_compute_multi_gpu[0].autoscaling_group_name, null)
+}
+
+output "worker_urls" {
+  description = "Machine type to worker address, for the Scheduler's TRAINING_WORKER_URLS (JSON). Maitha, #70."
+  value = var.enable_training_compute && var.enable_worker_load_balancers ? {
+    (var.gpu_instance_type)       = module.training_compute_gpu[0].worker_url
+    (var.multi_gpu_instance_type) = module.training_compute_multi_gpu[0].worker_url
+  } : {}
+}
+
+output "log_group_names" {
+  description = "Per service: its CloudWatch log group (Hamda: awslogs-group in the ECS task definitions)."
+  value       = try(module.monitoring[0].log_group_names, null)
+}
+
+output "alarm_names" {
+  value = try(module.monitoring[0].alarm_names, null)
+}

@@ -1,7 +1,8 @@
 """Object storage for dataset files: LocalStack S3 locally, real S3 in the cloud.
 
-Object key layout: `<dataset_id>/v<version>/data` inside the `datasets` bucket
-(shown outside as `s3://datasets/<dataset_id>/v<version>/`).
+Object key layout: `<dataset_id>/v<version>/data` inside the datasets bucket
+(shown outside as `s3://<bucket>/<dataset_id>/v<version>/`). The bucket is `datasets` locally; on AWS
+it has a globally unique name (DATASETS_BUCKET), so the URI always uses the real bucket name.
 """
 
 from __future__ import annotations
@@ -20,8 +21,12 @@ class StorageUnavailable(Exception):
     """Raised when object storage cannot be reached or fails a read/write."""
 
 
-def storage_uri(dataset_id: str, version: int) -> str:
-    return f"s3://datasets/{dataset_id}/v{version}/"
+class StorageObjectMissing(Exception):
+    """Raised when storage is reachable but the file is not there (e.g. LocalStack was restarted)."""
+
+
+def storage_uri(bucket: str, dataset_id: str, version: int) -> str:
+    return f"s3://{bucket}/{dataset_id}/v{version}/"
 
 
 def object_key(dataset_id: str, version: int) -> str:
@@ -35,6 +40,8 @@ class PresignedDownload:
 
 
 class ObjectStorage(Protocol):
+    bucket: str
+
     def put(self, key: str, data: bytes) -> None: ...
 
     def get(self, key: str) -> bytes: ...
@@ -48,6 +55,7 @@ class MemoryStorage:
 
     objects: dict[str, bytes] = field(default_factory=dict)
     fail: bool = False
+    bucket: str = "datasets"
 
     def _maybe_fail(self) -> None:
         if self.fail:
@@ -59,6 +67,8 @@ class MemoryStorage:
 
     def get(self, key: str) -> bytes:
         self._maybe_fail()
+        if key not in self.objects:
+            raise StorageObjectMissing(key)
         return self.objects[key]
 
     def presigned_get(self, key: str, expires_seconds: int = 900) -> PresignedDownload:
@@ -99,7 +109,11 @@ class S3Storage:
         try:
             response = self.client.get_object(Bucket=self.bucket, Key=key)
             return response["Body"].read()
-        except (ClientError, EndpointConnectionError, BotoCoreError) as error:
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+                raise StorageObjectMissing(key) from error
+            raise StorageUnavailable("Object storage is not reachable") from error
+        except (EndpointConnectionError, BotoCoreError) as error:
             raise StorageUnavailable("Object storage is not reachable") from error
 
     def presigned_get(self, key: str, expires_seconds: int = 900) -> PresignedDownload:

@@ -4,11 +4,12 @@ Owners: Hamda + Fatma.
 
 | File | Purpose |
 |---|---|
-| `localstack.tfvars.example` | LocalStack practice (same tool as the app — decisions 0005 / 0007) |
+| `emulator.tfvars.example` | AWS Emulator, our stand-in for an AWS account (decision 0011) |
+| `localstack.tfvars.example` | LocalStack (same tool as the app — decision 0005) |
 | `terraform.tfvars.example` | Real AWS values (copy to git-ignored `terraform.tfvars`) |
 
 ```bash
-docker compose -f docker-compose.localstack.yml up -d
-export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
-terraform apply -var-file=environments/dev/localstack.tfvars.example
+./scripts/emulator-up.sh
+source ./scripts/emulator-env.sh
+terraform apply -var-file=environments/dev/emulator.tfvars.example
 ```

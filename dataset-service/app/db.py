@@ -84,3 +84,17 @@ class LineageRecord(Base):
     version: Mapped[int] = mapped_column(Integer)
     job_id: Mapped[str] = mapped_column(String(32))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class AuditEvent(Base):
+    """One upload, new version, download or download link, kept as a permanent record."""
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    action: Mapped[str] = mapped_column(String(32))  # upload, new_version, download, download_url
+    dataset_id: Mapped[int] = mapped_column(ForeignKey(f"{SCHEMA}.datasets.id"))
+    version: Mapped[int] = mapped_column(Integer)
+    actor: Mapped[str] = mapped_column(String(128))  # user id, or "internal" for worker calls
+    request_id: Mapped[str] = mapped_column(String(128))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

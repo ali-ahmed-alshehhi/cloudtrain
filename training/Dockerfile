@@ -1,4 +1,4 @@
-# CloudTrain training worker image (stand-in).
+# CloudTrain training worker image.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -11,6 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY distributed ./distributed
 
 # Run as a normal user, not root.
 RUN useradd --create-home --uid 10001 appuser

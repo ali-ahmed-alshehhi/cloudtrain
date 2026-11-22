@@ -11,11 +11,12 @@ module "networking" {
 }
 
 module "security" {
-  count  = var.enable_networking ? 1 : 0
+  count  = var.enable_networking && var.enable_security_groups ? 1 : 0
   source = "./modules/security"
 
   environment = var.environment
   vpc_id      = module.networking[0].vpc_id
+  vpc_cidr    = module.networking[0].vpc_cidr
 }
 
 module "object_storage" {
@@ -37,4 +38,126 @@ module "container_registry" {
   source = "./modules/container-registry"
 
   environment = var.environment
+}
+
+module "database" {
+  count  = var.enable_database ? 1 : 0
+  source = "./modules/database"
+
+  environment        = var.environment
+  project            = var.project
+  private_subnet_ids = module.networking[0].private_subnet_ids
+  # Without our own security groups (the emulator, see enable_security_groups), the database
+  # sits in the VPC's default security group, which networking locks down (no rules).
+  database_security_group_id = var.enable_security_groups ? module.security[0].database_security_group_id : module.networking[0].default_security_group_id
+  instance_class             = var.db_instance_class
+  multi_az                   = var.db_multi_az
+  deletion_protection        = var.db_deletion_protection
+}
+
+# Cognito login (decision 0006). Module lives in modules/identity (from Salem #121); wired here.
+module "identity" {
+  count  = var.enable_identity ? 1 : 0
+  source = "./modules/identity"
+
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  issuer_base_url            = var.use_emulator ? var.emulator_endpoint : ""
+  allow_admin_password_login = var.use_emulator
+  deletion_protection        = var.environment == "staging"
+}
+
+module "iam" {
+  count  = var.enable_training_compute || var.enable_ecs_roles ? 1 : 0
+  source = "./modules/iam"
+
+  environment          = var.environment
+  datasets_bucket_arn  = module.object_storage.datasets_bucket_arn
+  artifacts_bucket_arn = module.object_storage.artifacts_bucket_arn
+  job_events_queue_arn = module.message_queue.job_events_queue_arn
+
+  # ECS task execution role + GitHub OIDC deploy role (modules/iam/ecs.tf, Salem)
+  enable_ecs_roles    = var.enable_ecs_roles
+  aws_region          = var.aws_region
+  ecr_repository_arns = var.enable_container_registry ? values(module.container_registry[0].repository_arns) : []
+  ecs_cluster_name    = "${var.environment}-cloudtrain"
+  # Each service's OWN database secret (scripts/bootstrap-schemas.sh), never the master secret
+  secret_names = var.enable_service_roles ? [for name in values(module.service_roles[0].database_secret_names) : name if name != null] : []
+  # The deploy role may pass exactly these per-service task roles (plus the execution role) to ECS
+  task_role_arns = var.enable_service_roles ? values(module.service_roles[0].task_role_arns) : []
+}
+
+module "training_compute_gpu" {
+  count  = var.enable_training_compute ? 1 : 0
+  source = "./modules/training-compute"
+
+  environment   = var.environment
+  pool_name     = "gpu-1"
+  instance_type = var.gpu_instance_type
+  ami_id        = var.worker_ami_id
+  subnet_ids    = module.networking[0].private_subnet_ids
+  # Without our own security groups (the emulator), workers use the VPC's locked-down default group.
+  security_group_ids    = [var.enable_security_groups ? module.security[0].workers_security_group_id : module.networking[0].default_security_group_id]
+  instance_profile_name = module.iam[0].worker_instance_profile_name
+  desired_capacity      = var.worker_desired_capacity
+  min_size              = 0
+  max_size              = var.worker_max_size
+  enable_load_balancer  = var.enable_worker_load_balancers
+  vpc_id                = module.networking[0].vpc_id
+
+  worker_env = {
+    JOB_EVENTS_QUEUE_URL = module.message_queue.job_events_queue_url
+    DATASETS_BUCKET      = module.object_storage.datasets_bucket_name
+    ARTIFACTS_BUCKET     = module.object_storage.artifacts_bucket_name
+  }
+}
+
+# One task role per service (security/DEPLOYMENT_POLICY.md). Used by the ECS services in #36.
+module "service_roles" {
+  count  = var.enable_service_roles ? 1 : 0
+  source = "./modules/service-roles"
+
+  environment             = var.environment
+  datasets_bucket_arn     = module.object_storage.datasets_bucket_arn
+  artifacts_bucket_arn    = module.object_storage.artifacts_bucket_arn
+  training_jobs_queue_arn = module.message_queue.training_jobs_queue_arn
+  training_jobs_dlq_arn   = module.message_queue.training_jobs_dlq_arn
+  job_events_queue_arn    = module.message_queue.job_events_queue_arn
+}
+
+# Multi-GPU workers (#36): the same module, a machine with 4 GPUs for Ahmed + Abdulla's DDP runs.
+# contracts/pricing.yaml has no 2-GPU machine, so a 2-GPU job runs here (and pays for the machine).
+module "training_compute_multi_gpu" {
+  count  = var.enable_training_compute ? 1 : 0
+  source = "./modules/training-compute"
+
+  environment           = var.environment
+  pool_name             = "gpu-4"
+  instance_type         = var.multi_gpu_instance_type
+  ami_id                = var.worker_ami_id
+  subnet_ids            = module.networking[0].private_subnet_ids
+  security_group_ids    = [var.enable_security_groups ? module.security[0].workers_security_group_id : module.networking[0].default_security_group_id]
+  instance_profile_name = module.iam[0].worker_instance_profile_name
+  desired_capacity      = var.multi_gpu_desired_capacity
+  min_size              = 0
+  max_size              = var.multi_gpu_max_size
+  enable_load_balancer  = var.enable_worker_load_balancers
+  vpc_id                = module.networking[0].vpc_id
+
+  worker_env = {
+    JOB_EVENTS_QUEUE_URL = module.message_queue.job_events_queue_url
+    DATASETS_BUCKET      = module.object_storage.datasets_bucket_name
+    ARTIFACTS_BUCKET     = module.object_storage.artifacts_bucket_name
+  }
+}
+
+# CloudWatch log groups (one per ECS service) and alarms (#36). Alarms follow monitoring/aws/README.md.
+module "monitoring" {
+  count  = var.enable_monitoring ? 1 : 0
+  source = "./modules/monitoring"
+
+  environment           = var.environment
+  training_jobs_dlq_arn = module.message_queue.training_jobs_dlq_arn
+  job_events_queue_arn  = module.message_queue.job_events_queue_arn
+  log_retention_days    = var.log_retention_days
 }
