@@ -30,8 +30,9 @@ test('projects: create, refresh, select, validate and recover from a network err
     const created = await response.json();
     await page.getByRole('button', { name: new RegExp(name) }).waitFor();
     assert.equal(await page.getByRole('button', { name: new RegExp(name) }).getAttribute('aria-pressed'), 'true');
+    const refreshed = page.waitForResponse(r => r.url().endsWith('/api/v1/projects') && r.request().method() === 'GET');
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-    await page.waitForResponse(r => r.url().endsWith('/api/v1/projects') && r.request().method() === 'GET');
+    await refreshed;
     await page.getByRole('button', { name: new RegExp(name) }).click();
     assert.equal(await page.getByRole('button', { name: new RegExp(name) }).getAttribute('aria-pressed'), 'true');
     // A failed read must show an error, then recover when the connection returns.
