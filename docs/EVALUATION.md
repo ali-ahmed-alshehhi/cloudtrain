@@ -1,6 +1,6 @@
 # Evaluation: performance, reliability and cloud cost
 
-**Owners:** Hilal + Adel (Student 10). **Status on 19 Nov 2026: skeleton, measurements in: Tests A, B and C (speed, upload/download, alert), dashboard on a laptop.** The methods are fixed; most
+**Owners:** Hilal + Adel (Student 10). **Status on 22 Nov 2026: measurements in: Tests A, B, C (speed, upload/download, alert) and D (real training), dashboard on a laptop.** The methods are fixed; most
 numbers wait for the integrated system (see "Waiting on" in each table). Final version: Fri 27 Nov.
 
 **How to read the status column**
@@ -31,8 +31,8 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 | What | Method | Status | Result | Evidence |
 |---|---|---|---|---|
 | Gateway latency per route, p50 / p95 | Prometheus histogram `gateway_request_duration_seconds` while `make e2e` runs 3 times; dashboard panel "Slowest 5% of answers" | ✅ Measured on a laptop (20 Nov, #115 at `aa6cc8b`) | p50: projects 2.9 ms, datasets 7.0 ms, jobs 7.7 ms, experiments 7.5 ms. p95: 19, 19, 22 and 50 ms. About 75 requests; values are estimates inside the histogram buckets (5, 10, 25, 50 ms) | [`docs/evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) |
-| Time from `POST /jobs` to RUNNING (queue + scheduling) | `cloudtrain_job_queue_wait_seconds` from `job-events-monitor` (QUEUED → RUNNING per attempt), 10 small jobs | ⏳ Waiting on: #115, a real worker (#93) | | |
-| Training time per job | `cloudtrain_job_run_seconds{result}` and MLflow run duration, same 10 jobs | ⏳ Waiting on: #93 | | |
+| Time from `POST /jobs` to RUNNING (queue + scheduling) | `cloudtrain_job_queue_wait_seconds` from `job-events-monitor` (QUEUED → RUNNING per attempt), 10 small jobs | ✅ Measured on a laptop (22 Nov, `main` at `7b77c76`, real training worker) | **Average 36 ms**; all 10 jobs under 1 s. The histogram's smallest bucket is 1 s, so its p50/p95 say only "under 1 s" | [`docs/evaluation/test-d-real-training.md`](evaluation/test-d-real-training.md) |
+| Training time per job | `cloudtrain_job_run_seconds{result}` and the job's `started_at` → `finished_at`, same 10 jobs | ✅ Measured on a laptop (22 Nov, `7b77c76`): `tabular_mlp` on the Wisconsin data, laptop CPU | **Median 3.05 s**, 2.9–12.7 s (the first includes the worker's cold start); 10 of 10 succeeded. Whole walk-through: 24.8 s the first time, then 5.4–5.6 s | [`docs/evaluation/test-d-real-training.md`](evaluation/test-d-real-training.md) |
 | Alert delay: status change → visible in the portal | `occurred_at` of the event vs the time the alert appears in the browser (Playwright), plus `cloudtrain_job_event_lag_seconds` for the monitor | ⏳ Waiting on: #99 + job page (#59) | | |
 | Inference latency `POST /predict` | 100 requests through the gateway after one warm-up; p50 / p95 | ⏳ Waiting on: Majed (prediction API, due Tue 24) | | |
 | Dataset upload / download speed | Upload and download a 50 MB and a 500 MB file through the gateway, 3 times each, MB/s | ✅ Measured on a laptop (20 Nov, `aa6cc8b`), with `curl` through the gateway (the portal page, #99, is not needed for this) | **52 MB:** upload 161 MB/s, download 253 MB/s. **524 MB:** upload 154 MB/s, download 270 MB/s (medians of 3). Every download returned the exact size; speed per MB stays the same for the bigger file. One laptop, no network: upper bounds | [`docs/evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) |
@@ -74,7 +74,7 @@ All three are on `main` since 18 Nov.
 
 | What | Status | Result | Evidence |
 |---|---|---|---|
-| Cost per job and per project | 🧪 Portal views on `main` (#117), tested with FIXTURE jobs. ⏳ Real numbers waiting on: machine types from the scheduler (#105) and real jobs (#93) | | `portal/components/usage/`, `portal/test/usage.test.mjs` |
+| Cost per job and per project | ✅ Real jobs (22 Nov): the scheduler chose `local-cpu` for all 10, so 0.0 GPU-hours and **$0.00** each, the real price of `local-cpu` (not a missing value). Portal views on `main` (#117), tested with FIXTURE jobs for GPU prices. A GPU job's cost needs a GPU machine, which the laptop and the AWS Emulator do not have | | `portal/components/usage/`, `portal/test/usage.test.mjs` |
 | Cost of the 1 GPU vs 2 GPU benchmark | ⏳ Waiting on: Ahmed + Abdulla | | `docs/BENCHMARKS.md` |
 | Total cloud spend | **$0: no AWS account.** The team uses the AWS Emulator (decision 0011), so all costs in this report are **estimates of what the same work would cost on AWS**, not bills | | [decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md) |
 | Keeping cost down | ✅ Checked in the code (20 Nov, `main` at `474a732`). **1. Smallest machine that fits:** the scheduler picks 0 GPU → `c6i.2xlarge`, 1 → `g4dn.xlarge`, 2–4 → `g4dn.12xlarge`, 5–8 → `g4dn.metal` (`scheduler/app/machines.py`, #105); locally always `local-cpu` ($0). **2. Machines are not started and stopped per job:** each GPU pool has a fixed size set in Terraform (`worker_desired_capacity`, 1 in the dev settings; the 4-GPU pool 0; min 0), with no autoscaling, so a machine costs money while idle: one idle `g4dn.xlarge` ≈ **$12.62 a day** (24 h × $0.526). Saving money is manual: set the capacity to 0 when nobody trains, `terraform destroy` after use. **3.** The scheduler frees a job's slot only when the next job needs one ("Busy workers" stays 1 after a job); that affects placement, not the bill | | `scheduler/app/machines.py`, `infrastructure/main.tf`, `infrastructure/README.md` ("Demo 4"), `contracts/pricing.yaml` |
@@ -120,6 +120,7 @@ open http://localhost:3001                # Grafana, dashboard "CloudTrain overv
 | A | A service stopped or frozen: the gateway answers 503 at once or after 10 s, and recovers; the alert fires | [`evaluation/test-a-service-stopped-or-frozen.md`](evaluation/test-a-service-stopped-or-frozen.md), [`evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) (part 3) |
 | B | What survives `make down` + `make up` (records yes, local S3 files no) | [`evaluation/test-b-restart-keeps-data.md`](evaluation/test-b-restart-keeps-data.md) |
 | C | Gateway p50/p95, dataset upload and download speed | [`evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) |
+| D | 10 real training jobs: queue wait, training time, machine and cost per job | [`evaluation/test-d-real-training.md`](evaluation/test-d-real-training.md) |
 
 The automatic checks behind the "🧪 Tested" lines:
 
