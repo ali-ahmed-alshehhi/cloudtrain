@@ -327,3 +327,15 @@ def test_health_when_database_is_down_is_503(storage, projects, check):
 
     assert response.status_code == 503
     check(response.json(), "Error")
+
+
+def test_missing_file_in_storage_is_404_not_503(client, check, storage):
+    dataset_id = upload(client).json()["dataset_id"]
+    storage.objects.clear()  # what a LocalStack restart does: the record stays, the file is gone
+
+    response = client.get(f"/datasets/{dataset_id}/versions/1/download", headers=USER)
+
+    assert response.status_code == 404
+    check(response.json(), "Error")
+    assert response.json()["error"]["code"] == "DATASET_FILE_MISSING"
+    assert audit_actions(client, dataset_id) == [("upload", 1, "user-1")]
