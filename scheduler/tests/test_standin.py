@@ -38,6 +38,10 @@ class FakeSqs:
     def delete_message(self, QueueUrl, ReceiptHandle):
         self.deleted.append(ReceiptHandle)
 
+    def change_message_visibility(self, QueueUrl, ReceiptHandle, VisibilityTimeout):
+        self.visibility_changes = getattr(self, "visibility_changes", [])
+        self.visibility_changes.append({"handle": ReceiptHandle, "timeout": VisibilityTimeout})
+
 
 class FakeServices:
     """Training Jobs and the worker."""

@@ -72,6 +72,7 @@ class Scheduler:
         urls_json = os.environ.get("TRAINING_WORKER_URLS", "{}")
         self.worker_urls: dict[str, str] = json.loads(urls_json)
         self.max_wait_for_worker = float(os.environ.get("SQS_VISIBILITY_TIMEOUT_SECONDS", "300"))
+        self.retry_visibility_seconds = int(os.environ.get("SQS_RETRY_VISIBILITY_SECONDS", "5"))
         self._queue_url: str | None = None
         max_w = int(os.environ.get("SCHEDULER_MAX_WORKERS", "1"))
         max_gpus_str = os.environ.get("SCHEDULER_MAX_GPUS")
@@ -213,6 +214,12 @@ class Scheduler:
                 done = False
             if done:
                 self.sqs.delete_message(QueueUrl=self.queue_url(), ReceiptHandle=message["ReceiptHandle"])
+            else:
+                self.sqs.change_message_visibility(
+                    QueueUrl=self.queue_url(),
+                    ReceiptHandle=message["ReceiptHandle"],
+                    VisibilityTimeout=self.retry_visibility_seconds,
+                )
 
 
 def create_app(
