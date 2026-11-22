@@ -35,7 +35,7 @@ latency ms: min 2.6, p50 3.2, p95 4.4, max 6.1
 |---|---|
 | Answers | **100 of 100** HTTP 200; the top label of the first answer is `cat` |
 | Latency (client, through the gateway) | min **2.6 ms**, p50 **3.2 ms**, p95 **4.4 ms**, max **6.1 ms** |
-| First request | 9.5 ms (the model version was already loaded by step 10's health gate) |
+| First request | 9.5 ms (not counted in the 100) |
 
 **What it means.** The platform adds only a few milliseconds around a prediction on one laptop: the gateway's
 check and forwarding, the inference service and its answer. A trained model would add its own compute time on
