@@ -1,7 +1,7 @@
 # Evaluation: performance, reliability and cloud cost
 
 **Owners:** Hilal + Adel (Student 10). **Status on 22 Nov 2026: Tests A, B, C (speed, upload/download, alert),
-D (real training) and E (alert delay in the portal) measured on a laptop; GPU, prediction and worker-failure numbers still pending.** Every
+D (real training), E (alert delay in the portal) and F (a burst of jobs) measured on a laptop; GPU, prediction and worker-failure numbers still pending.** Every
 ⏳ row names who it waits on and when. Final version: Fri 27 Nov.
 
 ## Headline results (so far)
@@ -15,6 +15,7 @@ speed. Each links to its row below and to the raw output.
 | A service stops or freezes | the gateway answers **503 at once** (stopped) or **after 10 s** (frozen), never hangs, and works again on the first request after the restart; tested on 5 services (Test A). Alert "service down" fires after **83–88 s** |
 | Restart (`make down` + `make up`) | **records kept** (projects, jobs, datasets, MLflow experiments and runs); **local S3 files lost**, as decision 0005 expects (Test B) |
 | Dataset transfer | upload **154–161 MB/s**, download **253–270 MB/s** (medians of 3, 52 MB and 524 MB files; Test C) |
+| A burst of jobs | 3 jobs sent at once with one worker: waits **0.1 s, 300 s and 729 s** for about 4 s of training each. A job that finds the worker busy comes back only after the queue's 300 s visibility timeout; the cloud uses the same settings (Test F) |
 | Alert delay in the portal | an alert is on the Projects page **2.3 s** (median) after the job event, never more than **5.0 s** (the page's 5 s poll); 40 of 40 alerts shown (Test E) |
 | 10 real training jobs | **10 of 10 succeeded**; time per job median **3.05 s** on the laptop CPU, with the walk-through's tiny 8-row CSV (platform overhead, not training on real data); queue wait average 36 ms (runs 1–3) (Test D) |
 | Cost | **$0 spent** (no AWS account, decision 0011). Local jobs run on `local-cpu`, priced $0. GPU costs in this report are estimates of what AWS would charge |
@@ -36,7 +37,7 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 | | Value |
 |---|---|
 | Where everything runs | Docker Compose on a laptop (`make up`): 12 containers, i.e. the 9 CloudTrain services plus Postgres, LocalStack (S3, SQS) and MLflow; 15 with the monitoring stack (#115, on `main` since 22 Nov) |
-| Laptop used for Tests A to E | MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM, macOS 27.2.1; Docker Engine 29.9.2 and Docker Compose v5.6.1, with 7.7 GiB of memory for the containers |
+| Laptop used for Tests A to F | MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM, macOS 27.2.1; Docker Engine 29.9.2 and Docker Compose v5.6.1, with 7.7 GiB of memory for the containers |
 | "Cloud" | The AWS Emulator with the same Terraform ([decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md), merged in #112): checks the infrastructure, runs no real machines |
 | GPUs | Real GPU runs only on a team workstation (Ahmed + Abdulla, `docs/BENCHMARKS.md`). No cloud GPU |
 | Monitoring | Prometheus + Grafana dashboard "CloudTrain overview" and `job-events-monitor` (`monitoring/`, #115, #109) |
@@ -69,7 +70,8 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 
 | What | Status | Result | Evidence |
 |---|---|---|---|
-| What scales separately and how (training workers vs inference vs stateless services behind the gateway) | ⏳ Waiting on: Adel, write-up from `docs/ARCHITECTURE.md` and decision 0012 (Thu 26 Nov) | | `docs/ARCHITECTURE.md` |
+| What scales separately and how | ✅ Read from the code (22 Nov, `main` at `a21d01c`); not measured on AWS (no account) | **Training:** GPU workers in two EC2 Auto Scaling groups (decision 0012): `gpu-1` (`g4dn.xlarge`, `worker_desired_capacity`, at most `worker_max_size` = 2) and `gpu-4` (`g4dn.12xlarge`, at most 1). The size changes with one `terraform apply`; nothing scales it automatically. **Services:** each is its own ECS Fargate service, but Terraform gives all of them the same `ecs_desired_count` (1 in the dev settings) and no autoscaling; the gateway and portal sit behind the load balancer. **Between them:** SQS. `POST /jobs` answers 202 at once and the job waits in `training-jobs`, so a burst of submissions never blocks the API. **Limit:** the scheduler places only `SCHEDULER_MAX_WORKERS` jobs at once (default 1, not set in Terraform), so more GPU machines alone do not run more jobs at once (Test F) | `infrastructure/main.tf`, `infrastructure/README.md`, decision 0012, `scheduler/app/main.py` |
+| A burst of jobs with one worker | ✅ Measured on a laptop (22 Nov, `db26b20`): 3 small CPU jobs submitted at the same moment | Waits **0.1 s, 300.3 s and 729.2 s**; together they needed about 11 s of training and took **732 s**. A job that arrives while the worker is busy is turned away and SQS hides it for the 300 s visibility timeout (3 "no capacity" lines in the scheduler log). The 729 s includes a pause of the laptop of about 3.5 min; the code predicts about 600 s. Fixes are the Scheduler owner's call (Maitha) | [`docs/evaluation/test-f-burst.md`](evaluation/test-f-burst.md) |
 | 1 GPU vs 2-GPU DDP: speedup, efficiency, throughput, GPU-hours | ⏳ Waiting on: Ahmed + Abdulla, 2-GPU run (Tue 24). Only real GPU measurements are used | | `docs/BENCHMARKS.md` section 2 |
 | Local 1-GPU baseline (not the comparison) | ✅ Measured by Ahmed + Abdulla on 1× RTX 5090 | CIFAR-10, ResNet-18, 10 epochs: 2.0 s per epoch, 74.0% accuracy (3 seeds) | `docs/BENCHMARKS.md`, `docs/benchmarks/local-cifar10-1gpu-baseline.json` |
 
@@ -118,6 +120,9 @@ All three are on `main` since 18 Nov.
 - **LocalStack serves both S3 and SQS on the laptop.** During the 500 MB uploads (Test C) the time since the
   last `job-events` read rose to about 55 s on the dashboard (normally 0–20 s), still under the 120 s alert.
   In the cloud, S3 and SQS are separate services.
+- **One job at a time.** With the current settings (local and cloud), the scheduler runs one job at once, and a
+  job that arrives while another runs waits about 300 s per turn (Test F). Until that changes, bursts of jobs
+  are slow and extra GPU machines stay idle.
 - `job-events-monitor` keeps durations and counters in memory: a restart forgets jobs in flight, and its
   counters start again from 0. Prometheus treats that as a counter reset, so `rate()` and `increase()` stay
   right; events are not lost (unread ones wait in SQS).
@@ -141,6 +146,7 @@ open http://localhost:3001                # Grafana, dashboard "CloudTrain overv
 | C | Gateway p50/p95, dataset upload and download speed | [`evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) |
 | D | 10 real training jobs: queue wait, training time, machine and cost per job | [`evaluation/test-d-real-training.md`](evaluation/test-d-real-training.md) |
 | E | Alert delay: job event → alert on the Projects page, 10 jobs | [`evaluation/test-e-alert-delay.md`](evaluation/test-e-alert-delay.md) |
+| F | A burst of 3 jobs with one worker: wait in the queue per job | [`evaluation/test-f-burst.md`](evaluation/test-f-burst.md) |
 
 The automatic checks behind the "🧪 Tested" lines:
 
@@ -155,7 +161,7 @@ cd portal && npm test                                       # portal unit tests
 
 | Who | Part of this evaluation |
 |---|---|
-| Adel | This report and its methods; Tests A to E on a laptop; the job-events reader, Prometheus alerts and Grafana dashboard (#115, contract #125, decision 0014 in #152); live job status and alerts (#96, #100), MLflow results (#98), cost views (#117), the 1-GPU vs multi-GPU comparison (#124) and their pages `/compare` and `/usage` (#156) in the portal. Problems found and reported while measuring: #126 (Faisal), #138 (Maitha, fixed in #139) |
+| Adel | This report and its methods; Tests A to F on a laptop; the job-events reader, Prometheus alerts and Grafana dashboard (#115, contract #125, decision 0014 in #152); live job status and alerts (#96, #100), MLflow results (#98), cost views (#117), the 1-GPU vs multi-GPU comparison (#124) and their pages `/compare` and `/usage` (#156) in the portal. Problems found and reported while measuring: #126 (Faisal), #138 (Maitha, fixed in #139) |
 | Hilal | Portal pages (#99: projects, datasets, job alerts on the Projects page) and their browser tests (functional checks, passing). ⏳ Browser timings: recorded here once measured |
 | Ahmed + Abdulla | GPU benchmarks (`docs/BENCHMARKS.md`) |
 | Mariam | Job timings, retries and cost fields (Training Jobs) |
