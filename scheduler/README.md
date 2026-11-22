@@ -33,7 +33,9 @@ If capacity is full the message stays on the queue for the next poll.
 | `SQS_ENDPOINT` | *(none)* | LocalStack endpoint for local development |
 | `TRAINING_JOBS_QUEUE` | `training-jobs` | SQS queue name |
 | `JOB_SERVICE_URL` | `http://job-service:8003` | Training Jobs service base URL |
-| `TRAINING_WORKER_URL` | `http://training-worker:8010` | Training Worker base URL |
+| `TRAINING_WORKER_URL` | `http://training-worker:8010` | Training Worker base URL (fallback for machine types not in TRAINING_WORKER_URLS) |
+| `TRAINING_WORKER_URLS` | `{}` | JSON dict mapping machine types to worker pool URLs, e.g. `{"g4dn.xlarge": "http://gpu-lb:8010"}` |
+| `SCHEDULER_MAX_GPUS` | *(none)* | Maximum total GPUs the scheduler will commit; unlimited if unset |
 | `SQS_VISIBILITY_TIMEOUT_SECONDS` | `300` | Max time to wait for a busy worker |
 
 ## Tests
