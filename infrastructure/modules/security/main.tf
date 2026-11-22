@@ -19,6 +19,23 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Lab / emulator: HTTP on the contract ports until ACM exists (decision 0011).
+  ingress {
+    description = "Gateway published port (contracts/ports.md)"
+    from_port   = 5810
+    to_port     = 5810
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Portal published port (contracts/ports.md)"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     description = "To targets and AWS APIs"
     from_port   = 0
