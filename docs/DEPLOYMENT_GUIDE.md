@@ -38,7 +38,7 @@ terraform apply -var-file=environments/dev/emulator.tfvars.example
 terraform output
 ```
 
-Creates the whole dev environment (on `main`, 22 Nov 2026):
+Creates the whole dev environment (126 resources on `main`, 22 Nov 2026):
 
 - **Network:** VPC with public and private subnets and NAT. Our security groups are skipped on the
   emulator because of an emulator gap (see `infrastructure/README.md`).
@@ -50,6 +50,9 @@ Creates the whole dev environment (on `main`, 22 Nov 2026):
 - **Permissions:** one task role per service, the shared ECS execution role, the GitHub deploy role.
 - **GPU workers:** two Auto Scaling groups, `gpu-1` (`g4dn.xlarge`, 1 GPU) and `gpu-4` (`g4dn.12xlarge`,
   4 GPUs), each with an internal load balancer on port 8010 (decision 0012).
+- **Services:** ECS cluster `dev-cloudtrain` with one Fargate service per service, behind a public load
+  balancer (gateway on 5810, portal on 3000).
+- **Monitoring:** one CloudWatch log group per service, `/cloudtrain/<env>/<service>`, and alarms.
 
 `terraform output` lists what each teammate needs (table at the end of this guide).
 
@@ -102,8 +105,29 @@ Creates roles/schemas: `projects`, `datasets`, `jobs`, `scheduler`, `registry`, 
 `?sslmode=require` because RDS forces SSL (`rds.force_ssl`).
 
 ## 4. Deploy the services
-Images → ECR, services → ECS Fargate: Salem's pipeline. Hamda + Fatma provide ECR URLs and
-network/security group IDs via `terraform output`.
+Terraform creates the **place** the services run; Salem's pipeline puts the **images** in it.
+
+- **Terraform (Hamda, #135):** ECS cluster `dev-cloudtrain`, one Fargate service and task definition per
+  service, a public load balancer (gateway on 5810, portal on 3000), each service with its own task role
+  (#128), the shared execution role (#129), its own `DATABASE_URL` secret and its log group (#134). The
+  Scheduler gets `TRAINING_WORKER_URLS` from `worker_urls`. The training workers stay on EC2, not Fargate.
+- **Pipeline (Salem, #54):** builds the images, pushes them, registers a new task definition revision with
+  the commit's image tag and updates the services. Terraform ignores `task_definition` and `desired_count`
+  after creation, so a later `terraform apply` doesn't roll a deploy back.
+- **On the emulator:** `ecs_desired_count = 0`. The services exist but run no tasks, because the emulator's
+  ECR refuses image uploads (images are on ghcr.io today). Services keep using `make up` for their work.
+
+Check after `terraform apply`:
+
+```bash
+terraform output ecs_cluster_name          # dev-cloudtrain
+terraform output ecs_service_names         # the 9 services
+aws ecs list-services --cluster dev-cloudtrain
+terraform output gateway_url               # the public address of the gateway
+```
+
+Emulator quirk: its load balancer address is `127.0.0.1:<port>`, so `gateway_url` and `portal_url` look like
+`http://127.0.0.1:32863:5810`. On real AWS the address is a host name and the URLs are right.
 
 ## 5. Change something through Terraform
 The worker capacity is a variable (demo 4). To run two 1-GPU workers instead of one:
@@ -128,9 +152,11 @@ the plan, apply.
 ## 6. Operate
 - **Worker addresses:** `terraform output worker_urls` (machine type to load balancer address). The
   Scheduler reads it as `TRAINING_WORKER_URLS` (#70).
-- **Logs and alarms:** CloudWatch log groups `/cloudtrain/<env>/<service>` and alarms for dead letters,
-  unread job events and server errors come with the monitoring module (#134). On the emulator they get no
-  live data; the live view is the local Grafana (#109).
+- **Logs:** each service writes to its CloudWatch log group, `/cloudtrain/<env>/<service>`
+  (`terraform output log_group_names`), kept 14 days.
+- **Alarms** (`terraform output alarm_names`): dead letters on `training-jobs-dlq`, `job-events` not read
+  for 5 minutes, more than 5% 5xx through the public load balancer. They show in CloudWatch; nobody is
+  notified yet. On the emulator they get no live data; the live view is the local Grafana (#109).
 - **A job failed 3 times:** it is on `training-jobs-dlq` (kept 14 days). Mariam's dead-letter reader
   retries it.
 - **Job cost:** hourly prices in `contracts/pricing.yaml` × machine time. The portal labels it
@@ -179,13 +205,16 @@ The seven mandatory demos, on the emulator. Start with `./scripts/emulator-up.sh
 
 | # | Demo | Commands | What to show |
 |---|---|---|---|
-| 1 | Apply creates dev | `terraform init` then `terraform apply -var-file=$V` | `Apply complete! Resources: N added` (89 on `main`, 22 Nov), then `terraform output` |
+| 1 | Apply creates dev | `terraform init` then `terraform apply -var-file=$V` | `Apply complete! Resources: 126 added` (on `main`, 22 Nov), then `terraform output` |
 | 2 | Inspect the plan | `terraform plan -var-file=$V -out=dev.tfplan` then `terraform show dev.tfplan` | `+` create, `~` change in place, `-` destroy; the summary line |
-| 3 | Deploy the services | after #135: `terraform output ecs_cluster_name`, `terraform output ecs_service_names`, `aws ecs list-services --cluster dev-cloudtrain` | the 9 ECS services behind the load balancer. On the emulator they run 0 tasks (no images in its ECR); Salem's pipeline does the image rollout |
+| 3 | Deploy the services | `terraform output ecs_cluster_name`, `terraform output ecs_service_names`, `aws ecs list-services --cluster dev-cloudtrain` | `dev-cloudtrain` and its 9 services behind the load balancer (section 4). On the emulator they run 0 tasks (no images in its ECR); Salem's pipeline does the image rollout |
 | 4 | Change a parameter | `terraform plan -var-file=$V -var worker_desired_capacity=2` | `~ desired_capacity = 1 -> 2`, `0 to add, 1 to change, 0 to destroy` |
 | 5 | Apply it, no manual rebuild | `terraform apply -var-file=$V -var worker_desired_capacity=2`, then `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names dev-cloudtrain-gpu-1 --query 'AutoScalingGroups[0].[DesiredCapacity,length(Instances)]'` | `2 2`; a new plan says `No changes` |
-| 6 | State and dependencies | `terraform state list`; `terraform state show 'module.training_compute_gpu[0].aws_autoscaling_group.worker'`; `terraform graph \| dot -Tsvg > graph.svg` (needs Graphviz) | every resource Terraform manages; how the workers depend on the network, the IAM role and the queues |
+| 6 | State and dependencies | `terraform state list`; `terraform state show 'module.training_compute_gpu[0].aws_autoscaling_group.worker'`; `terraform graph \| dot -Tsvg > graph.svg` (needs Graphviz: `brew install graphviz`) | every resource Terraform manages; how the workers depend on the network, the IAM role and the queues |
 | 7 | Destroy safely | `terraform plan -destroy -var-file=$V`, then `terraform destroy -var-file=$V`, then `terraform state list \| wc -l` | `Destroy complete!`, state empty, the state bucket untouched |
+
+Rehearsed on 22 Nov 2026 on `main`: all seven worked (126 created; demo 4 changed 1 resource; `terraform
+state list` showed 140 entries, resources plus data sources; destroy removed 126 and left the state empty).
 
 Say during the demo: the emulator starts no real machines, so GPU speed is "not measured on AWS"
 (decision 0011); the Terraform is the same for real AWS (section 3b).
@@ -204,4 +233,7 @@ Say during the demo: the emulator starts no real machines, so GPU speed is "not 
 | `jwt_issuer`, `jwt_audience`, `jwt_jwks_url`, `cognito_user_pool_id` | Ali (gateway), Salem (login), portal |
 | `worker_urls`, `gpu_worker_autoscaling_group`, `multi_gpu_worker_autoscaling_group` | Maitha (Scheduler), Ahmed + Abdulla, Abdullah |
 | `service_task_role_arns`, `ecs_task_execution_role_arn`, `github_deploy_role_arn` | Hamda (ECS), Salem (deploy) |
+| `ecs_cluster_name`, `ecs_service_names` | Salem (deploy, #54) |
+| `gateway_url`, `portal_url`, `alb_dns_name` | everyone (the public addresses) |
+| `log_group_names`, `alarm_names` | monitoring; Hilal + Adel |
 | `vpc_id`, subnet IDs, security group IDs | Hamda, Salem, Maitha |
