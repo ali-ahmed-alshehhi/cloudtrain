@@ -1,0 +1,9 @@
+# Local only: virtualenv, Pulumi's local state and home, the passphrase, Terraform's outputs,
+# and each person's stack config (it holds an encryption salt tied to their passphrase).
+venv/
+state/
+.pulumi-home/
+.passphrase
+tf-outputs.json
+Pulumi.*.yaml
+__pycache__/

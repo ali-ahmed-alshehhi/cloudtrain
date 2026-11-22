@@ -1,0 +1,7 @@
+name: cloudtrain-dashboard
+description: CloudWatch dashboard above the Terraform dev environment (Pulumi layer above Terraform, decision 0013)
+runtime:
+  name: python
+  options:
+    toolchain: pip
+    virtualenv: venv
