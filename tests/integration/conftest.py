@@ -129,3 +129,40 @@ def events_of(gateway: httpx.Client, job_id: str) -> list[dict]:
     response = gateway.get(f"/api/v1/jobs/{job_id}/events")
     response.raise_for_status()
     return response.json()["items"]
+
+
+def in_inference_container(*command: str) -> bytes:
+    """Run Python inside the inference-service container of `make up` (it has PyTorch and MLflow)."""
+    done = subprocess.run(
+        ["docker", "compose", "exec", "-T", "inference-service", "python", *command],
+        cwd=REPO,
+        capture_output=True,
+        timeout=180,
+    )
+    assert done.returncode == 0, done.stderr.decode(errors="replace")
+    return done.stdout
+
+
+def links_of(job: dict) -> dict:
+    """What a model version is linked to: the job's project, the job, and its dataset version."""
+    spec = job["spec"]
+    return {
+        "project_id": job["project_id"],
+        "job_id": job["job_id"],
+        "dataset_id": spec["dataset_id"],
+        "dataset_version": spec["dataset_version"],
+    }
+
+
+def log_image_test_model(job: dict) -> str:
+    """Log the small CIFAR-10-shaped image model (inference-service/app/fixture_model.py) as an
+    MLflow run tagged with the job's project, job and dataset, and return its run ID."""
+    flags = [f"--{key.replace('_', '-')}={value}" for key, value in links_of(job).items()]
+    output = in_inference_container("-m", "app.fixture_model", *flags)
+    return output.decode().strip().splitlines()[-1]
+
+
+def class_image(label: str) -> bytes:
+    """A PNG of one CIFAR-10 class, as the image test model learned it."""
+    code = f"import sys, app.fixture_model as f; sys.stdout.buffer.write(f.class_image({label!r}))"
+    return in_inference_container("-c", code)
