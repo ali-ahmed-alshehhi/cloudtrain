@@ -142,3 +142,12 @@ output "worker_urls" {
     (var.multi_gpu_instance_type) = module.training_compute_multi_gpu[0].worker_url
   } : {}
 }
+
+output "log_group_names" {
+  description = "Per service: its CloudWatch log group (Hamda: awslogs-group in the ECS task definitions)."
+  value       = try(module.monitoring[0].log_group_names, null)
+}
+
+output "alarm_names" {
+  value = try(module.monitoring[0].alarm_names, null)
+}
