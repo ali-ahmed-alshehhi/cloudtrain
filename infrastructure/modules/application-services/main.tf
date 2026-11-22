@@ -2,7 +2,8 @@
 # Owners: Hamda + Fatma.
 #
 # Cluster name is <environment>-cloudtrain (Salem's deploy role in #129).
-# Log groups: prefer monitoring's log_group_names; otherwise create /cloudtrain/<env>/<service>.
+# Log groups: create /cloudtrain/<env>/<service> here until #134 monitoring passes
+# log_group_names (Fatma wires that after this merges). Only one owner at a time.
 # Worker LBs stay in Fatma's training-compute work — this ALB is public only.
 
 data "aws_caller_identity" "current" {}
@@ -66,7 +67,7 @@ resource "aws_ecs_cluster_capacity_providers" "this" {
   }
 }
 
-# ---------- Log groups (until monitoring module owns them) ----------
+# ---------- Log groups (this PR owns them; #134 takes over via log_group_names) ----------
 
 resource "aws_cloudwatch_log_group" "service" {
   # checkov:skip=CKV_AWS_158: Lab log groups use CloudWatch default encryption
@@ -282,9 +283,16 @@ resource "aws_ecs_task_definition" "service" {
           }
         }
       },
-      each.key == "portal" ? {} : {
+      {
+        # Same as docker-compose.yml: images have no curl (python:3.11-slim / node:24-alpine).
         healthCheck = {
-          command     = ["CMD-SHELL", "curl -f http://localhost:${each.value.port}/health || exit 1"]
+          command = each.key == "portal" ? [
+            "CMD", "node", "-e",
+            "fetch('http://localhost:${each.value.port}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            ] : [
+            "CMD", "python", "-c",
+            "import urllib.request; urllib.request.urlopen('http://localhost:${each.value.port}/health', timeout=3)"
+          ]
           interval    = 30
           timeout     = 5
           retries     = 3
