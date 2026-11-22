@@ -32,6 +32,9 @@ training workers a time-limited download link.
 Plus `GET /health`, `GET /metrics`.
 
 If object storage is down, mutating/download calls answer **503 SERVICE_UNAVAILABLE** (same idea as a down database).
+If storage is up but a version's file is gone (for example LocalStack was restarted, since it keeps
+files in memory), the download answers **404 DATASET_FILE_MISSING** instead, so the message points to
+the real cause.
 
 ## Storage
 - PostgreSQL schema `datasets` — see `docs/database/datasets.md`
