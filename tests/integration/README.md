@@ -19,7 +19,10 @@ Run the end-to-end walk-through **through the gateway** against the whole system
   and reads work, MLflow's errors come back in the shared format, writes are blocked (405), and a
   login is needed (401).
 
-Run with `make e2e` (needs `make up` first).
+Run with `make e2e` (needs `make up` first). It logs in with the laptop dev token, so step 1 is
+skipped. `make e2e-login` runs the same tests with the real login: Salem's Cognito on the AWS
+Emulator, as test user Alice (needs Terraform and the AWS CLI; see `security/login/README.md`).
+CI runs it in the Login workflow.
 
 Port: — · Endpoints: none of its own; it calls only the gateway (5810).
 
