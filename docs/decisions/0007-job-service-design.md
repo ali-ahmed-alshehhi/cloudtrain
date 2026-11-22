@@ -1,6 +1,6 @@
 # 0007 — How the Training Jobs service stays correct when things fail
 
-- **Status:** accepted. Point 6 is an agreed contract change (#89); point 7 was declined for now (#89)
+- **Status:** accepted. Points 6 and 9 are agreed contract changes (#89, #102); point 7 was declined for now (#89)
 - **Date:** 2026-11-15
 - **Decided by:** Mariam (Student 3)
 
@@ -57,6 +57,19 @@ the workers, and any of them can be down or late. These are the choices that kee
 8. **Our own failure reports stay on `training-jobs-dlq`.** This service is the queue's only reader. It
    hides its own reports for 12 hours (the SQS maximum) instead of deleting them, so the queue depth
    stays visible to people and to a CloudWatch alarm; SQS retention removes them later.
+
+9. **A read-only internal endpoint for the Scheduler (agreed in #102).** `GET /internal/jobs/{job_id}`
+   answers `status`, `attempt`, `machine_type` and `updated_at`, with no user check (the gateway refuses
+   every `/internal/` path). The Scheduler asks it only when it needs a slot, and frees the slots of jobs
+   that ended, were retried (`QUEUED` again) or no longer exist. *Why:* the only other reader is the public
+   `GET /jobs/{id}`, which needs a user and a membership check, so the Scheduler could not tell when a job
+   had ended, and with one worker the second job and every retry waited forever (found reviewing #88).
+
+10. **The failure-recovery demo runs in CI (#145).** `tests/integration/test_failure_recovery.py` kills
+    the real worker in the middle of a job on every pull request. CI uses short heartbeat settings
+    (2 s / 6 s), so it takes about a minute; with the default 120-second timeout the test skips and
+    says why. *Why:* the demo is the acceptance test of this service; a test that only runs by hand
+    breaks without anyone noticing (it had: the real worker refused its old image dataset).
 
 ## Also worth knowing (for Abdullah and Maitha)
 - A worker should stop when the heartbeat answer is anything other than `SCHEDULED` or `RUNNING`, not
