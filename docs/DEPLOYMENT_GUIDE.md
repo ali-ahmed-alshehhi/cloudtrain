@@ -223,11 +223,36 @@ The seven mandatory demos, on the emulator. Start with `./scripts/emulator-up.sh
 | 6 | State and dependencies | `terraform state list`; `terraform state show 'module.training_compute_gpu[0].aws_autoscaling_group.worker'`; `terraform graph \| dot -Tsvg > graph.svg` (needs Graphviz: `brew install graphviz`) | every resource Terraform manages; how the workers depend on the network, the IAM role and the queues |
 | 7 | Destroy safely | `terraform plan -destroy -var-file=$V`, then `terraform destroy -var-file=$V`, then `terraform state list \| wc -l` | `Destroy complete!`, state empty, the state bucket untouched |
 
+Optional 8th demo: the Pulumi layer (section 10), between demo 6 and demo 7.
+
 Rehearsed on 22 Nov 2026 on `main`: all seven worked (126 created; demo 4 changed 1 resource; `terraform
 state list` showed 140 entries, resources plus data sources; destroy removed 126 and left the state empty).
 
 Say during the demo: the emulator starts no real machines, so GPU speed is "not measured on AWS"
 (decision 0011); the Terraform is the same for real AWS (section 3b).
+
+## 10. The Pulumi layer: CloudWatch dashboard (optional 8th demo)
+Terraform creates every resource; a small Pulumi program above it creates **only** the CloudWatch
+dashboard, from Terraform's outputs (decision [0013](decisions/0013-pulumi-layer-above-terraform.md)).
+Setup once and all settings: [infrastructure/pulumi/README.md](../infrastructure/pulumi/README.md).
+
+After demo 1 (Terraform applied, emulator running), from `infrastructure/pulumi/`:
+
+```bash
+source ../scripts/emulator-env.sh
+export PULUMI_CONFIG_PASSPHRASE='<your own passphrase>'
+terraform -chdir=.. output -json > tf-outputs.json   # Pulumi reads Terraform, never the other way round
+pulumi preview                                      # + 3 to create (stack, AWS provider, dashboard)
+pulumi up --yes
+pulumi stack output                                 # dashboard_name = dev-cloudtrain, widget_count = 5
+terraform -chdir=.. plan -var-file=environments/dev/emulator.tfvars.example   # No changes: Pulumi touched nothing of Terraform's
+```
+
+**Destroy order:** `pulumi destroy --yes` first, then demo 7 (`terraform destroy`). The dashboard points at
+Terraform's resources, so it goes before them.
+
+Say during the demo: Pulumi is a layer on top, not a replacement; it owns one resource, and the seven
+Terraform demos work with or without it.
 
 ## Hand-off values (after apply)
 
