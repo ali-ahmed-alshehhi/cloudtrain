@@ -67,7 +67,8 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `iam` | worker role + instance profile: read datasets, read/write artifacts, send `job-events`; nothing else |
 | `training-compute` | GPU worker pools: launch template + Auto Scaling group on EC2 (decision 0012), optional internal load balancer; `gpu-1` (1 GPU) and `gpu-4` (4 GPUs) |
 | `service-roles` | one least-privilege task role per service: only the buckets and queues its code calls |
-| `application-services` / `monitoring` | stubs — next |
+| `monitoring` | CloudWatch log group per ECS service (`/cloudtrain/<env>/<service>`) and alarms (dead letters, job events not read; 5xx once the ALB exists) |
+| `application-services` | stub — Hamda, #36 |
 
 ### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
 
@@ -122,6 +123,26 @@ to address, for example `{"g4dn.xlarge": "http://dev-cloudtrain-gpu-1-….elb.am
 Maitha reads it as `TRAINING_WORKER_URLS` (JSON); `TRAINING_WORKER_URL` stays for `local-cpu`, so
 `make up` doesn't change (#70). The workers' security group now only accepts port 8010: from the
 services, and from inside the VPC for the load balancer's health checks.
+
+### Monitoring: log groups and alarms (#36)
+
+`enable_monitoring = true` (on in `emulator.tfvars.example`) creates:
+
+- **One CloudWatch log group per ECS service**, `/cloudtrain/<env>/<service>`, kept `log_retention_days`
+  (14). That is the only path the shared execution role may write to (#129). Output `log_group_names`
+  (service to log group) is for the `awslogs-group` setting in the ECS task definitions.
+- **Alarms**, the same as the local Prometheus rules (from Hilal + Adel, `monitoring/aws/README.md` in #115):
+
+| Alarm | Fires when | Local twin |
+|---|---|---|
+| `<env>-cloudtrain-dead-letters` | `training-jobs-dlq` has any message (1 minute) | `CloudTrainDeadLetters` |
+| `<env>-cloudtrain-job-events-not-read` | the oldest `job-events` message is older than 5 minutes, twice in a row | `CloudTrainJobEventsNotRead` |
+| `<env>-cloudtrain-server-errors` | more than 5% of requests through the public load balancer answer 5xx (from the services or from the load balancer itself), 5 minutes | `CloudTrainHighErrorRate` |
+
+The server-errors alarm is created once `application-services` passes its load balancer (`alb_arn_suffix`).
+Alarms only show in CloudWatch for now (`alarm_actions` is empty). Not here yet: the CloudWatch dashboard and
+the "monitor down" alarm, which use Adil's files and `job-events-monitor` from #115 once it merges. On the
+emulator these resources are created, but receive no live data (decision 0011); the live view is the local Grafana.
 
 ### Service roles for ECS (#35, with Salem; used in #36)
 

@@ -15,7 +15,7 @@ from app.errors import ApiError
 from app.idempotency import create_once, fingerprint
 from app.projects import ProjectsClient
 from app.schemas import dataset_json, iso, version_json
-from app.storage import ObjectStorage, object_key, storage_uri
+from app.storage import ObjectStorage, StorageObjectMissing, object_key, storage_uri
 from app.validation import matches_format
 
 router = APIRouter()
@@ -256,7 +256,12 @@ def download(
 ) -> Response:
     dataset, found = load_version(session, dataset_id, version)
     require_dataset_member(projects, dataset, user_id, request)
-    content = storage.get(found.object_key)
+    try:
+        content = storage.get(found.object_key)
+    except StorageObjectMissing:
+        raise ApiError(
+            404, "DATASET_FILE_MISSING", f"The file of {dataset_id} version {version} is missing from storage"
+        ) from None
     record_audit(session, "download", dataset, found.number, user_id, request)
     session.commit()
     return Response(content=content, media_type="application/octet-stream")
