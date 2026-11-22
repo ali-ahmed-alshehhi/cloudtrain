@@ -204,3 +204,27 @@ variable "log_retention_days" {
   type        = number
   default     = 14
 }
+
+variable "enable_application_services" {
+  description = "Create the ECS Fargate cluster, services and public ALB (#36)."
+  type        = bool
+  default     = false
+}
+
+variable "ecs_image_tag" {
+  description = "Container image tag for ECS task definitions (commit SHA from images.yml)."
+  type        = string
+  default     = "bootstrap"
+}
+
+variable "ecs_desired_count" {
+  description = "Desired Fargate tasks per service. 0 on the emulator until images exist in ECR."
+  type        = number
+  default     = 0
+}
+
+variable "enable_ecs_service_discovery" {
+  description = "Private DNS for service-to-service calls. Set false if the stand-in has no Cloud Map."
+  type        = bool
+  default     = true
+}
