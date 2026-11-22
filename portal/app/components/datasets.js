@@ -5,7 +5,7 @@ import Problem from "./problem";
 
 const ACCEPT = { csv: ".csv", zip: ".zip", tar_gz: ".tar.gz,.tgz" };
 
-export default function Datasets({ api, project }) {
+export default function Datasets({ api, project, onUploadingChange }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(Boolean(project));
   const [loadError, setLoadError] = useState(null);
@@ -106,6 +106,7 @@ export default function Datasets({ api, project }) {
     uploadRequest.current = controller;
     busyRef.current = true;
     setBusy(kind);
+    onUploadingChange?.(true);
     try {
       if (isNew) {
         const created = await api.uploadDataset(form, retry.current[kind].key, controller.signal);
@@ -136,6 +137,7 @@ export default function Datasets({ api, project }) {
       if (!controller.signal.aborted) reportError(error);
     } finally {
       busyRef.current = false;
+      onUploadingChange?.(false);
       if (!controller.signal.aborted) setBusy("");
     }
   }

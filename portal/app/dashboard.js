@@ -20,6 +20,7 @@ export default function Dashboard({ gatewayUrl, devToken }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   // Keep the same key when retrying an unchanged form after a lost response.
   const submission = useRef(null);
@@ -50,7 +51,7 @@ export default function Dashboard({ gatewayUrl, devToken }) {
 
   async function createProject(event) {
     event.preventDefault();
-    if (savingRef.current) return;
+    if (savingRef.current || uploading) return;
     const project = { name: name.trim(), description: description.trim() || null };
     if (!project.name) {
       setCreateProblem(new Error("Enter a project name."));
@@ -96,13 +97,13 @@ export default function Dashboard({ gatewayUrl, devToken }) {
       <div className="workspace-grid">
         <section className="panel" aria-labelledby="project-list-title">
           <div className="section-heading"><h2 id="project-list-title">Your projects</h2>
-            <button className="secondary" disabled={loading || saving} onClick={() => setRefresh((value) => value + 1)}>Refresh</button></div>
+            <button className="secondary" disabled={loading || saving || uploading} onClick={() => setRefresh((value) => value + 1)}>Refresh</button></div>
           <Problem error={problem} />
           {loading ? <p role="status">Loading projects…</p> : problem ? <p>Refresh to try loading your projects again.</p> : projects.length === 0 ?
             <div className="empty"><h3>A fresh start</h3><p>Create your first project using the form.</p></div> :
             <ul className="project-list">{projects.map((project) => <li key={project.project_id}>
               <button className={`project-card ${selectedId === project.project_id ? "selected" : ""}`} aria-pressed={selectedId === project.project_id}
-                onClick={() => setSelectedId(project.project_id)}>
+                disabled={saving || uploading} onClick={() => setSelectedId(project.project_id)}>
                 <strong>{project.name}</strong><span>{project.description || "No description"}</span><small>{project.project_id}</small>
               </button>
             </li>)}</ul>}
@@ -110,7 +111,7 @@ export default function Dashboard({ gatewayUrl, devToken }) {
         <section className="panel" aria-labelledby="create-title">
           <h2 id="create-title">Create a project</h2><p className="muted">Give your next experiment a home.</p>
           <form onSubmit={createProject}>
-            <fieldset disabled={saving || loading}><label htmlFor="project-name">Project name <span aria-hidden="true">*</span></label>
+            <fieldset disabled={saving || loading || uploading}><label htmlFor="project-name">Project name <span aria-hidden="true">*</span></label>
               <input id="project-name" required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Image classification" />
               <label htmlFor="project-description">Description <span className="muted">(optional)</span></label>
               <textarea id="project-description" maxLength={1000} rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What will you train or explore?" />
@@ -124,7 +125,8 @@ export default function Dashboard({ gatewayUrl, devToken }) {
         <p className="eyebrow">SELECTED PROJECT</p><h2 id="selected-title">{selectedProject.name}</h2>
         <p>{selectedProject.description || "No description provided."}</p><small>{selectedProject.project_id}</small>
       </section>}
-      <Datasets key={selectedId} api={api} project={selectedProject} />
+      {uploading && <p role="status">Upload in progress. Project selection will be available when it finishes.</p>}
+      <Datasets key={selectedId} api={api} project={selectedProject} onUploadingChange={setUploading} />
       <section className="panel">
         {selectedId ? <ProjectAlerts key={selectedId} api={api} projectId={selectedId} /> : <><h2>Job alerts</h2><p className="muted">Select a project to view its job events.</p></>}
       </section>

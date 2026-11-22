@@ -62,8 +62,7 @@ endpoint. The details show actual file size, SHA-256 checksum, upload time and n
 Users can also upload a new version with a file and optional note.
 
 Retries of an unchanged upload reuse the idempotency key. A new file or changed
-metadata gets a new key. Switching projects resets dataset state and cancels
-outstanding requests. Version fetch errors hide previous metadata and offer retry.
+metadata gets a new key. Project switching, creation and refresh are disabled while a dataset or version upload is in progress, so its request and retry key stay alive. Otherwise switching projects resets dataset state and cancels outstanding reads. Version fetch errors hide previous metadata and offer retry.
 Clicking an already selected dataset preserves the selection and metadata.
 
 **Backend dependency:** the current dataset service is still Faisal's in-memory
@@ -88,7 +87,7 @@ boundary. `GatewayError` exposes `status`, `code`, `message` and `requestId`.
 Abort errors remain abort errors, so components can ignore cancelled requests.
 Do not put tokens in local storage or commit them. Real login integration awaits
 Salem's provider; a dev token is supplied to the browser only when both
-`ENVIRONMENT=local` and `AUTH_MODE=dev`. No production sign-in is implemented yet.
+`AUTH_MODE=dev` and `ENVIRONMENT=local` (or ENVIRONMENT omitted in an older local `.env`). Explicit nonlocal environments never receive it. No production sign-in is implemented yet.
 
 ## Run and verify
 

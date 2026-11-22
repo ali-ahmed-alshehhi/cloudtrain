@@ -47,7 +47,7 @@ export function createGatewayClient({ gatewayUrl, getToken = () => "", fetchImpl
       );
     }
     if (data === null && response.status !== 204) {
-      throw new GatewayError("CloudTrain returned an unreadable response. Please try again.", response.status, "INVALID_RESPONSE");
+      throw new GatewayError("CloudTrain returned an unreadable response. Please try again.", 502, "INVALID_RESPONSE");
     }
     return data;
   }

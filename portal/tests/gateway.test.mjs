@@ -122,3 +122,10 @@ test("Adel's alert adapter leaves network errors for the feed's back-off", async
   const api = client(async () => { throw new TypeError("Disconnected"); });
   await assert.rejects(api.fetchEvents({ project_id: "project-01" }), (error) => error.code === "NETWORK_ERROR");
 });
+
+ test("unreadable successful event responses become 502 for alert backoff", async () => {
+  const api = createGatewayClient({ gatewayUrl: "http://localhost:5810", fetchImpl: async () => new Response("broken", { status: 200 }) });
+  const result = await api.fetchEvents({ project_id: "project-01" });
+  assert.equal(result.status, 502);
+  assert.equal(result.body.error.code, "INVALID_RESPONSE");
+});
