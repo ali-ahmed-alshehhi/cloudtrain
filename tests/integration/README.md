@@ -11,7 +11,7 @@ Run the end-to-end walk-through **through the gateway** against the whole system
 - `test_walkthrough.py` — the 12 demo steps. Steps that depend on work not yet delivered are marked
   `skip` with the owner's name and hand-off date, and are switched on as owners deliver.
 - `test_failure_recovery.py` — a worker is killed mid-job, the heartbeat stops, the job goes FAILED,
-  is retried, and succeeds.
+  is retried, and succeeds. Runs with short heartbeat settings (CI sets them); see the file.
 - `test_refusals.py` — a bad training job is refused at submit time and never saved: unknown project,
   dataset or version (404), a dataset from another project (422), and the alert feed of a project you
   are not in (403). Every refusal uses the shared error format with a request ID.

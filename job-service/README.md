@@ -83,10 +83,12 @@ make up && make e2e               # the walk-through through the gateway
 Building the image outside Compose (for example a deploy pipeline) needs the contracts folder too:
 `docker build --build-context contracts=contracts job-service`. Without it the build stops.
 
-The failure-recovery demo (`tests/integration/test_failure_recovery.py`) passes with this service and
-the stand-in scheduler and worker. Run it with short settings in `.env`, then `make reset && make up`:
-`HEARTBEAT_INTERVAL_SECONDS=2`, `HEARTBEAT_TIMEOUT_SECONDS=6`, `JOB_SWEEP_INTERVAL_SECONDS=2`,
-`STANDIN_TRAINING_SECONDS=30`, `SQS_VISIBILITY_TIMEOUT_SECONDS=20`. It takes about one minute.
+The failure-recovery demo (`tests/integration/test_failure_recovery.py`) runs in CI on every pull
+request, with the real Scheduler and the real training worker: the worker is killed mid-job, the job
+fails after the heartbeat timeout, is retried and succeeds on attempt 2. CI uses short settings; to
+run it on a laptop put them in `.env`, then `make reset && make up`: `HEARTBEAT_INTERVAL_SECONDS=2`,
+`HEARTBEAT_TIMEOUT_SECONDS=6`, `JOB_SWEEP_INTERVAL_SECONDS=2`, `SQS_VISIBILITY_TIMEOUT_SECONDS=20`.
+It takes about one minute.
 
 ## Acceptance test
 A submitted job enters the queue, is scheduled, runs and reaches a correct final state.
