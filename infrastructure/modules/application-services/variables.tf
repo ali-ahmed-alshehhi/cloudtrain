@@ -63,7 +63,7 @@ variable "desired_count" {
 }
 
 variable "log_group_names" {
-  description = "Per service: CloudWatch log group name from monitoring. Empty = create /cloudtrain/<env>/<service> here until monitoring lands."
+  description = "Per service: CloudWatch log group name from monitoring. Empty = create /cloudtrain/<env>/<service> here."
   type        = map(string)
   default     = {}
 }

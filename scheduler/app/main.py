@@ -68,6 +68,9 @@ class Scheduler:
         self.queue_name = os.environ.get("TRAINING_JOBS_QUEUE", "training-jobs")
         self.job_service = os.environ.get("JOB_SERVICE_URL", "http://job-service:8003")
         self.worker = os.environ.get("TRAINING_WORKER_URL", "http://training-worker:8010")
+        # Per-machine-type worker URLs (JSON dict), e.g. {"g4dn.xlarge": "http://gpu-lb:8010"}
+        urls_json = os.environ.get("TRAINING_WORKER_URLS", "{}")
+        self.worker_urls: dict[str, str] = json.loads(urls_json)
         self.max_wait_for_worker = float(os.environ.get("SQS_VISIBILITY_TIMEOUT_SECONDS", "300"))
         self._queue_url: str | None = None
         max_w = int(os.environ.get("SCHEDULER_MAX_WORKERS", "1"))
@@ -86,6 +89,12 @@ class Scheduler:
         except QUEUE_ERRORS:
             return False
         return True
+
+    def worker_url(self, machine: str) -> str:
+        """Return the worker base URL for a machine type.
+        Uses TRAINING_WORKER_URLS if the machine has an entry, otherwise falls back
+        to TRAINING_WORKER_URL (the single local worker)."""
+        return self.worker_urls.get(machine, self.worker)
 
     def report(
         self,
@@ -148,7 +157,7 @@ class Scheduler:
 
         waited = 0.0
         while True:
-            answer = self.http.post(f"{self.worker}/internal/run", json=form)
+            answer = self.http.post(f"{self.worker_url(machine)}/internal/run", json=form)
             if answer.status_code == 202:
                 break
             if answer.status_code != 409 or waited >= self.max_wait_for_worker:
@@ -242,4 +251,5 @@ def create_app(
     )
     holder["scheduler"] = scheduler
     app.state.scheduler = scheduler
+    _scheduler_metrics()  # initialise at 0 so Prometheus sees them from startup
     return app

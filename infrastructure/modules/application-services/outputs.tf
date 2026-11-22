@@ -21,6 +21,11 @@ output "alb_arn" {
   value = aws_lb.public.arn
 }
 
+output "alb_arn_suffix" {
+  description = "For monitoring's ALB 5xx alarm (AWS/ApplicationELB dimensions)."
+  value       = aws_lb.public.arn_suffix
+}
+
 output "gateway_url" {
   value = "http://${aws_lb.public.dns_name}:5810"
 }

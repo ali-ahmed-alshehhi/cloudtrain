@@ -143,6 +143,15 @@ output "worker_urls" {
   } : {}
 }
 
+output "log_group_names" {
+  description = "Per service: its CloudWatch log group (Hamda: awslogs-group in the ECS task definitions)."
+  value       = try(module.monitoring[0].log_group_names, null)
+}
+
+output "alarm_names" {
+  value = try(module.monitoring[0].alarm_names, null)
+}
+
 output "ecs_cluster_name" {
   description = "ECS cluster for Salem's deploy (#54). Always <environment>-cloudtrain."
   value       = try(module.application_services[0].ecs_cluster_name, null)
@@ -156,6 +165,11 @@ output "ecs_service_names" {
 output "alb_dns_name" {
   description = "Public load balancer DNS (gateway and portal)."
   value       = try(module.application_services[0].alb_dns_name, null)
+}
+
+output "alb_arn_suffix" {
+  description = "Public ALB arn_suffix for the monitoring 5xx alarm."
+  value       = try(module.application_services[0].alb_arn_suffix, null)
 }
 
 output "gateway_url" {

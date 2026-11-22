@@ -151,6 +151,36 @@ module "training_compute_multi_gpu" {
   }
 }
 
+# CloudWatch log groups (one per ECS service) and alarms (#36). Alarms follow monitoring/aws/README.md.
+module "monitoring" {
+  count  = var.enable_monitoring ? 1 : 0
+  source = "./modules/monitoring"
+
+  environment           = var.environment
+  training_jobs_dlq_arn = module.message_queue.training_jobs_dlq_arn
+  job_events_queue_arn  = module.message_queue.job_events_queue_arn
+  log_retention_days    = var.log_retention_days
+  # ALB 5xx alarm once application-services exists (no cycle: log names are a static map below).
+  alb_arn_suffix = length(module.application_services) > 0 ? module.application_services[0].alb_arn_suffix : null
+}
+
+# Same paths monitoring creates — pass by name so ECS does not create the groups twice.
+locals {
+  ecs_log_group_names = {
+    for name in [
+      "gateway",
+      "portal",
+      "project-service",
+      "dataset-service",
+      "job-service",
+      "scheduler",
+      "model-registry",
+      "inference-service",
+      "mlflow",
+    ] : name => "/cloudtrain/${var.environment}/${name}"
+  }
+}
+
 # ECS Fargate + public ALB (#36). Cluster name <environment>-cloudtrain matches #129.
 module "application_services" {
   count  = var.enable_application_services ? 1 : 0
@@ -171,6 +201,9 @@ module "application_services" {
   ecr_repository_urls = module.container_registry[0].repository_urls
   image_tag           = var.ecs_image_tag
   desired_count       = var.ecs_desired_count
+
+  # Prefer monitoring's groups when enabled; otherwise this module creates them.
+  log_group_names = var.enable_monitoring ? local.ecs_log_group_names : {}
 
   database_secret_names = module.service_roles[0].database_secret_names
 

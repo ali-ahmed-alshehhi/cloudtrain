@@ -2,8 +2,8 @@
 # Owners: Hamda + Fatma.
 #
 # Cluster name is <environment>-cloudtrain (Salem's deploy role in #129).
-# Log groups: create /cloudtrain/<env>/<service> here until #134 monitoring passes
-# log_group_names (Fatma wires that after this merges). Only one owner at a time.
+# Log groups: prefer var.log_group_names from monitoring (#134); otherwise create
+# /cloudtrain/<env>/<service> here. Only one owner creates them.
 # Worker LBs stay in Fatma's training-compute work — this ALB is public only.
 
 data "aws_caller_identity" "current" {}
@@ -67,7 +67,7 @@ resource "aws_ecs_cluster_capacity_providers" "this" {
   }
 }
 
-# ---------- Log groups (this PR owns them; #134 takes over via log_group_names) ----------
+# ---------- Log groups (only when monitoring did not pass log_group_names) ----------
 
 resource "aws_cloudwatch_log_group" "service" {
   # checkov:skip=CKV_AWS_158: Lab log groups use CloudWatch default encryption

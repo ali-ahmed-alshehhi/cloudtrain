@@ -193,6 +193,18 @@ variable "enable_worker_load_balancers" {
   default     = false
 }
 
+variable "enable_monitoring" {
+  description = "Create the CloudWatch log groups (one per ECS service) and alarms."
+  type        = bool
+  default     = false
+}
+
+variable "log_retention_days" {
+  description = "How long CloudWatch keeps service logs."
+  type        = number
+  default     = 14
+}
+
 variable "enable_application_services" {
   description = "Create the ECS Fargate cluster, services and public ALB (#36)."
   type        = bool
