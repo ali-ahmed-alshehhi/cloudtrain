@@ -15,6 +15,8 @@ MLflow can't filter a tag by a list of values, so runs/search is filtered here; 
 therefore hold fewer runs than max_results.
 """
 
+from urllib.parse import urlencode
+
 import httpx
 from fastapi import Request
 from starlette.responses import JSONResponse, Response
@@ -27,6 +29,8 @@ PREFIX = "/api/v1/experiments/"
 EXPERIMENT_PATHS = {"experiments/get", "experiments/get-by-name", "experiments/search"}
 RUN_PATHS = {"runs/get", "metrics/get-history"}
 SEARCH_PATH = "runs/search"
+# metrics/get-history is sent to MLflow with only the checked run_id and these parameters.
+METRIC_PARAMS = ("metric_key", "max_results", "page_token")
 
 
 class Unavailable(Exception):
@@ -100,10 +104,14 @@ async def forward(
             found["runs"] = [run for run in found.get("runs", []) if run_project(run) in projects]
             return JSONResponse(found)
 
-        run_id = request.query_params.get("run_id") or request.query_params.get("run_uuid")
-        if not run_id:
-            return error_response(400, "INVALID_PARAMETER_VALUE", "run_id is required.", request_id)
-        run_url = route.upstream_url(PREFIX + "runs/get", f"run_id={run_id}")
+        # Exactly one run id: Starlette reads the last of a repeated parameter and MLflow the first,
+        # so a repeated or mixed run_id/run_uuid could pass the check on one run and read another.
+        ids = request.query_params.getlist("run_id") + request.query_params.getlist("run_uuid")
+        if len(ids) != 1 or not ids[0]:
+            message = "Give exactly one run_id."
+            return error_response(400, "INVALID_PARAMETER_VALUE", message, request_id)
+        run_id = ids[0]
+        run_url = route.upstream_url(PREFIX + "runs/get", urlencode({"run_id": run_id}))
         answer = await read_mlflow(client, "GET", run_url, request_id, timeout)
         if answer.status_code >= 400:
             return await proxy.mlflow_error(answer, request_id)
@@ -112,7 +120,14 @@ async def forward(
             return not_found(run_id, request_id)
         if endpoint == "runs/get":
             return JSONResponse(answer.json())
-        return await proxy.forward(client, request, route, user_id, request_id, timeout)
+        # Never forward the caller's query: rebuild it from the run that was checked.
+        params = {"run_id": run_id}
+        params.update({n: request.query_params[n] for n in METRIC_PARAMS if n in request.query_params})
+        url = route.upstream_url(path, urlencode(params))
+        answer = await read_mlflow(client, "GET", url, request_id, timeout)
+        if answer.status_code >= 400:
+            return await proxy.mlflow_error(answer, request_id)
+        return JSONResponse(answer.json())
     except Unavailable as error:
         return error_response(503, "SERVICE_UNAVAILABLE", f"{error} is not reachable", request_id)
     except ValueError:

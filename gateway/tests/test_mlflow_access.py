@@ -100,3 +100,29 @@ def test_503_when_projects_cannot_be_checked(local_env, error_schema):
     assert response.status_code == 503
     jsonschema.validate(response.json(), error_schema)
     assert all(request.url.host != "mlflow" for request in services.received)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "run_id=other&run_id=abc1",  # Starlette reads the last value, MLflow the first
+        "run_id=abc1&run_id=other",
+        "run_uuid=other&run_id=abc1",
+    ],
+)
+def test_a_repeated_run_id_is_refused(client, services, query):
+    response = client.get(f"/api/v1/experiments/metrics/get-history?{query}&metric_key=f1", headers=AUTH)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_PARAMETER_VALUE"
+    assert all(request.url.host != "mlflow" for request in services.received)
+
+
+def test_only_the_checked_run_and_known_parameters_reach_mlflow(client, services):
+    path = "/api/v1/experiments/metrics/get-history?run_id=abc1&metric_key=f1&max_results=10&extra=x"
+    response = client.get(path, headers=AUTH)
+
+    assert response.status_code == 200
+    assert str(services.last.url) == (
+        "http://mlflow:5000/api/2.0/mlflow/metrics/get-history?run_id=abc1&metric_key=f1&max_results=10"
+    )
