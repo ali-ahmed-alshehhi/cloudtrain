@@ -65,11 +65,7 @@ Retries of an unchanged upload reuse the idempotency key. A new file or changed
 metadata gets a new key. Project switching, creation and refresh are disabled while a dataset or version upload is in progress, so its request and retry key stay alive. Otherwise switching projects resets dataset state and cancels outstanding reads. Version fetch errors hide previous metadata and offer retry.
 Clicking an already selected dataset preserves the selection and metadata.
 
-**Backend dependency:** the current dataset service is still Faisal's in-memory
-stand-in. Data disappears when that service restarts; S3/PostgreSQL persistence
-and project membership enforcement remain his responsibility. Project filtering
-in this UI does not replace backend authorization. Production login also remains
-pending Salem's integration.
+**Backend dependency:** Faisal's persistent dataset service (#91) is now on main, including project membership enforcement. PostgreSQL records persist; uploaded files in the free local LocalStack S3 do not survive a LocalStack restart (decision 0005). Project filtering in this UI does not replace backend authorization. Salem's real-login tooling is on main; integrating sign-in into these portal pages remains pending.
 
 ### Shared client for Adel
 
