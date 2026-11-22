@@ -13,7 +13,10 @@ The steps share what they create (project -> dataset -> job), so run the whole f
 
 import base64
 import json
+import os
 import re
+import subprocess
+import time
 
 import httpx
 import pytest
@@ -173,9 +176,34 @@ def test_step_07_job_succeeded_and_alert_is_in_the_feed(gateway, finished_job):
     ), "the alert feed (what the portal shows) must contain job.succeeded"
 
 
-@pytest.mark.skip(reason="Maitha: the machine is released after the job — Fri 20 Nov")
 def test_step_07b_machine_released(gateway, finished_job):
     """After SUCCEEDED, the Scheduler has released the job's machine (no worker still running it)."""
+    assert finished_job["status"] == "SUCCEEDED"
+
+    def scheduler_metrics() -> dict[str, float]:
+        out = subprocess.run(
+            ["docker", "compose", "exec", "-T", "scheduler", "python", "-c",
+             "import urllib.request; print(urllib.request.urlopen(\"http://localhost:8004/metrics\").read().decode())"],
+            capture_output=True, timeout=30,
+            cwd=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        )
+        text = out.stdout.decode()
+        values = {}
+        for name in ("scheduler_workers_busy", "scheduler_gpus_in_use"):
+            match = re.search(rf"^{name}\s+([\d.]+)", text, re.MULTILINE)
+            if match:
+                values[name] = float(match.group(1))
+        return values
+
+    # The scheduler releases the slot on its next poll; wait up to 60 s
+    for _ in range(12):
+        metrics = scheduler_metrics()
+        if metrics.get("scheduler_workers_busy", 1) == 0:
+            break
+        time.sleep(5)
+
+    assert metrics["scheduler_workers_busy"] == 0, f"expected 0 busy workers, got {metrics}"
+    assert metrics["scheduler_gpus_in_use"] == 0, f"expected 0 GPUs in use, got {metrics}"
 
 
 # ---------- 8-12: switched on as owners deliver ----------
