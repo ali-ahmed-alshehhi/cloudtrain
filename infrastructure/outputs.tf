@@ -142,3 +142,40 @@ output "worker_urls" {
     (var.multi_gpu_instance_type) = module.training_compute_multi_gpu[0].worker_url
   } : {}
 }
+
+output "log_group_names" {
+  description = "Per service: its CloudWatch log group (Hamda: awslogs-group in the ECS task definitions)."
+  value       = try(module.monitoring[0].log_group_names, null)
+}
+
+output "alarm_names" {
+  value = try(module.monitoring[0].alarm_names, null)
+}
+
+output "ecs_cluster_name" {
+  description = "ECS cluster for Salem's deploy (#54). Always <environment>-cloudtrain."
+  value       = try(module.application_services[0].ecs_cluster_name, null)
+}
+
+output "ecs_service_names" {
+  description = "Per service: ECS service name in the cluster."
+  value       = try(module.application_services[0].ecs_service_names, null)
+}
+
+output "alb_dns_name" {
+  description = "Public load balancer DNS (gateway and portal)."
+  value       = try(module.application_services[0].alb_dns_name, null)
+}
+
+output "alb_arn_suffix" {
+  description = "Public ALB arn_suffix for the monitoring 5xx alarm."
+  value       = try(module.application_services[0].alb_arn_suffix, null)
+}
+
+output "gateway_url" {
+  value = try(module.application_services[0].gateway_url, null)
+}
+
+output "portal_url" {
+  value = try(module.application_services[0].portal_url, null)
+}
