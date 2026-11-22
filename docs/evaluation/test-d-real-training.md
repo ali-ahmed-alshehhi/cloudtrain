@@ -34,15 +34,30 @@ q 'histogram_quantile(0.50, sum by (le) (increase(cloudtrain_job_run_seconds_buc
 q 'histogram_quantile(0.95, sum by (le) (increase(cloudtrain_job_run_seconds_bucket{result="SUCCEEDED"}[60m])))'   # => 21.0
 ```
 
-Counts are not whole numbers because `increase()` extrapolates. **The quantiles are not usable here:** the
-smallest bucket is 1 s for the queue wait and 10 s for the run time (chosen for GPU jobs of minutes to hours),
-so every job falls in the first bucket and the quantile is only a guess inside it ("under 1 s", "under 10 s").
-The averages (sum ÷ count) and the per-job times below are exact.
+Counts are not whole numbers because `increase()` extrapolates to the edges of the window.
+
+**The quantiles say little here.** The smallest bucket is 1 s for the queue wait and 10 s for the run time
+(chosen for GPU jobs of minutes to hours; #153 adds smaller ones). The queue waits all fall in the first
+bucket, so p50 and p95 are only guesses inside it ("under 1 s"). For the run time, 9 of the 10 jobs fall in
+the first bucket (under 10 s) and one, the cold start at 12.7 s, in the next (10–30 s): that one job is why
+p95 says 21 s, a guess inside the 10–30 s bucket, not a measured time.
+
+**The averages are estimates, not exact.** Sum ÷ count divides two `increase()` values over the same window,
+so the extrapolation mostly cancels out, but it is still a window average from Prometheus, not a per-job
+measurement. The averages above cover **runs 1–3 only** (3 jobs). The exact per-job times are in section 3,
+from the jobs' own `started_at` and `finished_at`.
 
 ## 3. Every job, from Training Jobs (through the gateway)
 
-`/tmp/jobs.py` lists each project's jobs: status, machine type, GPU-hours, estimated cost, and
-`finished_at − started_at`.
+[`jobs.py`](jobs.py) lists each project's jobs: status, machine type, GPU-hours, estimated cost, and
+`finished_at − started_at` (standard library only; reads `GET /api/v1/projects` and
+`GET /api/v1/jobs?project_id=…`). The run on 22 Nov used a throwaway copy in `/tmp` that was not kept;
+`jobs.py` is a re-creation that prints the same columns.
+
+```bash
+export DEV_AUTH_TOKEN=$(grep '^DEV_AUTH_TOKEN=' .env | cut -d= -f2)
+python3 docs/evaluation/jobs.py
+```
 
 ```
 job-01 SUCCEEDED local-cpu gpu_hours: 0.0 cost: 0.0 run_s: 3.0
@@ -71,8 +86,8 @@ this test. **`job-07` to `job-16` are today's 10 real training jobs.**
 | Measure | Result |
 |---|---|
 | Succeeded | 10 of 10, no retry, no failure |
-| Wait in the queue (QUEUED → RUNNING) | average **36 ms** (runs 1–3); all 10 under 1 s |
-| Training time (RUNNING → SUCCEEDED) | median **3.05 s**, range 2.9–12.7 s; the first job (12.7 s) includes the worker's cold start |
+| Wait in the queue (QUEUED → RUNNING) | average **36 ms** over **runs 1–3 only** (3 jobs; a Prometheus window average, section 2); the histogram puts all 10 under 1 s |
+| Training time (RUNNING → SUCCEEDED) | median **3.05 s**, range 2.9–12.7 s, from each job's `started_at` and `finished_at` (section 3); the first job (12.7 s) includes the worker's cold start |
 | Whole walk-through | 24.8 s the first time, then 5.4–5.6 s |
 | Machine chosen by the scheduler | `local-cpu` for all 10 (no GPU asked) |
 | GPU-hours and estimated cost | 0.0 GPU-hours, **$0.00** for every job: the real price of `local-cpu` in `contracts/pricing.yaml`, not a missing value |
