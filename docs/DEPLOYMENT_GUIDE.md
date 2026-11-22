@@ -4,10 +4,14 @@
 How to provision, operate and destroy the CloudTrain cloud environment.
 
 ## 1. Before you start
-- AWS account, region and budget: _(see docs/OPEN_DECISIONS.md #1 — still open)_
-- Tools: Terraform >= 1.6, Docker, AWS CLI
-- GPU quota status: request early; approval can take days
-- Login: short-lived credentials / IAM roles — no long-lived keys committed
+- **No AWS account:** the instructors asked us to use the **AWS Emulator** instead (decision
+  [0011](decisions/0011-aws-emulator-instead-of-aws-account.md)). Everything below runs on a laptop.
+  The same Terraform runs on real AWS later (section 3b).
+- **Tools:** Terraform **1.10 or newer** (S3-native state locking, `use_lockfile`), Docker with about
+  2 GB free memory for the emulator, AWS CLI.
+- **No GPU quota needed:** the emulator starts no real machines, so no real GPU runs (decision 0011).
+- **Credentials:** `scripts/emulator-env.sh` points the AWS CLI and Terraform at the emulator. Never use
+  real AWS keys with it, and never commit keys, `.env`, state files or `backend.tf`.
 
 ## 2. One-time bootstrap: the state bucket
 On **real AWS**, create a dedicated S3 bucket for Terraform state (once per account).
@@ -34,11 +38,20 @@ terraform apply -var-file=environments/dev/emulator.tfvars.example
 terraform output
 ```
 
-Creates the whole dev environment: VPC with public and private subnets and NAT (our security
-groups are skipped on the emulator because of an emulator gap, see `infrastructure/README.md`);
-S3 `datasets` + `artifacts`; SQS `training-jobs` (+ DLQ) + `job-events`; one ECR repository per
-service; RDS PostgreSQL 17 with its master secret in Secrets Manager. `terraform output` lists
-what each teammate needs (see the hand-off table in `infrastructure/README.md`).
+Creates the whole dev environment (on `main`, 22 Nov 2026):
+
+- **Network:** VPC with public and private subnets and NAT. Our security groups are skipped on the
+  emulator because of an emulator gap (see `infrastructure/README.md`).
+- **Storage and queues:** S3 `datasets` + `artifacts`; SQS `training-jobs` (+ `training-jobs-dlq`)
+  + `job-events`.
+- **Images and database:** one ECR repository per service (keeps the last 20 images); RDS PostgreSQL 17
+  with an RDS-managed master secret.
+- **Login:** Cognito user pool, portal app client and role groups (decision 0006).
+- **Permissions:** one task role per service, the shared ECS execution role, the GitHub deploy role.
+- **GPU workers:** two Auto Scaling groups, `gpu-1` (`g4dn.xlarge`, 1 GPU) and `gpu-4` (`g4dn.12xlarge`,
+  4 GPUs), each with an internal load balancer on port 8010 (decision 0012).
+
+`terraform output` lists what each teammate needs (table at the end of this guide).
 
 Skip `scripts/bootstrap-schemas.sh` on the emulator: its RDS cannot create schemas (`CREATE SCHEMA`
 gives a syntax error, see "Emulator gap: database schemas" in `infrastructure/README.md`), so the
@@ -93,30 +106,89 @@ Images → ECR, services → ECS Fargate: Salem's pipeline. Hamda + Fatma provid
 network/security group IDs via `terraform output`.
 
 ## 5. Change something through Terraform
-Example: change `sqs_visibility_timeout_seconds` in tfvars → `terraform plan` → `terraform apply`.
-
-## 6. Operate
-- Logs/dashboards: CloudWatch (module still a stub)
-- Job cost: `contracts/pricing.yaml`
-- Stuck worker: Maitha + this guide
-
-## 7. Destroy
+The worker capacity is a variable (demo 4). To run two 1-GPU workers instead of one:
 
 ```bash
-# LocalStack
-terraform destroy -var-file=environments/dev/localstack.tfvars.example
-docker compose -f docker-compose.localstack.yml down
-
-# Real AWS
-terraform destroy -var-file=environments/dev/terraform.tfvars
+terraform plan  -var-file=environments/dev/emulator.tfvars.example -var worker_desired_capacity=2
+terraform apply -var-file=environments/dev/emulator.tfvars.example -var worker_desired_capacity=2
 ```
 
-Keep the **state bucket** on real AWS. Destroy disposable `dev` resources after tests and after submission.
+Expected: the plan shows `~ desired_capacity = 1 -> 2` and `Plan: 0 to add, 1 to change, 0 to destroy`.
+The Auto Scaling group starts the extra machine and registers it in the pool's load balancer by itself;
+nothing is rebuilt by hand. To keep the change, edit the value in your tfvars file instead of using `-var`.
 
-## 8. Cost notes
-- NAT Gateway and idle GPU instances cost money on real AWS.
-- LocalStack practice costs $0 (no AWS account required).
-- Tag every resource with `Project`, `Environment`, `Owner`.
+| Pool | Size variable | Upper limit | Machine |
+|---|---|---|---|
+| `gpu-1` | `worker_desired_capacity` | `worker_max_size` (2) | `g4dn.xlarge`, 1 GPU |
+| `gpu-4` | `multi_gpu_desired_capacity` | `multi_gpu_max_size` (1) | `g4dn.12xlarge`, 4 GPUs |
+
+Any other variable works the same way (for example `sqs_visibility_timeout_seconds`): change it, read
+the plan, apply.
+
+## 6. Operate
+- **Worker addresses:** `terraform output worker_urls` (machine type to load balancer address). The
+  Scheduler reads it as `TRAINING_WORKER_URLS` (#70).
+- **Logs and alarms:** CloudWatch log groups `/cloudtrain/<env>/<service>` and alarms for dead letters,
+  unread job events and server errors come with the monitoring module (#134). On the emulator they get no
+  live data; the live view is the local Grafana (#109).
+- **A job failed 3 times:** it is on `training-jobs-dlq` (kept 14 days). Mariam's dead-letter reader
+  retries it.
+- **Job cost:** hourly prices in `contracts/pricing.yaml` × machine time. The portal labels it
+  "Estimated cost", not a bill.
+- **Stuck worker:** Maitha's Scheduler frees the slot (#102); scale the pool with section 5 if needed.
+
+## 7. Destroy
+Always look at the plan first, then destroy:
+
+```bash
+# AWS Emulator (what we use)
+terraform plan -destroy -var-file=environments/dev/emulator.tfvars.example   # read what goes
+terraform destroy       -var-file=environments/dev/emulator.tfvars.example
+terraform state list | wc -l                                                 # expect 0
+./scripts/emulator-down.sh
+
+# Real AWS
+terraform plan -destroy -var-file=environments/dev/terraform.tfvars
+terraform destroy       -var-file=environments/dev/terraform.tfvars
+```
+
+- `destroy` removes only the `dev` environment. The **state bucket** has its own state in
+  `infrastructure/bootstrap/` and is not touched; keep it on real AWS.
+- If you use the remote state bucket, run `git restore backend.tf && terraform init -reconfigure`
+  before committing anything. `backend.tf` is never committed.
+- Destroy disposable `dev` resources after every test and after submission.
+
+## 8. Cost notes (real AWS, us-east-1, on-demand)
+The emulator costs nothing. On real AWS the expensive parts are the GPU machines and the NAT gateway:
+
+| Item | Price | Note |
+|---|---|---|
+| `g4dn.xlarge` (1 GPU) | $0.526 / hour | `contracts/pricing.yaml` |
+| `g4dn.12xlarge` (4 GPUs) | $3.912 / hour | `contracts/pricing.yaml`; also runs 2-GPU jobs |
+| `g4dn.metal` (8 GPUs) | $7.824 / hour | `contracts/pricing.yaml`; not built by Terraform |
+| NAT gateway | about $0.045 / hour + data | check the AWS price page before quoting |
+
+- Both GPU pools default to **0 machines** in code (the emulator tfvars set 1 for `gpu-1`), and the
+  upper limits (`worker_max_size`, `multi_gpu_max_size`) stop a typo from starting many GPU machines.
+- Every resource is tagged `Project`, `Environment`, `Owner`.
+- Prices change: check them again before quoting them in the final report.
+
+## 9. The Terraform demos (runbook)
+The seven mandatory demos, on the emulator. Start with `./scripts/emulator-up.sh` and
+`source ./scripts/emulator-env.sh`, from `infrastructure/`. `V=environments/dev/emulator.tfvars.example`.
+
+| # | Demo | Commands | What to show |
+|---|---|---|---|
+| 1 | Apply creates dev | `terraform init` then `terraform apply -var-file=$V` | `Apply complete! Resources: N added` (89 on `main`, 22 Nov), then `terraform output` |
+| 2 | Inspect the plan | `terraform plan -var-file=$V -out=dev.tfplan` then `terraform show dev.tfplan` | `+` create, `~` change in place, `-` destroy; the summary line |
+| 3 | Deploy the services | after #135: `terraform output ecs_cluster_name`, `terraform output ecs_service_names`, `aws ecs list-services --cluster dev-cloudtrain` | the 9 ECS services behind the load balancer. On the emulator they run 0 tasks (no images in its ECR); Salem's pipeline does the image rollout |
+| 4 | Change a parameter | `terraform plan -var-file=$V -var worker_desired_capacity=2` | `~ desired_capacity = 1 -> 2`, `0 to add, 1 to change, 0 to destroy` |
+| 5 | Apply it, no manual rebuild | `terraform apply -var-file=$V -var worker_desired_capacity=2`, then `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names dev-cloudtrain-gpu-1 --query 'AutoScalingGroups[0].[DesiredCapacity,length(Instances)]'` | `2 2`; a new plan says `No changes` |
+| 6 | State and dependencies | `terraform state list`; `terraform state show 'module.training_compute_gpu[0].aws_autoscaling_group.worker'`; `terraform graph \| dot -Tsvg > graph.svg` (needs Graphviz) | every resource Terraform manages; how the workers depend on the network, the IAM role and the queues |
+| 7 | Destroy safely | `terraform plan -destroy -var-file=$V`, then `terraform destroy -var-file=$V`, then `terraform state list \| wc -l` | `Destroy complete!`, state empty, the state bucket untouched |
+
+Say during the demo: the emulator starts no real machines, so GPU speed is "not measured on AWS"
+(decision 0011); the Terraform is the same for real AWS (section 3b).
 
 ## Hand-off values (after apply)
 
@@ -124,9 +196,12 @@ Keep the **state bucket** on real AWS. Destroy disposable `dev` resources after 
 |---|---|
 | `datasets_bucket` | Faisal |
 | `artifacts_bucket` | Abdullah, Majed |
-| `training_jobs_queue_url` | Mariam (write), Maitha (read) |
-| `job_events_queue_url` | Mariam / notifications |
+| `training_jobs_queue_url`, `training_jobs_dlq_url` | Mariam (write, read the DLQ), Maitha (only reader of `training-jobs`) |
+| `job_events_queue_url` | Mariam, workers (write); `job-events-monitor` (read) |
 | `ecr_repository_urls` | Salem |
-| `vpc_id` / subnet IDs / security groups | Maitha, Salem, Majed |
-| `db_endpoint` | Service owners (DATABASE_URL) |
-| `db_master_secret_arn` | Hamda/Fatma + deploy pipeline |
+| `db_endpoint`, `db_address`, `db_port`, `db_name`, `db_master_secret_arn` | bootstrap script; service owners via their `DATABASE_URL` secret |
+| `service_database_secret_names` | ECS task definitions (each service's own `DATABASE_URL`) |
+| `jwt_issuer`, `jwt_audience`, `jwt_jwks_url`, `cognito_user_pool_id` | Ali (gateway), Salem (login), portal |
+| `worker_urls`, `gpu_worker_autoscaling_group`, `multi_gpu_worker_autoscaling_group` | Maitha (Scheduler), Ahmed + Abdulla, Abdullah |
+| `service_task_role_arns`, `ecs_task_execution_role_arn`, `github_deploy_role_arn` | Hamda (ECS), Salem (deploy) |
+| `vpc_id`, subnet IDs, security group IDs | Hamda, Salem, Maitha |
