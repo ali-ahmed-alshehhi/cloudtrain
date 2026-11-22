@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest==9.2.0
+httpx==0.28.1
+httpx2==2.16.0  # the test client (removes a deprecation warning)
+moto[sqs]==5.1.21  # a fake SQS in memory, to test the real boto3 calls

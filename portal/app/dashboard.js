@@ -1,91 +1,135 @@
 "use client";
-// Runs in the browser. Shows the gateway's health, the user's projects and the job alert feed.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createGatewayClient } from "./lib/gateway.mjs";
+import Problem from "./components/problem";
+import Datasets from "./components/datasets";
+import ProjectAlerts from "./components/project-alerts";
 
-const FIRST_WAIT_MS = 5000; // the alert feed is asked every 5 seconds...
-const LONGEST_WAIT_MS = 60000; // ...and waits longer (up to 60 s) while the gateway does not answer
+
 
 export default function Dashboard({ gatewayUrl, devToken }) {
-  const [health, setHealth] = useState("checking...");
+  const api = useMemo(() => createGatewayClient({ gatewayUrl, getToken: () => devToken }), [gatewayUrl, devToken]);
+  const [health, setHealth] = useState("Checking connection");
   const [projects, setProjects] = useState([]);
-  const [alerts, setAlerts] = useState([]);
-  const [problem, setProblem] = useState("");
-
-  const headers = devToken ? { Authorization: `Bearer ${devToken}` } : {};
+  const [selectedId, setSelectedId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [refresh, setRefresh] = useState(0);
+  const [problem, setProblem] = useState(null);
+  const [createProblem, setCreateProblem] = useState(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  // Keep the same key when retrying an unchanged form after a lost response.
+  const submission = useRef(null);
+  const savingRef = useRef(false);
+  const selectedProject = projects.find((project) => project.project_id === selectedId);
 
   useEffect(() => {
-    fetch(`${gatewayUrl}/health`)
-      .then((answer) => answer.json())
-      .then((body) => setHealth(body.status))
-      .catch(() => setHealth("not reachable"));
+    const controller = new AbortController();
+    api.request("/health", { signal: controller.signal })
+      .then(() => setHealth("Connected"))
+      .catch((error) => { if (error.name !== "AbortError") setHealth("Unavailable"); });
+    return () => controller.abort();
+  }, [api, refresh]);
 
-    fetch(`${gatewayUrl}/api/v1/projects`, { headers })
-      .then((answer) => answer.json())
-      .then((body) => (body.items ? setProjects(body.items) : setProblem(body.error?.message)))
-      .catch(() => setProblem("Could not load projects"));
-  }, [gatewayUrl]);
-
-  // The alert feed: ask for events newer than the last one we saw; back off when there is trouble.
   useEffect(() => {
-    let lastEventId = null;
-    let wait = FIRST_WAIT_MS;
-    let timer;
-    let stopped = false;
+    const controller = new AbortController();
+    setLoading(true);
+    setProblem(null);
+    api.listProjects(controller.signal).then((body) => {
+      if (!Array.isArray(body.items)) throw new Error("The project list could not be read.");
+      setProjects(body.items);
+      setSelectedId((current) => body.items.some((p) => p.project_id === current) ? current : "");
+    }).catch((error) => {
+      if (error.name !== "AbortError") setProblem(error);
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [api, refresh]);
 
-    async function poll() {
-      const after = lastEventId ? `?after=${lastEventId}` : "";
-      try {
-        const answer = await fetch(`${gatewayUrl}/api/v1/jobs/events${after}`, { headers });
-        if (!answer.ok) throw new Error(`status ${answer.status}`);
-        const body = await answer.json();
-        if (body.items.length > 0) setAlerts((old) => [...old, ...body.items].slice(-20));
-        lastEventId = body.last_event_id;
-        wait = FIRST_WAIT_MS;
-      } catch {
-        wait = Math.min(wait * 2, LONGEST_WAIT_MS);
-      }
-      if (!stopped) timer = setTimeout(poll, wait);
+  async function createProject(event) {
+    event.preventDefault();
+    if (savingRef.current || uploading) return;
+    const project = { name: name.trim(), description: description.trim() || null };
+    if (!project.name) {
+      setCreateProblem(new Error("Enter a project name."));
+      return;
     }
+    const fingerprint = JSON.stringify(project);
+    if (submission.current?.fingerprint !== fingerprint) {
+      submission.current = { fingerprint, key: crypto.randomUUID() };
+    }
+    savingRef.current = true;
+    setSaving(true);
+    setCreateProblem(null);
+    setConfirmation("");
+    try {
+      const created = await api.createProject(project, submission.current.key);
+      setProjects((old) => [...old.filter((p) => p.project_id !== created.project_id), created]);
+      setSelectedId(created.project_id);
+      setName("");
+      setDescription("");
+      submission.current = null;
+      setConfirmation(`Created ${created.name}. Your project is selected.`);
+    } catch (error) {
+      setCreateProblem(error);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
 
-    poll();
-    return () => {
-      stopped = true;
-      clearTimeout(timer);
-    };
-  }, [gatewayUrl]);
-
-  return (
-    <main>
-      <h1>CloudTrain</h1>
-      <p style={{ color: "#a15c00" }}>Stand-in portal — Hilal + Adel replace this page.</p>
-
-      <h2>Gateway</h2>
-      <p>
-        <code>{gatewayUrl}/health</code>: <strong>{health}</strong>
-      </p>
-
-      <h2>Projects</h2>
-      {problem && <p style={{ color: "crimson" }}>{problem}</p>}
-      {projects.length === 0 && !problem && <p>No projects yet.</p>}
-      <ul>
-        {projects.map((project) => (
-          <li key={project.project_id}>
-            <strong>{project.project_id}</strong> — {project.name}
-          </li>
-        ))}
-      </ul>
-
-      <h2>Job alerts</h2>
-      {alerts.length === 0 && <p>No job events yet.</p>}
-      <ul>
-        {alerts.map((event) => (
-          <li key={event.event_id}>
-            {event.occurred_at} · <strong>{event.job_id}</strong> · {event.event_type}
-            {event.data?.reason ? ` (${event.data.reason})` : ""}
-          </li>
-        ))}
-      </ul>
+  return <div className="shell">
+    <aside className="sidebar">
+      <a className="brand" href="/"><img src="/brand/cloudtrain-logo-dark.png" alt="CloudTrain" width="168" height="69" /><span>ML workspace</span></a>
+      <nav aria-label="Main navigation"><a href="#projects" aria-current="page">Projects</a><a href="#datasets">Datasets</a></nav>
+      <p className="sidebar-note">Organize your data, training and models in one workspace.</p>
+    </aside>
+    <main id="projects">
+      <header className="page-header"><div><p className="eyebrow">YOUR WORKSPACE</p><h1>Projects</h1>
+        <p>Create a project to keep your datasets and training runs together.</p></div>
+        <span className={`connection ${health === "Connected" ? "connected" : ""}`} role="status">{health}</span>
+      </header>
+      {devToken && <p className="notice">Local development session. Real sign-in will be integrated with the team’s identity provider.</p>}
+      {!devToken && <p className="notice">This workspace requires a signed-in session. Sign-in integration is pending.</p>}
+      <div className="workspace-grid">
+        <section className="panel" aria-labelledby="project-list-title">
+          <div className="section-heading"><h2 id="project-list-title">Your projects</h2>
+            <button className="secondary" disabled={loading || saving || uploading} onClick={() => setRefresh((value) => value + 1)}>Refresh</button></div>
+          <Problem error={problem} />
+          {loading ? <p role="status">Loading projects…</p> : problem ? <p>Refresh to try loading your projects again.</p> : projects.length === 0 ?
+            <div className="empty"><h3>A fresh start</h3><p>Create your first project using the form.</p></div> :
+            <ul className="project-list">{projects.map((project) => <li key={project.project_id}>
+              <button className={`project-card ${selectedId === project.project_id ? "selected" : ""}`} aria-pressed={selectedId === project.project_id}
+                disabled={saving || uploading} onClick={() => setSelectedId(project.project_id)}>
+                <strong>{project.name}</strong><span>{project.description || "No description"}</span><small>{project.project_id}</small>
+              </button>
+            </li>)}</ul>}
+        </section>
+        <section className="panel" aria-labelledby="create-title">
+          <h2 id="create-title">Create a project</h2><p className="muted">Give your next experiment a home.</p>
+          <form onSubmit={createProject}>
+            <fieldset disabled={saving || loading || uploading}><label htmlFor="project-name">Project name <span aria-hidden="true">*</span></label>
+              <input id="project-name" required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Image classification" />
+              <label htmlFor="project-description">Description <span className="muted">(optional)</span></label>
+              <textarea id="project-description" maxLength={1000} rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What will you train or explore?" />
+              <button type="submit">{saving ? "Creating…" : "Create project"}</button>
+            </fieldset>
+            <Problem error={createProblem} /><p className="success" role="status">{confirmation}</p>
+          </form>
+        </section>
+      </div>
+      {selectedProject && <section className="panel selection" aria-labelledby="selected-title">
+        <p className="eyebrow">SELECTED PROJECT</p><h2 id="selected-title">{selectedProject.name}</h2>
+        <p>{selectedProject.description || "No description provided."}</p><small>{selectedProject.project_id}</small>
+      </section>}
+      {uploading && <p role="status">Upload in progress. Project selection will be available when it finishes.</p>}
+      <Datasets key={selectedId} api={api} project={selectedProject} onUploadingChange={setUploading} />
+      <section className="panel">
+        {selectedId ? <ProjectAlerts key={selectedId} api={api} projectId={selectedId} /> : <><h2>Job alerts</h2><p className="muted">Select a project to view its job events.</p></>}
+      </section>
     </main>
-  );
+  </div>;
 }

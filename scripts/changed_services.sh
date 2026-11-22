@@ -5,7 +5,7 @@
 # because a shared change can break any of them.
 set -euo pipefail
 
-all_services=(gateway project-service dataset-service job-service scheduler training model-registry inference-service)
+all_services=(gateway project-service dataset-service job-service scheduler training model-registry inference-service monitoring/job-events-monitor)
 base=${1:-}
 
 # No usable base commit (e.g. the first push of a branch): test everything.
