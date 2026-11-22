@@ -116,7 +116,9 @@ flowchart TB
    Create requests accept an `Idempotency-Key`.
 6. **Persistent state.** Datasets, models, experiment metadata and job records survive container restarts.
 7. **Cloud-native, infrastructure as code.** Services and training run in AWS. Terraform creates all cloud
-   resources, with remote state, locking and restricted access. Nothing is created by hand.
+   resources, with remote state, locking and restricted access. A small Pulumi program
+   (`infrastructure/pulumi/`) sits above it: it only reads Terraform's outputs and creates the CloudWatch
+   dashboard, which nothing in Terraform depends on (decision 0013). Nothing is created by hand.
 8. **Observable.** Every service writes JSON logs with `request_id` and exposes `/health` and `/metrics`
    (Prometheus format).
 9. **Automated.** Every change goes through a pull request, CI checks and a review before it reaches `main`.
