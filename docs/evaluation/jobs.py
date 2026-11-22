@@ -44,8 +44,17 @@ def main():
         jobs.extend(get(f"/api/v1/jobs?{query}")["items"])
     for job in sorted(jobs, key=lambda j: j["job_id"]):
         run_s = seconds_between(job.get("started_at"), job.get("finished_at"))
-        print(job["job_id"], job["status"], job.get("machine_type"),
-              "gpu_hours:", job.get("gpu_hours"), "cost:", job.get("estimated_cost_usd"), "run_s:", run_s)
+        print(
+            job["job_id"],
+            job["status"],
+            job.get("machine_type"),
+            "gpu_hours:",
+            job.get("gpu_hours"),
+            "cost:",
+            job.get("estimated_cost_usd"),
+            "run_s:",
+            run_s,
+        )
 
 
 if __name__ == "__main__":
