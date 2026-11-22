@@ -150,3 +150,14 @@ module "training_compute_multi_gpu" {
     ARTIFACTS_BUCKET     = module.object_storage.artifacts_bucket_name
   }
 }
+
+# CloudWatch log groups (one per ECS service) and alarms (#36). Alarms follow monitoring/aws/README.md.
+module "monitoring" {
+  count  = var.enable_monitoring ? 1 : 0
+  source = "./modules/monitoring"
+
+  environment           = var.environment
+  training_jobs_dlq_arn = module.message_queue.training_jobs_dlq_arn
+  job_events_queue_arn  = module.message_queue.job_events_queue_arn
+  log_retention_days    = var.log_retention_days
+}
