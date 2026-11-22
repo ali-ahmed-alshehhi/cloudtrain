@@ -15,6 +15,14 @@ class Hyperparameters(BaseModel):
     batch_size: int = Field(ge=1, le=4096, strict=True)
     learning_rate: float = Field(gt=0, le=10)
 
+    @model_validator(mode="after")
+    def extra_settings_are_plain_values(self) -> "Hyperparameters":
+        # The contract allows extra settings only as a number, string or boolean (not null, lists or objects)
+        for name, value in (self.model_extra or {}).items():
+            if not isinstance(value, (bool, int, float, str)):
+                raise ValueError(f"hyperparameter {name!r} must be a number, string or boolean")
+        return self
+
 
 class Resources(BaseModel):
     model_config = ConfigDict(extra="forbid")

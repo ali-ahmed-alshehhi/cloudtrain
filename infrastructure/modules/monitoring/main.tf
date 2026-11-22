@@ -60,7 +60,7 @@ resource "aws_cloudwatch_metric_alarm" "job_events_not_read" {
 # More than 5% of requests through the public load balancer fail with 5xx for 5 minutes
 # (local twin: CloudTrainHighErrorRate). Created once application-services gives us the ALB.
 resource "aws_cloudwatch_metric_alarm" "server_errors" {
-  count               = var.alb_arn_suffix == null ? 0 : 1
+  count               = var.create_server_errors_alarm ? 1 : 0
   alarm_name          = "${var.environment}-cloudtrain-server-errors"
   alarm_description   = "More than 5% of requests to the gateway or portal answer 5xx."
   evaluation_periods  = 5
