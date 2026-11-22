@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadAndDeleteJobEventsOnly",
+      "Effect": "Allow",
+      "Action": ["sqs:GetQueueUrl", "sqs:ReceiveMessage", "sqs:DeleteMessage"],
+      "Resource": "${job_events_queue_arn}"
+    }
+  ]
+}
