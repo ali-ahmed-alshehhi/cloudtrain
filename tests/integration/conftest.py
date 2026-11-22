@@ -88,14 +88,37 @@ def tiny_image_dataset() -> bytes:
     return archive.getvalue()
 
 
+def tiny_tabular_dataset() -> bytes:
+    """A tiny Wisconsin-style CSV for the laptop/LocalStack walk-through."""
+    rows = ["radius,texture,perimeter,diagnosis"]
+    for value, label in (
+        (1.0, "B"),
+        (1.1, "B"),
+        (0.9, "B"),
+        (1.2, "B"),
+        (8.0, "M"),
+        (8.1, "M"),
+        (7.9, "M"),
+        (8.2, "M"),
+    ):
+        rows.append(f"{value},{value + 0.1},{value + 0.2},{label}")
+    return ("\n".join(rows) + "\n").encode()
+
+
 def small_job(project_id: str, dataset_id: str) -> dict:
     """A job form for the walk-through (CPU only, so it runs on a laptop)."""
     return {
         "project_id": project_id,
         "dataset_id": dataset_id,
         "dataset_version": 1,
-        "model": "resnet18",
-        "hyperparameters": {"epochs": 1, "batch_size": 32, "learning_rate": 0.001},
+        "model": "tabular_mlp",
+        "hyperparameters": {
+            "epochs": 1,
+            "batch_size": 4,
+            "learning_rate": 0.05,
+            "seed": 7,
+            "hidden_size": 8,
+        },
         "resources": {"gpu_count": 0, "cpu_cores": 2, "memory_gb": 4},
         "parallelism": {"strategy": "single", "world_size": 1},
         "execution": {"max_runtime_minutes": 10, "retry_limit": 2},
