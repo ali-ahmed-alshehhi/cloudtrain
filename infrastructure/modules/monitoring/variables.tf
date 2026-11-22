@@ -38,6 +38,12 @@ variable "alb_arn_suffix" {
   default     = null
 }
 
+variable "create_server_errors_alarm" {
+  description = "Create the ALB 5xx alarm. Must be known at plan time (do not derive from alb_arn_suffix)."
+  type        = bool
+  default     = false
+}
+
 variable "alarm_actions" {
   description = "Where alarms notify (for example an SNS topic ARN). Empty = alarms show in CloudWatch only."
   type        = list(string)

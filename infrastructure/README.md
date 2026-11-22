@@ -68,7 +68,7 @@ moves its state there. Steps in [bootstrap/README.md](bootstrap/README.md).
 | `training-compute` | GPU worker pools: launch template + Auto Scaling group on EC2 (decision 0012), optional internal load balancer; `gpu-1` (1 GPU) and `gpu-4` (4 GPUs) |
 | `service-roles` | one least-privilege task role per service: only the buckets and queues its code calls |
 | `monitoring` | CloudWatch log group per ECS service (`/cloudtrain/<env>/<service>`) and alarms (dead letters, job events not read; 5xx once the ALB exists) |
-| `application-services` | stub — Hamda, #36 |
+| `application-services` | ECS Fargate cluster `<env>-cloudtrain`, services, public ALB (gateway :5810, portal :3000); uses monitoring log groups when enabled |
 
 ### Wed 18 hand-off: the dev environment on the emulator (#34, #66)
 
@@ -158,6 +158,23 @@ The **execution role** (ECS pulls the image, writes logs and injects the databas
 role in `modules/iam/ecs.tf` (Salem, #129). The database secrets are not created by Terraform:
 `scripts/bootstrap-schemas.sh` creates `cloudtrain/<env>/database/<schema>` after the apply (names in
 `service_database_secret_names`), so no password is in Terraform state.
+
+### Sun 22 hand-off: services on ECS Fargate (#36, #75)
+
+`enable_application_services = true` creates the ECS cluster **`dev-cloudtrain`**, one Fargate
+service per app container (not the training worker), and a public ALB on ports **5810** / **3000**
+(HTTP until an ACM certificate exists). Outputs for Salem and the team:
+
+| Output | Who needs it |
+|---|---|
+| `ecs_cluster_name`, `ecs_service_names` | Salem (deploy #54) |
+| `ecs_task_execution_role_arn` | Salem (task definitions) |
+| `gateway_url`, `portal_url`, `alb_dns_name` | Everyone (hand-off #75) |
+
+On the emulator set `ecs_desired_count = 0` and `enable_ecs_service_discovery = false` (no images in
+emulator ECR; Cloud Map may be missing). With `enable_monitoring = true`, task definitions use
+monitoring's log groups (no duplicate create). `alb_arn_suffix` feeds the 5xx alarm. Fatma owns the
+2-GPU pool, worker LBs / `worker_urls`, and the monitoring module.
 
 **Emulator gap: security groups.** Right after creating a security group, Terraform removes the
 "allow all outbound" rule AWS adds, naming it with ports 0-0. Real AWS ignores ports for an
