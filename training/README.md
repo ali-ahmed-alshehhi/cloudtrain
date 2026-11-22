@@ -26,6 +26,8 @@ archive contains `cifar-10-batches-py`.
 # from training/, after dependencies are installed
 python -m scripts.smoke_local
 python -m scripts.evaluate_bundle --bundle /tmp/model-bundle.pt
+# Student 5 (#28): 2-process DDP on CPU (gloo). Additive helper; safe to remove.
+python -m scripts.smoke_ddp_local
 ```
  The worker calls `ddp.launch`, uses a module-level spawn target,
 `make_loader`, `set_epoch`, `wrap`, and `unwrap`. Only rank 0 produces
