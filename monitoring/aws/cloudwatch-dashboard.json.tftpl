@@ -1,0 +1,448 @@
+{
+  "widgets": [
+    {
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 24,
+      "height": 2,
+      "properties": {
+        "markdown": "## CloudTrain\nJob metrics from **job-events-monitor** (CloudWatch EMF, namespace `CloudTrain`), queues, load balancer and containers. On the AWS Emulator (decision 0011) this dashboard is created but receives no live data; the live dashboard is the local Grafana."
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 2,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Job events (count)",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Sum",
+        "period": 300,
+        "metrics": [
+          [
+            "CloudTrain",
+            "JobEvents",
+            "Service",
+            "job-events-monitor",
+            "EventType",
+            "job.queued",
+            {
+              "label": "job.queued"
+            }
+          ],
+          [
+            "CloudTrain",
+            "JobEvents",
+            "Service",
+            "job-events-monitor",
+            "EventType",
+            "job.scheduled",
+            {
+              "label": "job.scheduled"
+            }
+          ],
+          [
+            "CloudTrain",
+            "JobEvents",
+            "Service",
+            "job-events-monitor",
+            "EventType",
+            "job.running",
+            {
+              "label": "job.running"
+            }
+          ],
+          [
+            "CloudTrain",
+            "JobEvents",
+            "Service",
+            "job-events-monitor",
+            "EventType",
+            "job.succeeded",
+            {
+              "label": "job.succeeded"
+            }
+          ],
+          [
+            "CloudTrain",
+            "JobEvents",
+            "Service",
+            "job-events-monitor",
+            "EventType",
+            "job.failed",
+            {
+              "label": "job.failed"
+            }
+          ],
+          [
+            "CloudTrain",
+            "JobEvents",
+            "Service",
+            "job-events-monitor",
+            "EventType",
+            "job.cancelled",
+            {
+              "label": "job.cancelled"
+            }
+          ],
+          [
+            "CloudTrain",
+            "JobEvents",
+            "Service",
+            "job-events-monitor",
+            "EventType",
+            "job.retrying",
+            {
+              "label": "job.retrying"
+            }
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "label": "events",
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 2,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Waiting in the queue (QUEUED \u2192 RUNNING)",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Average",
+        "period": 300,
+        "metrics": [
+          [
+            "CloudTrain",
+            "QueueWaitSeconds",
+            "Service",
+            "job-events-monitor",
+            {
+              "stat": "Average",
+              "label": "average"
+            }
+          ],
+          [
+            "CloudTrain",
+            "QueueWaitSeconds",
+            "Service",
+            "job-events-monitor",
+            {
+              "stat": "p95",
+              "label": "p95"
+            }
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "label": "seconds",
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 2,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Training time by result (RUNNING \u2192 end)",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Average",
+        "period": 300,
+        "metrics": [
+          [
+            "CloudTrain",
+            "RunSeconds",
+            "Service",
+            "job-events-monitor",
+            "Result",
+            "SUCCEEDED",
+            {
+              "label": "SUCCEEDED"
+            }
+          ],
+          [
+            "CloudTrain",
+            "RunSeconds",
+            "Service",
+            "job-events-monitor",
+            "Result",
+            "FAILED",
+            {
+              "label": "FAILED"
+            }
+          ],
+          [
+            "CloudTrain",
+            "RunSeconds",
+            "Service",
+            "job-events-monitor",
+            "Result",
+            "CANCELLED",
+            {
+              "label": "CANCELLED"
+            }
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "label": "seconds",
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 8,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Messages waiting",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Maximum",
+        "period": 60,
+        "metrics": [
+          [
+            "AWS/SQS",
+            "ApproximateNumberOfMessagesVisible",
+            "QueueName",
+            "${training_jobs_queue}",
+            {
+              "label": "${training_jobs_queue}"
+            }
+          ],
+          [
+            "AWS/SQS",
+            "ApproximateNumberOfMessagesVisible",
+            "QueueName",
+            "${training_jobs_dlq}",
+            {
+              "label": "${training_jobs_dlq}"
+            }
+          ],
+          [
+            "AWS/SQS",
+            "ApproximateNumberOfMessagesVisible",
+            "QueueName",
+            "${job_events_queue}",
+            {
+              "label": "${job_events_queue}"
+            }
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "label": "messages",
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 8,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Oldest message age",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Maximum",
+        "period": 60,
+        "metrics": [
+          [
+            "AWS/SQS",
+            "ApproximateAgeOfOldestMessage",
+            "QueueName",
+            "${training_jobs_queue}",
+            {
+              "label": "${training_jobs_queue}"
+            }
+          ],
+          [
+            "AWS/SQS",
+            "ApproximateAgeOfOldestMessage",
+            "QueueName",
+            "${job_events_queue}",
+            {
+              "label": "${job_events_queue}"
+            }
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "label": "seconds",
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 8,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "job-events delay (occurred \u2192 read), p95",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Average",
+        "period": 300,
+        "metrics": [
+          [
+            "CloudTrain",
+            "EventLagSeconds",
+            "Service",
+            "job-events-monitor",
+            {
+              "stat": "p95",
+              "label": "p95"
+            }
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "label": "seconds",
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 14,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Load balancer: server errors and requests",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Sum",
+        "period": 60,
+        "metrics": [
+          [
+            "AWS/ApplicationELB",
+            "HTTPCode_Target_5XX_Count",
+            "LoadBalancer",
+            "${alb_arn_suffix}",
+            {
+              "label": "5xx",
+              "stat": "Sum"
+            }
+          ],
+          [
+            "AWS/ApplicationELB",
+            "RequestCount",
+            "LoadBalancer",
+            "${alb_arn_suffix}",
+            {
+              "label": "requests",
+              "stat": "Sum"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 14,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Load balancer: answer time p95",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Average",
+        "period": 60,
+        "metrics": [
+          [
+            "AWS/ApplicationELB",
+            "TargetResponseTime",
+            "LoadBalancer",
+            "${alb_arn_suffix}",
+            {
+              "stat": "p95",
+              "label": "p95"
+            }
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "label": "seconds",
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 14,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Containers: CPU and memory",
+        "region": "${region}",
+        "view": "timeSeries",
+        "stacked": false,
+        "stat": "Average",
+        "period": 60,
+        "metrics": [
+          [
+            "AWS/ECS",
+            "CPUUtilization",
+            "ClusterName",
+            "${ecs_cluster_name}",
+            {
+              "label": "CPU %"
+            }
+          ],
+          [
+            "AWS/ECS",
+            "MemoryUtilization",
+            "ClusterName",
+            "${ecs_cluster_name}",
+            {
+              "label": "memory %"
+            }
+          ]
+        ],
+        "yAxis": {
+          "left": {
+            "label": "percent",
+            "min": 0
+          }
+        }
+      }
+    }
+  ]
+}

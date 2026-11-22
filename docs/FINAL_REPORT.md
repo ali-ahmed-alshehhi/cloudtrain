@@ -9,6 +9,8 @@
 
 ## 2. Architecture
 Diagrams and service boundaries (from `docs/ARCHITECTURE.md`); how the 8 logical services are covered.
+Diagrams: `docs/diagrams/architecture.svg` and `docs/diagrams/deployment.svg` (redraw with
+`python docs/diagrams/build.py`).
 
 ## 3. Each subsystem (one section per student)
 For each: what it does, design, API, data, tests, how it integrates, what works.
