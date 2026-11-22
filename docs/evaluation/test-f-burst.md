@@ -78,7 +78,7 @@ predicts about 600 s (two timeouts). `job-29` and `job-30` ended before the gap.
 **What it means.** With one slot, the waiting time comes from the queue's visibility timeout, not from the work:
 a burst of N short jobs takes about (N − 1) × 300 s. The same settings are used in the cloud (Terraform sets the
 same 300 s timeout, and nothing sets `SCHEDULER_MAX_WORKERS`, so it is 1 there too), so more GPU machines
-(`worker_desired_capacity`) would not run more jobs at once. Possible fixes are the Scheduler owner's call
+(`worker_desired_capacity`) would not run more jobs at once. Reported as #158. Possible fixes are the Scheduler owner's call
 (Maitha), for example: give a turned-away message back sooner (`ChangeMessageVisibility` to a few seconds), wait
 for the running job to end, and set `SCHEDULER_MAX_WORKERS` (and `SCHEDULER_MAX_GPUS`) from the pool sizes in
 Terraform. Not measured with more than one worker: locally the scheduler has a single worker address.
