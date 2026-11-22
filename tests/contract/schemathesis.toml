@@ -6,3 +6,9 @@
 # really be csv". The service then rightly answers 400 or 422; that is not a contract failure.
 # (Schemathesis's default list, plus 400 and 422.)
 expected-statuses = ["2xx", "3xx", "400", "401", "403", "404", "409", "422", "429", "5xx"]
+
+[[operations]]
+# Inference: before any model version is live (e.g. right after `make up`), GET /model-info rightly
+# answers its documented 503 "no model loaded yet". Any other 5xx, anywhere, is still a failure.
+include-name = "GET /model-info"
+checks.not_a_server_error.expected-statuses = ["2xx", "3xx", "4xx", "503"]

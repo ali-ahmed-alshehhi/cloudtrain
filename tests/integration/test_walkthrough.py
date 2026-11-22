@@ -1,22 +1,33 @@
 """The final-demo walk-through (docs/ARCHITECTURE.md, section 18), run through the gateway.
 
-Steps 2-5 and 7 run for real now (against the stand-ins where owners have not delivered yet).
-The other steps are written but SKIPPED, with the owner and the hand-off date: when you deliver,
-remove the `skip` line of your step and make it pass.
+Steps 2-7 and 12 run for real now. Step 6 asserts Abdullah's live MLflow metrics after the
+real training worker finishes. Step 1 runs with the real login (`make e2e-login`, and the
+Login workflow in CI); `make e2e` uses the laptop dev token and skips it. The other steps
+are written but SKIPPED, with the owner and the hand-off date: when you deliver, remove
+the `skip` line of your step and make it pass.
 
 The steps share what they create (project -> dataset -> job), so run the whole file, in order.
 """
 
+import base64
+import json
 import re
 
 import pytest
 
-from tests.integration.conftest import events_of, small_job, tiny_image_dataset, wait_for
+from tests.integration.conftest import (
+    events_of,
+    real_login,
+    setting,
+    small_job,
+    tiny_tabular_dataset,
+    wait_for,
+)
 
 
 @pytest.fixture(scope="module")
 def project(gateway) -> dict:
-    response = gateway.post("/api/v1/projects", json={"name": "Image Classification"})
+    response = gateway.post("/api/v1/projects", json={"name": "Wisconsin Breast Cancer"})
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -25,8 +36,12 @@ def project(gateway) -> dict:
 def dataset(gateway, project) -> dict:
     response = gateway.post(
         "/api/v1/datasets",
-        data={"project_id": project["project_id"], "name": "cifar-10 (tiny sample)", "format": "tar_gz"},
-        files={"file": ("cifar10-sample.tar.gz", tiny_image_dataset(), "application/gzip")},
+        data={
+            "project_id": project["project_id"],
+            "name": "wisconsin-breast-cancer (tiny sample)",
+            "format": "csv",
+        },
+        files={"file": ("wisconsin.csv", tiny_tabular_dataset(), "text/csv")},
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -47,31 +62,42 @@ def finished_job(gateway, job) -> dict:
         found = gateway.get(f"/api/v1/jobs/{job['job_id']}").json()
         return found if found["status"] in ("SUCCEEDED", "FAILED", "CANCELLED") else None
 
-    return wait_for(final, f"{job['job_id']} to finish")
+    return wait_for(final, f"{job['job_id']} to finish", timeout_seconds=300)
 
 
 # ---------- 1. Log in (Salem) ----------
 
 
-@pytest.mark.skip(reason="Salem: real login in the gateway — hand-off Fri 20 Nov")
 def test_step_01_log_in(gateway):
-    """Sign in with the real login provider and use its token for every step below."""
+    """Alice signs in with the real login (Cognito) and every step below uses her ID token.
+    Salem's security/tests check the token rules in depth; this checks the demo uses the real login."""
+    if not real_login():
+        pytest.skip("`make up` uses the dev token; `make e2e-login` runs this step with the real login")
+    token = gateway.headers["Authorization"].removeprefix("Bearer ")
+    payload = token.split(".")[1]
+    claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+
+    assert claims["token_use"] == "id"
+    assert claims["cognito:username"] == "alice"
+    assert gateway.get("/api/v1/projects").status_code == 200
+    dev = {"Authorization": f"Bearer {setting('DEV_AUTH_TOKEN')}"}
+    assert gateway.get("/api/v1/projects", headers=dev).status_code == 401, "dev token must be off"
 
 
 def test_requests_without_login_are_refused(gateway):
-    """Until Salem's step works: the gateway already refuses requests with no valid token."""
+    """With either login, the gateway refuses requests with no valid token."""
     response = gateway.get("/api/v1/projects", headers={"Authorization": "Bearer wrong"})
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "NOT_AUTHENTICATED"
 
 
-# ---------- 2-5, 7: run now ----------
+# ---------- 2-7, 12: run now ----------
 
 
 def test_step_02_create_project(project):
     assert re.fullmatch(r"project-[0-9]+", project["project_id"])
-    assert project["name"] == "Image Classification"
+    assert project["name"] == "Wisconsin Breast Cancer"
 
 
 def test_step_03_upload_dataset(gateway, dataset):
@@ -93,12 +119,43 @@ def test_step_05_queued_then_scheduled_then_running(gateway, job, finished_job):
     assert finished_job["machine_type"], "the Scheduler must report the machine it chose"
 
 
-@pytest.mark.skip(
-    reason="Abdullah; Ahmed + Abdulla: real training with live MLflow metrics, model in S3 — Fri 20 Nov"
-)
 def test_step_06_training_tracked_in_mlflow(gateway, finished_job):
     """The job's MLflow run has parameters and metrics (GET /api/v1/experiments/runs/search),
     and its model files are in the artifacts bucket."""
+    assert finished_job["status"] == "SUCCEEDED", finished_job
+    experiment = gateway.get(
+        "/api/v1/experiments/experiments/get-by-name",
+        params={"experiment_name": "cloudtrain"},
+    )
+    assert experiment.status_code == 200, experiment.text
+    experiment_id = experiment.json()["experiment"]["experiment_id"]
+    response = gateway.post(
+        "/api/v1/experiments/runs/search",
+        json={
+            "experiment_ids": [experiment_id],
+            "filter": (
+                f"tags.job_id = '{finished_job['job_id']}' "
+                f"and tags.project_id = '{finished_job['project_id']}'"
+            ),
+            "max_results": 10,
+        },
+    )
+    assert response.status_code == 200, response.text
+    runs = response.json().get("runs") or []
+    assert runs, "expected at least one MLflow run tagged with the finished job"
+    data = runs[0].get("data", runs[0])
+    params = (
+        {item["key"]: item["value"] for item in data.get("params", [])}
+        if isinstance(data.get("params"), list)
+        else data.get("params", {})
+    )
+    metrics = (
+        {item["key"]: item.get("value") for item in data.get("metrics", [])}
+        if isinstance(data.get("metrics"), list)
+        else data.get("metrics", {})
+    )
+    assert params.get("model") == "tabular_mlp"
+    assert {"accuracy", "f1", "validation_loss", "train_loss"} & set(metrics)
 
 
 def test_step_07_job_succeeded_and_alert_is_in_the_feed(gateway, finished_job):

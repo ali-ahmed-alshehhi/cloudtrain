@@ -1,4 +1,4 @@
-"""gpu_hours and estimated_cost_usd from contracts/pricing.yaml (placeholder prices for now)."""
+"""gpu_hours and estimated_cost_usd from contracts/pricing.yaml (real us-east-1 prices)."""
 
 from tests.conftest import FORM, beat, job, report, start, submit, sweep
 
@@ -16,25 +16,25 @@ def test_a_queued_job_costs_nothing(client):
 
 def test_cost_of_a_finished_job(client, clock):
     job_id = submit(client, ONE_GPU)["job_id"]
-    start(client, job_id, machine_type="g4dn.xlarge")  # 0.53 USD an hour (placeholder)
+    start(client, job_id, machine_type="g4dn.xlarge")  # 0.526 USD an hour
     clock.advance(30 * 60)
 
     done = report(client, job_id, "SUCCEEDED", reported_by="worker").json()
 
     assert done["gpu_hours"] == 0.5
-    assert done["estimated_cost_usd"] == 0.265
+    assert done["estimated_cost_usd"] == 0.263
 
 
 def test_a_running_job_shows_its_cost_so_far(client, clock):
     job_id = submit(client)["job_id"]  # 2 GPUs
-    start(client, job_id, machine_type="g4dn.12xlarge")  # 3.91 USD an hour (placeholder)
+    start(client, job_id, machine_type="g4dn.12xlarge")  # 3.912 USD an hour
     clock.advance(15 * 60)
     beat(client, job_id)
 
     found = job(client, job_id)
 
     assert found["gpu_hours"] == 0.5  # 2 GPUs x 0.25 hours
-    assert found["estimated_cost_usd"] == 0.9775
+    assert found["estimated_cost_usd"] == 0.978
 
 
 def test_a_failed_attempt_still_counts(client, clock):
@@ -49,15 +49,59 @@ def test_a_failed_attempt_still_counts(client, clock):
     done = report(client, job_id, "SUCCEEDED", reported_by="worker").json()
 
     assert done["gpu_hours"] == 1.0
-    assert done["estimated_cost_usd"] == 0.53
+    assert done["estimated_cost_usd"] == 0.526
 
 
-def test_a_machine_missing_from_pricing_is_free_not_an_error(client, clock):
+def test_a_machine_missing_from_pricing_has_an_unknown_cost_not_zero(client, clock, check):
+    """#108: 0 means free (local-cpu), so a missing price is null, and the portal can say so."""
     job_id = submit(client, ONE_GPU)["job_id"]
     start(client, job_id, machine_type="p5.48xlarge")
     clock.advance(3600)
 
     done = report(client, job_id, "SUCCEEDED", reported_by="worker").json()
 
-    assert done["gpu_hours"] == 1.0
-    assert done["estimated_cost_usd"] == 0
+    check(done, "Job")
+    assert done["gpu_hours"] == 1.0  # still exact
+    assert done["estimated_cost_usd"] is None
+
+
+def test_local_cpu_really_is_free(client, clock):
+    job_id = submit(client, ONE_GPU)["job_id"]
+    start(client, job_id, machine_type="local-cpu")
+    clock.advance(3600)
+
+    assert report(client, job_id, "SUCCEEDED", reported_by="worker").json()["estimated_cost_usd"] == 0
+
+
+def test_no_machine_reported_means_unknown_cost(client, clock):
+    job_id = submit(client, ONE_GPU)["job_id"]
+    report(client, job_id, "SCHEDULED")  # an old Scheduler that sends no machine_type
+    report(client, job_id, "RUNNING")
+    clock.advance(600)
+
+    assert job(client, job_id)["estimated_cost_usd"] is None
+
+
+def test_one_unknown_attempt_makes_the_total_unknown(client, clock):
+    """Attempt 1 on a priced machine, attempt 2 on an unpriced one: a partial sum would be wrong."""
+    job_id = submit(client, ONE_GPU)["job_id"]
+    start(client, job_id, machine_type="g4dn.xlarge")
+    clock.advance(121)
+    sweep(client)
+    start(client, job_id, machine_type="p5.48xlarge")
+    clock.advance(600)
+
+    done = report(client, job_id, "SUCCEEDED", reported_by="worker").json()
+
+    assert done["estimated_cost_usd"] is None
+    assert done["gpu_hours"] > 0
+
+
+def test_a_missing_pricing_file_says_how_to_fix_it(tmp_path):
+    """On AWS nothing is mounted: if the file is not in the image, the start-up error must say why."""
+    import pytest
+
+    from app.pricing import Pricing
+
+    with pytest.raises(FileNotFoundError, match="build-context contracts=contracts"):
+        Pricing.from_file(tmp_path / "pricing.yaml")
