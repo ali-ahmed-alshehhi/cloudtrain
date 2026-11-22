@@ -21,6 +21,10 @@ class StorageUnavailable(Exception):
     """Raised when object storage cannot be reached or fails a read/write."""
 
 
+class StorageObjectMissing(Exception):
+    """Raised when storage is reachable but the file is not there (e.g. LocalStack was restarted)."""
+
+
 def storage_uri(bucket: str, dataset_id: str, version: int) -> str:
     return f"s3://{bucket}/{dataset_id}/v{version}/"
 
@@ -63,6 +67,8 @@ class MemoryStorage:
 
     def get(self, key: str) -> bytes:
         self._maybe_fail()
+        if key not in self.objects:
+            raise StorageObjectMissing(key)
         return self.objects[key]
 
     def presigned_get(self, key: str, expires_seconds: int = 900) -> PresignedDownload:
@@ -103,7 +109,11 @@ class S3Storage:
         try:
             response = self.client.get_object(Bucket=self.bucket, Key=key)
             return response["Body"].read()
-        except (ClientError, EndpointConnectionError, BotoCoreError) as error:
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+                raise StorageObjectMissing(key) from error
+            raise StorageUnavailable("Object storage is not reachable") from error
+        except (EndpointConnectionError, BotoCoreError) as error:
             raise StorageUnavailable("Object storage is not reachable") from error
 
     def presigned_get(self, key: str, expires_seconds: int = 900) -> PresignedDownload:
