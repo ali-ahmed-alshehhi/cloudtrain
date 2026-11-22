@@ -1,0 +1,261 @@
+# Deploy — owner: Salem (Student 9), task #54. Rules: security/DEPLOYMENT_POLICY.md
+#
+#   1. Staging     automatic after the images of a commit on main are pushed (images.yml):
+#                  deploy that commit, then a smoke test runs THOSE images with the demo tests.
+#   2. Production  the same images, only after a reviewer approves the "production" environment.
+#   3. Rollback    Actions -> Deploy -> Run workflow -> rollback: production goes back to the
+#                  previous version it ran. Nothing is rebuilt (images are kept per commit).
+#
+# Where: today the AWS Emulator (decision 0011). Each job starts the emulator and builds the dev
+# environment with Hamda + Fatma's Terraform, so staging and production are two separate runs of
+# it, told apart by the approval gate. With an AWS account (repository variables
+# AWS_DEPLOY_ROLE_ARN, STAGING_CLUSTER, PRODUCTION_CLUSTER) the same jobs sign in with GitHub OIDC
+# and deploy to the real clusters, and ECS waits until every service passes its /health check.
+name: Deploy
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && inputs.rollback && 'Rollback production' ||
+      format('Deploy {0}', github.event_name == 'pull_request' && 'test' ||
+                           github.event_name == 'workflow_run' && 'after Images' || 'by hand') }}
+
+on:
+  workflow_run:
+    workflows: [Images]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Image tag to deploy (7-character commit). Empty = the latest images of main."
+        required: false
+        default: ""
+      rollback:
+        description: "Roll production back to the version it ran before (ignores the commit)."
+        type: boolean
+        default: false
+  pull_request: # testing this workflow: staging only, never production
+    paths:
+      - ".github/workflows/deploy.yml"
+      - ".github/deploy/**"
+
+permissions:
+  contents: read
+  actions: read # find the latest images and the previous production version
+
+concurrency:
+  group: deploy-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false # never stop a deploy halfway
+
+env:
+  AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+jobs:
+  plan:
+    name: Which version
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+      prefix: ${{ steps.pick.outputs.prefix }}
+      rollback: ${{ steps.pick.outputs.rollback }}
+    steps:
+      - name: Pick the image tag
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          COMMIT: ${{ inputs.commit }}
+          ROLLBACK: ${{ inputs.rollback }}
+        run: |
+          repo=$GITHUB_REPOSITORY
+          owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          echo "prefix=ghcr.io/$owner/cloudtrain" >> "$GITHUB_OUTPUT"
+          latest_images() {
+            gh api "repos/$repo/actions/workflows/images.yml/runs?branch=main&status=success&per_page=1" \
+              --jq '.workflow_runs[0].head_sha[0:7]'
+          }
+          # Versions production ran, newest first: the job names say "Production (<tag>)"
+          production_history() {
+            for run in $(gh api "repos/$repo/actions/workflows/deploy.yml/runs?status=success&per_page=30" --jq '.workflow_runs[].id'); do
+              gh api "repos/$repo/actions/runs/$run/jobs" \
+                --jq '.jobs[] | select(.conclusion == "success") | .name | capture("^Production \\((?<tag>[0-9a-f]{7})\\)$").tag' || true
+            done
+          }
+          rollback=false
+          if [ "$EVENT" = "workflow_run" ]; then
+            tag=${RUN_SHA:0:7}
+          elif [ "$EVENT" = "workflow_dispatch" ] && [ "$ROLLBACK" = "true" ]; then
+            history=$(production_history | awk '!seen[$0]++')
+            current=$(echo "$history" | sed -n 1p)
+            tag=$(echo "$history" | sed -n 2p)
+            if [ -z "$tag" ]; then echo "::error::No earlier production version to roll back to."; exit 1; fi
+            echo "Production runs $current now; rolling back to $tag."
+            rollback=true
+          elif [ -n "$COMMIT" ]; then
+            tag=${COMMIT:0:7}
+          else
+            tag=$(latest_images)
+          fi
+          [[ "$tag" =~ ^[0-9a-f]{7}$ ]] || { echo "::error::Not an image tag: '$tag'"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "rollback=$rollback" >> "$GITHUB_OUTPUT"
+          echo "### Version: \`$tag\`$([ "$rollback" = true ] && echo ' (rollback)')" >> "$GITHUB_STEP_SUMMARY"
+
+  staging:
+    name: Staging (${{ needs.plan.outputs.tag }})
+    needs: plan
+    if: needs.plan.outputs.rollback != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    permissions:
+      contents: read
+      packages: read # pull the images for the smoke test
+      id-token: write # GitHub OIDC, only with an AWS account
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+      PREFIX: ${{ needs.plan.outputs.prefix }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: hashicorp/setup-terraform@v3
+        if: env.AWS_DEPLOY_ROLE_ARN == ''
+        with:
+          terraform_wrapper: false
+
+      - name: 1. AWS Emulator and the dev environment (Terraform)
+        if: env.AWS_DEPLOY_ROLE_ARN == ''
+        working-directory: infrastructure
+        run: |
+          mkdir -p ~/.aws/emulator && chmod 777 ~/.aws/emulator
+          docker compose -f docker-compose.emulator.yml up -d --build
+          # The emulator runs as user 1000 and writes private files; the GitHub runner is user 1001
+          for _ in $(seq 1 90); do sudo test -f ~/.aws/emulator/9297/ca.pem && break; sleep 2; done
+          sudo chown -R "$(id -u):$(id -g)" ~/.aws/emulator
+          source scripts/emulator-env.sh
+          terraform init -input=false >/dev/null
+          terraform apply -input=false -auto-approve -var-file=environments/dev/emulator.tfvars.example >/dev/null
+          echo "CLUSTER=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_ENV"
+          echo "SERVICES=$(terraform output -json ecs_service_names | jq -r 'values | join(" ")')" >> "$GITHUB_ENV"
+
+      - name: 1. Sign in to AWS with GitHub OIDC (only with an AWS account)
+        if: env.AWS_DEPLOY_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 2. Deploy to staging
+        env:
+          STAGING_CLUSTER: ${{ vars.STAGING_CLUSTER }}
+        run: |
+          if [ -n "$AWS_DEPLOY_ROLE_ARN" ]; then
+            CLUSTER=$STAGING_CLUSTER
+            SERVICES=$(aws ecs list-services --cluster "$CLUSTER" --query 'serviceArns[]' --output text | tr '\t' '\n' | awk -F/ '{print $NF}' | tr '\n' ' ')
+            export WAIT=1
+          else
+            source infrastructure/scripts/emulator-env.sh
+          fi
+          echo "## Staging: \`$CLUSTER\`" >> "$GITHUB_STEP_SUMMARY"
+          .github/deploy/deploy.sh "$CLUSTER" "$PREFIX" "$TAG" $SERVICES
+
+      - name: 3. Smoke test the deployed images (the demo walk-through)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # Run exactly the images that were just deployed, not a fresh build
+          python3 - "$PREFIX" "$TAG" > deployed-images.yml <<'PY'
+          import sys
+          prefix, tag = sys.argv[1:]
+          services = ["gateway", "project-service", "dataset-service", "job-service", "scheduler",
+                      "training-worker", "model-registry", "inference-service", "portal", "mlflow"]
+          print("services:")
+          for s in services:
+              print(f"  {s}:\n    image: {prefix}/{s}:{tag}\n    pull_policy: always")
+          PY
+          cp .env.example .env
+          docker compose -f docker-compose.yml -f deployed-images.yml up -d --no-build --wait
+          make e2e PYTHON=python
+          echo "Smoke test passed on the images \`$TAG\`." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 4. Rollback drill (pull requests only)
+        if: github.event_name == 'pull_request' && env.AWS_DEPLOY_ROLE_ARN == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source infrastructure/scripts/emulator-env.sh
+          # The images of an older commit on main, then back to the current one
+          older=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/images.yml/runs?branch=main&status=success&per_page=5" \
+            --jq '[.workflow_runs[].head_sha[0:7]] | map(select(. != "'"$TAG"'")) | .[0]')
+          echo "## Rollback drill: \`$TAG\` → \`$older\` → \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          .github/deploy/deploy.sh "$CLUSTER" "$PREFIX" "$older" $SERVICES
+          .github/deploy/deploy.sh "$CLUSTER" "$PREFIX" "$TAG" $SERVICES
+
+      - name: Logs (only when something failed)
+        if: failure()
+        run: docker compose -f docker-compose.yml -f deployed-images.yml logs --tail 40 || true
+
+  production:
+    name: Production (${{ needs.plan.outputs.tag }})
+    needs: [plan, staging]
+    # After staging passed, or straight away for a rollback. Never from a pull request.
+    if: >-
+      always() && github.event_name != 'pull_request' && needs.plan.result == 'success' &&
+      (needs.staging.result == 'success' || needs.plan.outputs.rollback == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production # required reviewers: the run waits here until someone approves
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+      PREFIX: ${{ needs.plan.outputs.prefix }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+        if: env.AWS_DEPLOY_ROLE_ARN == ''
+        with:
+          terraform_wrapper: false
+
+      - name: 1. AWS Emulator and the dev environment (Terraform)
+        if: env.AWS_DEPLOY_ROLE_ARN == ''
+        working-directory: infrastructure
+        run: |
+          mkdir -p ~/.aws/emulator && chmod 777 ~/.aws/emulator
+          docker compose -f docker-compose.emulator.yml up -d --build
+          for _ in $(seq 1 90); do sudo test -f ~/.aws/emulator/9297/ca.pem && break; sleep 2; done
+          sudo chown -R "$(id -u):$(id -g)" ~/.aws/emulator
+          source scripts/emulator-env.sh
+          terraform init -input=false >/dev/null
+          terraform apply -input=false -auto-approve -var-file=environments/dev/emulator.tfvars.example >/dev/null
+          echo "CLUSTER=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_ENV"
+          echo "SERVICES=$(terraform output -json ecs_service_names | jq -r 'values | join(" ")')" >> "$GITHUB_ENV"
+
+      - name: 1. Sign in to AWS with GitHub OIDC (only with an AWS account)
+        if: env.AWS_DEPLOY_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 2. Deploy to production
+        env:
+          PRODUCTION_CLUSTER: ${{ vars.PRODUCTION_CLUSTER }}
+        run: |
+          if [ -n "$AWS_DEPLOY_ROLE_ARN" ]; then
+            CLUSTER=$PRODUCTION_CLUSTER
+            SERVICES=$(aws ecs list-services --cluster "$CLUSTER" --query 'serviceArns[]' --output text | tr '\t' '\n' | awk -F/ '{print $NF}' | tr '\n' ' ')
+            export WAIT=1
+          else
+            source infrastructure/scripts/emulator-env.sh
+          fi
+          echo "## Production: \`$CLUSTER\`$([ '${{ needs.plan.outputs.rollback }}' = true ] && echo ' (rollback)')" >> "$GITHUB_STEP_SUMMARY"
+          .github/deploy/deploy.sh "$CLUSTER" "$PREFIX" "$TAG" $SERVICES
+          {
+            echo
+            echo "To roll back: **Actions → Deploy → Run workflow → rollback**."
+          } >> "$GITHUB_STEP_SUMMARY"
