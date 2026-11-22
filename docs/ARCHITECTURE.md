@@ -159,7 +159,7 @@ flowchart TB
 | `/api/v1/users/me`, `/api/v1/projects/*` | `http://project-service:8001` (strip `/api/v1`) | all |
 | `/api/v1/datasets/*` | `http://dataset-service:8002` (strip `/api/v1`) | all |
 | `/api/v1/jobs/*` | `http://job-service:8003` (strip `/api/v1`) | all |
-| `/api/v1/experiments/*` | `http://mlflow:5000/api/2.0/mlflow/*` (**rewrite**) | GET, plus POST on paths ending in `/search` only |
+| `/api/v1/experiments/*` | `http://mlflow:5000/api/2.0/mlflow/*` (**rewrite**) | GET, plus POST on paths ending in `/search` only; runs only for members of the run's project (#107) |
 | `/api/v1/models/*` | `http://model-registry:8006` (strip `/api/v1`) | all |
 | `/api/v1/predict/*` | `http://inference-service:8007` (strip `/api/v1`) | all |
 | `/health`, `/metrics` | the gateway itself | GET |
