@@ -28,6 +28,23 @@ has a fix, and pushes each one tagged with its commit (`gateway:4999c59`) on eve
   same workflow signs in with GitHub OIDC and pushes to ECR (`cloudtrain/dev/<service>`). Nothing
   else changes.
 
+## The deploy pipeline (task #54)
+`.github/workflows/deploy.yml` with `.github/deploy/deploy.sh`:
+
+1. **Staging**, automatically after `images.yml` pushed a commit's images on `main`: copy each
+   service's running task definition, change **only** the image to `<service>:<commit>`, register
+   it as a new revision and switch the service. Then a **smoke test** runs those exact images with
+   the demo walk-through (`make e2e`).
+2. **Production**, the same images, after a reviewer approves the GitHub environment
+   `production` (Settings → Environments → production → Required reviewers: Ali, Salem).
+3. **Rollback**, see below.
+
+Today it runs on the AWS Emulator (decision 0011): each job starts the emulator and builds the dev
+environment with Terraform, so staging and production are separate runs of it, told apart by the
+approval gate; services run no tasks there (`ecs_desired_count = 0`). With an AWS account, set the
+repository variables `AWS_DEPLOY_ROLE_ARN`, `STAGING_CLUSTER` and `PRODUCTION_CLUSTER`: the same
+jobs sign in with GitHub OIDC and wait until every service passes its `/health` check.
+
 ## Rules
 1. **Nobody deploys from a laptop** to staging or production. Only the pipeline does, with a GitHub
    OIDC role: GitHub stores **no AWS keys**.
@@ -44,8 +61,10 @@ has a fix, and pushes each one tagged with its commit (`gateway:4999c59`) on eve
 - **Old images must still exist.** ECR keeps every image under its commit tag. Its cleanup rule
   (lifecycle policy, in Terraform by Hamda + Fatma) keeps the **last 20 images of each service** and
   deletes only older ones, so there is always something to roll back to.
-- **Manual (one click):** GitHub → Actions → *Deploy* → *Run workflow* → choose the environment and
-  the last good commit. The pipeline redeploys those images; nothing is rebuilt.
+- **Manual (one click):** GitHub → Actions → *Deploy* → *Run workflow* → tick **rollback**. The
+  pipeline finds the version production ran before (each production job is named
+  `Production (<commit>)`), waits for the usual approval, and redeploys those images; nothing is
+  rebuilt. To deploy any other version, enter its commit instead.
 - **Models** are separate: Majed's model registry keeps the previous live version and switches back
   (Student 8 acceptance test). A code rollback does not change the live model.
 - After any rollback: open a `bug` issue with what failed and link the run.
