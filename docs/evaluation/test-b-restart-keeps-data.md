@@ -122,3 +122,6 @@ SAME: every record survived the restart
 after `make down` + `make up`: all live in PostgreSQL (`postgres-data` volume). The 6 jobs were run by the
 **stand-in worker** of the walk-through (`make e2e`), not by real training. Not covered yet: model records and
 MLflow runs (none exist until real training, #93), and files in S3 (lost locally, Part 1).
+
+**Update 22 Nov:** the side finding above was reported as #126 and fixed in #142 (Faisal): a missing file now
+answers `404 DATASET_FILE_MISSING` ("The file of … is missing from storage"); 503 stays for real connection errors.

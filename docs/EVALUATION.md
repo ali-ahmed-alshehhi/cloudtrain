@@ -18,7 +18,7 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 
 | | Value |
 |---|---|
-| Where everything runs | Docker Compose on a laptop (`make up`): 12 containers, i.e. the 9 CloudTrain services plus Postgres, LocalStack (S3, SQS) and MLflow; 15 with the monitoring stack (#115) |
+| Where everything runs | Docker Compose on a laptop (`make up`): 12 containers, i.e. the 9 CloudTrain services plus Postgres, LocalStack (S3, SQS) and MLflow; 15 with the monitoring stack (#115, on `main` since 22 Nov) |
 | Laptop used for Tests A, B and C | MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM, macOS 27.2.1; Docker Engine 29.9.2 and Docker Compose v5.6.1, with 7.7 GiB of memory for the containers |
 | "Cloud" | The AWS Emulator with the same Terraform ([decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md), merged in #112): checks the infrastructure, runs no real machines |
 | GPUs | Real GPU runs only on a team workstation (Ahmed + Abdulla, `docs/BENCHMARKS.md`). No cloud GPU |
@@ -46,7 +46,7 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 | A service stopped or too slow | The gateway answers 503 in the shared error format, nothing hangs; alert `CloudTrainServiceDown` after 1 min | ✅ Measured in Compose: Projects (19 Nov, `f8d8dab`), then datasets, jobs, models and MLflow (21 Nov, `b404125`). ✅ Alert in Compose (20 Nov, #115 at `aa6cc8b`): pending after 26–31 s, **firing after 83–88 s** (rule: 1 min, checks every 15 s), cleared 26–31 s after the restart | **Stopped:** 503 × 5, median 4.1 ms, `SERVICE_UNAVAILABLE` + `request_id`; gateway `/health` stays 200. **Frozen:** 503 × 3 after 10.01 s (the 10 s timeout). **Back:** 200 on the first request, 4.7 ms median, no restart. Normal: 7.2 ms median. **The same for datasets, jobs, models and MLflow:** stopped 503 in 6–29 ms, frozen 503 after 10.004–10.007 s, back 200 at once | [`docs/evaluation/test-a-service-stopped-or-frozen.md`](evaluation/test-a-service-stopped-or-frozen.md), [`docs/evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) (alert), `gateway/tests/test_gateway.py::test_503_when_a_service_is_down_or_slow` |
 | Duplicate or out-of-order job events | Counted once; durations right in any order (at-least-once SQS, confirmed by Mariam on #109) | 🧪 Tested, including a recording of what job-service sends | | `monitoring/job-events-monitor/tests/` |
 | Portal when the gateway or a service is down | Clear message, retries with back-off (alerts 10 s → 60 s), never another project's or job's data | 🧪 Tested (portal unit tests, Chrome checks with FIXTURE pages) | | `portal/test/`, #96, #98, #100, #117 |
-| Restarting containers keeps data | Datasets, models, experiments and job records still there after `make down && make up` | ✅ Measured locally: projects and datasets (19 Nov, `f8d8dab`); all 20 projects, 6 jobs with their status, 25 dataset records and the MLflow experiment list (21 Nov, `b404125`). ⏳ Models and MLflow runs: none exist until real training (#93) | **Records (PostgreSQL): kept**: identical lists before and after (projects, jobs and their status, datasets, MLflow experiments). **Files (LocalStack S3): lost**, the download answers 503, as [decision 0005](decisions/0005-localstack-for-s3.md) says (free LocalStack keeps S3 in memory; real S3 in the cloud is not affected). The 503 says "Object storage is not reachable" although only the file is missing (#126, Faisal) | [`docs/evaluation/test-b-restart-keeps-data.md`](evaluation/test-b-restart-keeps-data.md) |
+| Restarting containers keeps data | Datasets, models, experiments and job records still there after `make down && make up` | ✅ Measured locally: projects and datasets (19 Nov, `f8d8dab`); all 20 projects, 6 jobs with their status, 25 dataset records and the MLflow experiment list (21 Nov, `b404125`). ⏳ Models and MLflow runs: none exist until real training (#93) | **Records (PostgreSQL): kept**: identical lists before and after (projects, jobs and their status, datasets, MLflow experiments). **Files (LocalStack S3): lost**, the download answers 503, as [decision 0005](decisions/0005-localstack-for-s3.md) says (free LocalStack keeps S3 in memory; real S3 in the cloud is not affected). On 19 Nov the answer was a misleading 503 "Object storage is not reachable" (#126); since #142 (Faisal, 22 Nov) it is 404 `DATASET_FILE_MISSING` | [`docs/evaluation/test-b-restart-keeps-data.md`](evaluation/test-b-restart-keeps-data.md) |
 
 ## 3. Scalability
 
@@ -84,7 +84,7 @@ All three are on `main` since 18 Nov.
 | What | Status | Evidence |
 |---|---|---|
 | Every service serves `/health` and `/metrics` | ✅ On `main` (shared service helper) | `*/app/common.py` |
-| `job-events` read by exactly one reader, metrics per attempt | 🧪 Tested (24 tests). ✅ Runs in Compose on #115 (not merged yet): Healthy in CI (`make up`, and the Real login job) and on a laptop, 20 Nov | #115 |
+| `job-events` read by exactly one reader, metrics per attempt | 🧪 Tested (24 tests). ✅ Runs in Compose (#115, merged 22 Nov): Healthy in CI (`make up`, and the Real login job) and on a laptop, 20 Nov | #115 |
 | Dashboard "CloudTrain overview", 5 alert rules | ✅ Seen working on a laptop (20 Nov, #115 at `3fbdf42`): all 10 services UP, 0 alerts firing, time since the last `job-events` read 0–20 s (the 20 s long poll; alert at 120 s). Job, queue and GPU panels say "No data yet" until a training job runs (#93). This first run found two display bugs (a "56 years" spike before the first read, a 10000% axis), fixed in `3fbdf42`. 🧪 Alert rules unit-tested with promtool | `monitoring/README.md` |
 | AWS side: CloudWatch dashboard and alarms in Terraform | ⏳ #134 (Fatma): log groups and 3 alarms, which match `monitoring/aws/README.md` (reviewed 20 Nov); the dashboard and the monitor-down alarm follow #115. On the emulator: setup only, no live data | #134 |
 
@@ -110,9 +110,9 @@ All three are on `main` since 18 Nov.
 Everything goes through the gateway (port 5810) with the local dev login, read from `.env`:
 
 ```bash
-make up                                   # 15 containers with #115 (12 without monitoring)
+make up                                   # 15 containers
 TOKEN=$(grep '^DEV_AUTH_TOKEN=' .env | cut -d= -f2); H="Authorization: Bearer $TOKEN"
-open http://localhost:3001                # Grafana, dashboard "CloudTrain overview" (needs #115)
+open http://localhost:3001                # Grafana, dashboard "CloudTrain overview"
 ```
 
 | Test | What it shows | Commands and raw output |
