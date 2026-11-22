@@ -1,0 +1,10 @@
+# Loads every dashboard JSON in /var/lib/grafana/dashboards into the "CloudTrain" folder, read-only.
+apiVersion: 1
+providers:
+  - name: cloudtrain
+    folder: CloudTrain
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

@@ -95,8 +95,10 @@ jobs:
           IMAGES: ${{ steps.changed.outputs.images }}
         run: |
           cp .env.example .env
-          # folder name -> docker-compose name (only the training folder differs)
-          read -ra names <<< "${SERVICES//training/training-worker} $IMAGES"
+          # folder name -> docker-compose name (only training and monitoring/job-events-monitor differ)
+          compose_names=${SERVICES//training/training-worker}
+          compose_names=${compose_names//monitoring\/job-events-monitor/job-events-monitor}
+          read -ra names <<< "$compose_names $IMAGES"
           if [ ${#names[@]} -gt 0 ]; then docker compose build "${names[@]}"; fi
 
       - name: 3. Start everything
