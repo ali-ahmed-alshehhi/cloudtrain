@@ -1,7 +1,7 @@
 # Evaluation: performance, reliability and cloud cost
 
 **Owners:** Hilal + Adel (Student 10). **Status on 22 Nov 2026: Tests A, B, C (speed, upload/download, alert),
-D (real training), E (alert delay in the portal), F (a burst of jobs) and G (prediction latency) measured on a laptop; GPU, prediction and worker-failure numbers still pending.** Every
+D (real training), E (alert delay in the portal), F (a burst of jobs), G (prediction latency) and H (worker killed mid-job) measured on a laptop; GPU, prediction and worker-failure numbers still pending.** Every
 ⏳ row names who it waits on and when. Final version: Fri 27 Nov.
 
 ## Headline results (so far)
@@ -16,11 +16,12 @@ speed. Each links to its row below and to the raw output.
 | Restart (`make down` + `make up`) | **records kept** (projects, jobs, datasets, MLflow experiments and runs); **local S3 files lost**, as decision 0005 expects (Test B) |
 | Dataset transfer | upload **154–161 MB/s**, download **253–270 MB/s** (medians of 3, 52 MB and 524 MB files; Test C) |
 | A burst of jobs | 3 jobs sent at once with one worker: waits **0.1 s, 300 s and 729 s** for about 4 s of training each. A job that finds the worker busy comes back only after the queue's 300 s visibility timeout; the cloud uses the same settings (Test F) |
+| Worker killed mid-job | detected in **about 5 s** (6 s timeout), retried at once, running again after **about 25 s** and finished, 3 of 3 runs (short test settings; Test H) |
 | Prediction | **p50 3.2 ms, p95 4.4 ms** through the gateway, 100 of 100 answered, with the walk-through's small test model: the platform's serving path, not a trained model (Test G) |
 | Alert delay in the portal | an alert is on the Projects page **2.3 s** (median) after the job event, never more than **5.0 s** (the page's 5 s poll); 40 of 40 alerts shown (Test E) |
 | 10 real training jobs | **10 of 10 succeeded**; time per job median **3.05 s** on the laptop CPU, with the walk-through's tiny 8-row CSV (platform overhead, not training on real data); queue wait average 36 ms (runs 1–3) (Test D) |
 | Cost | **$0 spent** (no AWS account, decision 0011). Local jobs run on `local-cpu`, priced $0. GPU costs in this report are estimates of what AWS would charge |
-| Still pending | 1 GPU vs 2-GPU DDP (Ahmed + Abdulla, Tue 24); worker-failure recovery times (Adel, 22–23 Nov) |
+| Still pending | 1 GPU vs 2-GPU DDP (Ahmed + Abdulla, Tue 24) |
 
 **How to read the status column**
 
@@ -38,7 +39,7 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 | | Value |
 |---|---|
 | Where everything runs | Docker Compose on a laptop (`make up`): 12 containers, i.e. the 9 CloudTrain services plus Postgres, LocalStack (S3, SQS) and MLflow; 15 with the monitoring stack (#115, on `main` since 22 Nov) |
-| Laptop used for Tests A to G | MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM, macOS 27.2.1; Docker Engine 29.9.2 and Docker Compose v5.6.1, with 7.7 GiB of memory for the containers |
+| Laptop used for Tests A to H | MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM, macOS 27.2.1; Docker Engine 29.9.2 and Docker Compose v5.6.1, with 7.7 GiB of memory for the containers |
 | "Cloud" | The AWS Emulator with the same Terraform ([decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md), merged in #112): checks the infrastructure, runs no real machines |
 | GPUs | Real GPU runs only on a team workstation (Ahmed + Abdulla, `docs/BENCHMARKS.md`). No cloud GPU |
 | Monitoring | Prometheus + Grafana dashboard "CloudTrain overview" and `job-events-monitor` (`monitoring/`, #115, #109) |
@@ -60,7 +61,7 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 
 | Scenario | Expected behaviour | Status | Result | Evidence |
 |---|---|---|---|---|
-| Worker killed mid-job | Heartbeat stops → FAILED after the timeout (120 s, 6 s in the demo settings) → retried → SUCCEEDED; time to detect and time to recover | 🧪 Tested in job-service (fake clock), and **end to end in CI** since #145 (Mariam, merged 22 Nov): the real worker is killed mid-job, the job is marked FAILED for its stopped heartbeat, retried, and finishes on attempt 2 (short heartbeat settings). That proves it works; it does not record how long each step takes. ⏳ The times: waiting on Adel, `docs/evaluation/recovery.py` on the laptop (22–23 Nov) | | `job-service/tests/test_recovery.py`, `tests/integration/test_failure_recovery.py` (runs in CI; on a laptop only with the short settings) |
+| Worker killed mid-job | Heartbeat stops → FAILED after the timeout (120 s, 6 s in the demo settings) → retried → SUCCEEDED; time to detect and time to recover | 🧪 Tested in job-service (fake clock), and **end to end in CI** since #145 (Mariam, merged 22 Nov): the real worker is killed mid-job, the job is marked FAILED for its stopped heartbeat, retried, and finishes on attempt 2 (short heartbeat settings). ✅ **Times measured on a laptop** (22 Nov, `1bb2326`, short settings: 6 s timeout, 20 s visibility), 3 runs | Marked FAILED **4.9–6.1 s** after the kill and retried at once; running again after **25–27 s** (about 20 s waiting, most likely the 20 s visibility timeout, as in #158); finished after 42.5–43.9 s; **3 of 3** on attempt 2. With the normal settings: about 2 min to detect and up to 5 min more (derived, not measured) | [`docs/evaluation/test-h-recovery.md`](evaluation/test-h-recovery.md) | `job-service/tests/test_recovery.py`, `tests/integration/test_failure_recovery.py` (runs in CI; on a laptop only with the short settings) |
 | Retries used up | FAILED for good and reported to the dead-letter queue; dashboard alert `CloudTrainDeadLetters` | 🧪 Tested (job-service, alert rule) | | `test_retries_used_up_stays_failed_and_reports_to_the_dlq`, `monitoring/prometheus/alerts.test.yml` |
 | A service stopped or too slow | The gateway answers 503 in the shared error format, nothing hangs; alert `CloudTrainServiceDown` after 1 min | ✅ Measured in Compose: Projects (19 Nov, `f8d8dab`), then datasets, jobs, models and MLflow (21 Nov, `b404125`). ✅ Alert in Compose (20 Nov, #115 at `aa6cc8b`): pending after 26–31 s, **firing after 83–88 s** (rule: 1 min, checks every 15 s), cleared 26–31 s after the restart | **Stopped:** 503 × 5, median 4.1 ms, `SERVICE_UNAVAILABLE` + `request_id`; gateway `/health` stays 200. **Frozen:** 503 × 3 after 10.01 s (the 10 s timeout). **Back:** 200 on the first request, 4.7 ms median, no restart. Normal: 7.2 ms median. **The same for datasets, jobs, models and MLflow:** stopped 503 in 6–29 ms, frozen 503 after 10.004–10.007 s, back 200 at once | [`docs/evaluation/test-a-service-stopped-or-frozen.md`](evaluation/test-a-service-stopped-or-frozen.md), [`docs/evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) (alert), `gateway/tests/test_gateway.py::test_503_when_a_service_is_down_or_slow` |
 | Duplicate or out-of-order job events | Counted once; durations right in any order (at-least-once SQS, confirmed by Mariam on #109) | 🧪 Tested, including a recording of what job-service sends | | `monitoring/job-events-monitor/tests/` |
@@ -149,6 +150,7 @@ open http://localhost:3001                # Grafana, dashboard "CloudTrain overv
 | E | Alert delay: job event → alert on the Projects page, 10 jobs | [`evaluation/test-e-alert-delay.md`](evaluation/test-e-alert-delay.md) |
 | F | A burst of 3 jobs with one worker: wait in the queue per job | [`evaluation/test-f-burst.md`](evaluation/test-f-burst.md) |
 | G | Prediction latency through the gateway, 100 requests | [`evaluation/test-g-predict-latency.md`](evaluation/test-g-predict-latency.md) |
+| H | Worker killed mid-job: time to detect, retry and finish, 3 runs | [`evaluation/test-h-recovery.md`](evaluation/test-h-recovery.md) |
 
 The automatic checks behind the "🧪 Tested" lines:
 
@@ -163,7 +165,7 @@ cd portal && npm test                                       # portal unit tests
 
 | Who | Part of this evaluation |
 |---|---|
-| Adel | This report and its methods; Tests A to G on a laptop; the job-events reader, Prometheus alerts and Grafana dashboard (#115, contract #125, decision 0014 in #152); live job status and alerts (#96, #100), MLflow results (#98), cost views (#117), the 1-GPU vs multi-GPU comparison (#124) and their pages `/compare` and `/usage` (#156) in the portal. Problems found and reported while measuring: #126 (Faisal), #138 (Maitha, fixed in #139) |
+| Adel | This report and its methods; Tests A to H on a laptop; the job-events reader, Prometheus alerts and Grafana dashboard (#115, contract #125, decision 0014 in #152); live job status and alerts (#96, #100), MLflow results (#98), cost views (#117), the 1-GPU vs multi-GPU comparison (#124) and their pages `/compare` and `/usage` (#156) in the portal. Problems found and reported while measuring: #126 (Faisal), #138 (Maitha, fixed in #139) |
 | Hilal | Portal pages (#99: projects, datasets, job alerts on the Projects page) and their browser tests (functional checks, passing). ⏳ Browser timings: recorded here once measured |
 | Ahmed + Abdulla | GPU benchmarks (`docs/BENCHMARKS.md`) |
 | Mariam | Job timings, retries and cost fields (Training Jobs) |
