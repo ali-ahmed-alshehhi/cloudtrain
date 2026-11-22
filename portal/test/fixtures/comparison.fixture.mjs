@@ -9,14 +9,15 @@ const param = (key, value) => ({ key, value: String(value) });
 
 export function comparisonRun({ runId, jobId, gpus, strategy = gpus === 1 ? "single" : "ddp", accuracy = 0.74,
   start = 1795000000000, totalSeconds = 30, epochs = 3, batch = 128, model = "resnet18", project = "project-01",
-  status = "FINISHED" }) {
+  status = "FINISHED", resultLabel = "FIXTURE, not a real run" }) {
   return {
     info: { run_id: runId, run_name: `${jobId}-attempt`, experiment_id: "1", status, start_time: start, end_time: start + totalSeconds * 1000 },
     data: {
       metrics: [{ key: "final_accuracy", value: accuracy, step: 0, timestamp: start }],
       params: [param("model", model), param("dataset_id", "dataset-1"), param("dataset_version", 1), param("epochs", epochs),
         param("batch_size", batch), param("learning_rate", 0.05), param("strategy", strategy), param("world_size", gpus)],
-      tags: [tag("job_id", jobId), tag("project_id", project), tag("strategy", strategy), tag("world_size", gpus), tag("model", model)],
+      tags: [tag("job_id", jobId), tag("project_id", project), tag("strategy", strategy), tag("world_size", gpus), tag("model", model),
+        ...(resultLabel === null ? [] : [tag("result_label", resultLabel)])],
     },
   };
 }

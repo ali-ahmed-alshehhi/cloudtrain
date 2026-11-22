@@ -5,6 +5,7 @@ import {
   COMPARE_STATES,
   EPOCH_IMAGES,
   EPOCH_SECONDS,
+  RESULT_LABEL,
   comparisonMessage,
   formatEfficiency,
   formatSeconds,
@@ -80,6 +81,32 @@ test("1 GPU vs 2 GPUs: mean of repeats, speedup and efficiency against the 1-GPU
   close(two.accuracy, 0.74);
   close(two.gpuHours, (0.0111 + 0.0122) / 2, 6);
   close(two.cost, (0.0217 + 0.0239) / 2, 6);
+  assert.deepEqual([one.labels, two.labels], [["FIXTURE, not a real run"], ["FIXTURE, not a real run"]]);
+});
+
+test("where a result ran comes from its result_label tag, and a missing label is said out loud", async () => {
+  assert.equal(RESULT_LABEL, "result_label");
+  const runs = FIXTURE_COMPARISON.runs.map((run) =>
+    run.info.run_id === "r-2gpu-b" ? { ...run, data: { ...run.data, tags: run.data.tags.filter((t) => t.key !== RESULT_LABEL) } } : run,
+  );
+  const { experimentsApi, jobsApi } = apis({ runs });
+  const [group] = (await loadComparison({ experimentsApi, jobsApi, projectId: "project-01" })).groups;
+  const two = group.rows.find((r) => r.gpus === 2);
+  assert.deepEqual([two.labels, two.unlabelled], [["FIXTURE, not a real run"], 1]);
+  assert.match(group.problems.join(" "), /1 of 4 runs do not say where they ran \(MLflow tag "result_label"\)/);
+  assert.doesNotMatch(group.problems.join(" "), /different places/);
+});
+
+test("runs from different places are flagged, so the speedup is not read as like for like", async () => {
+  const placed = (run, label) => ({ ...run, data: { ...run.data, tags: run.data.tags.map((t) => (t.key === RESULT_LABEL ? { ...t, value: label } : t)) } });
+  const runs = FIXTURE_COMPARISON.runs.map((run) =>
+    placed(run, run.info.run_id.startsWith("r-1gpu") ? "2 processes on CPU, local stack" : "measured on Kaggle 2x T4, not on AWS"),
+  );
+  const { experimentsApi, jobsApi } = apis({ runs });
+  const [group] = (await loadComparison({ experimentsApi, jobsApi, projectId: "project-01" })).groups;
+  assert.deepEqual(group.rows.map((r) => r.labels), [["2 processes on CPU, local stack"], ["measured on Kaggle 2x T4, not on AWS"]]);
+  assert.match(group.problems.join(" "), /ran in different places \(2 processes on CPU, local stack; measured on Kaggle 2x T4, not on AWS\)/);
+  assert.doesNotMatch(group.problems.join(" "), /do not say where/);
 });
 
 test("runs without per-epoch timing: no speedup, a clear note, the known columns still shown", async () => {
