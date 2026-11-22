@@ -252,3 +252,72 @@ def test_an_unreachable_worker_frees_the_slot():
 
     assert scheduler.capacity.active_count == 0  # the slot is free again
     assert sqs.deleted == []  # the message stays, so the job is placed when the worker is back
+
+
+# ---------- worker routing (#41): jobs go to the right worker URL ----------
+
+
+def test_worker_routing_uses_per_machine_url():
+    """When TRAINING_WORKER_URLS maps a machine type, the scheduler posts to that URL."""
+    import os
+
+    old_env = os.environ.get("ENVIRONMENT")
+    old_urls = os.environ.get("TRAINING_WORKER_URLS")
+    os.environ["ENVIRONMENT"] = "cloud"
+    os.environ["TRAINING_WORKER_URLS"] = json.dumps({"g4dn.xlarge": "http://gpu-lb:8010"})
+    try:
+        gpu_form = {
+            **FORM,
+            "job_id": "job-gpu",
+            "resources": {"gpu_count": 1, "cpu_cores": 2, "memory_gb": 4},
+        }
+
+        class RoutingServices(FakeServices):
+            def handle(self, request):
+                if request.method == "GET":
+                    return super().handle(request)
+                body = json.loads(request.content)
+                self.calls.append((str(request.url), body))
+                if "gpu-lb" in str(request.url) or "training-worker" in str(request.url):
+                    return httpx.Response(self.worker_answers.pop(0), json={})
+                return httpx.Response(self.job_answers.pop(0), json={})
+
+        sqs = FakeSqs([gpu_form])
+        services = RoutingServices(job_answers=(200, 200), worker_answers=(202,))
+        app = create_app(sqs=sqs, transport=httpx.MockTransport(services.handle), start_loop=False)
+        app.state.scheduler.read_queue_once()
+
+        worker_calls = [url for url, _ in services.calls if "gpu-lb" in url]
+        assert len(worker_calls) == 1
+        assert "/internal/run" in worker_calls[0]
+    finally:
+        if old_env is None:
+            os.environ.pop("ENVIRONMENT", None)
+        else:
+            os.environ["ENVIRONMENT"] = old_env
+        if old_urls is None:
+            os.environ.pop("TRAINING_WORKER_URLS", None)
+        else:
+            os.environ["TRAINING_WORKER_URLS"] = old_urls
+
+
+def test_worker_routing_falls_back_to_default():
+    """A machine type not in TRAINING_WORKER_URLS uses the default TRAINING_WORKER_URL."""
+    import os
+
+    old_urls = os.environ.get("TRAINING_WORKER_URLS")
+    os.environ["TRAINING_WORKER_URLS"] = json.dumps({"g4dn.xlarge": "http://gpu-lb:8010"})
+    try:
+        sqs = FakeSqs([FORM])  # FORM has gpu_count=0 -> local-cpu -> not in TRAINING_WORKER_URLS
+        services = FakeServices(job_answers=(200, 200), worker_answers=(202,))
+        app = create_app(sqs=sqs, transport=httpx.MockTransport(services.handle), start_loop=False)
+        app.state.scheduler.read_queue_once()
+
+        worker_calls = [path for path, _ in services.calls if "/internal/run" in path]
+        assert len(worker_calls) == 1
+        assert sqs.deleted == ["r0"]
+    finally:
+        if old_urls is None:
+            os.environ.pop("TRAINING_WORKER_URLS", None)
+        else:
+            os.environ["TRAINING_WORKER_URLS"] = old_urls
