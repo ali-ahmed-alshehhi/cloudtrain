@@ -97,7 +97,7 @@ All three are on `main` since 18 Nov.
 - **Test A covers 5 services** (projects, datasets, jobs, models, MLflow). Not tested: `predict` and the
   upload routes, which wait up to 300 s (`GATEWAY_UPLOAD_TIMEOUT_SECONDS`) before 503.
 - **Locally, uploaded files do not survive a restart** (Test B, decision 0005): after `make down` +
-  `make up`, datasets must be uploaded again. For the demo: no restart between uploading and showing.
+  `make up`, datasets must be uploaded again before training on them.
 - **LocalStack serves both S3 and SQS on the laptop.** During the 500 MB uploads (Test C) the time since the
   last `job-events` read rose to about 55 s on the dashboard (normally 0–20 s), still under the 120 s alert.
   In the cloud, S3 and SQS are separate services.
