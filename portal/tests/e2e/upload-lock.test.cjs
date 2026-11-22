@@ -14,6 +14,7 @@ test('pending dataset and version uploads keep project and retry identity alive'
     const dataset = { dataset_id: 'fixture-data', project_id: 'fixture-a', name: 'Fixture data', format: 'csv', latest_version: 1 };
     await page.route('**/api/v1/**', async route => {
       const request = route.request();
+      assert.ok(request.headers()["authorization"]?.startsWith("Bearer "), "local page must send the dev session token");
       const url = new URL(request.url());
       let body;
       if (request.method() === 'POST') {
