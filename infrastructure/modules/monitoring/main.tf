@@ -69,18 +69,33 @@ resource "aws_cloudwatch_metric_alarm" "server_errors" {
   treat_missing_data  = "notBreaching"
   alarm_actions       = var.alarm_actions
 
+  # IF/FILL are CloudWatch's documented metric-math functions (Adil, #134): no division by zero,
+  # and a minute with no 5xx (no data point) counts as 0.
   metric_query {
     id          = "error_rate"
-    expression  = "100 * errors / MAX([requests, 1])"
+    expression  = "IF(requests > 0, 100 * (FILL(target_errors, 0) + FILL(elb_errors, 0)) / requests, 0)"
     label       = "5xx percent"
     return_data = true
   }
 
+  # 5xx answered by the services behind the load balancer.
   metric_query {
-    id = "errors"
+    id = "target_errors"
     metric {
       namespace   = "AWS/ApplicationELB"
       metric_name = "HTTPCode_Target_5XX_Count"
+      dimensions  = { LoadBalancer = var.alb_arn_suffix }
+      stat        = "Sum"
+      period      = 60
+    }
+  }
+
+  # 5xx the load balancer answers itself, for example when no gateway task is healthy.
+  metric_query {
+    id = "elb_errors"
+    metric {
+      namespace   = "AWS/ApplicationELB"
+      metric_name = "HTTPCode_ELB_5XX_Count"
       dimensions  = { LoadBalancer = var.alb_arn_suffix }
       stat        = "Sum"
       period      = 60
