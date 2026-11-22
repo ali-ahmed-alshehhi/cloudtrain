@@ -1,10 +1,8 @@
 """Test B, part 3: what survives `make down` + `make up`, now including models and MLflow runs. Owner: Adel.
 
-Prints, through the gateway, two sections that are compared before and after the restart:
-  RECORDS  projects with their jobs and number of datasets, registered models, MLflow experiments and runs
-           (all in PostgreSQL: expected to survive)
-  FILES    how many files MLflow lists for each run (in LocalStack S3: expected to be lost locally,
-           decision 0005)
+Prints, through the gateway, the records that live in PostgreSQL: projects with their jobs and number of
+datasets, registered models, MLflow experiments and runs (status, job_id tag, accuracy). Run it before and
+after the restart and compare:
 
     export DEV_AUTH_TOKEN=$(grep '^DEV_AUTH_TOKEN=' .env | cut -d= -f2)
     python3 docs/evaluation/snapshot.py > /tmp/before.txt
@@ -12,13 +10,14 @@ Prints, through the gateway, two sections that are compared before and after the
     python3 docs/evaluation/snapshot.py > /tmp/after.txt
     diff /tmp/before.txt /tmp/after.txt
 
+It does not check model files: the 22 Nov version (c274c62) counted each run's own artifact list, which is
+empty in MLflow 3 (a logged model is kept apart from the run), so that section was removed.
 Standard library only; it only reads. GATEWAY_URL defaults to http://localhost:5810.
 """
 
 import json
 import os
 import sys
-import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -34,19 +33,6 @@ def call(path, body=None):
     )
     with urllib.request.urlopen(request, timeout=20) as answer:
         return json.load(answer)
-
-
-def answer_code(path):
-    """The error code of a failed read, e.g. '503 SERVICE_UNAVAILABLE', for the FILES section."""
-    try:
-        call(path)
-        return None
-    except urllib.error.HTTPError as error:
-        try:
-            code = json.load(error).get("error", {}).get("code", "")
-        except ValueError:
-            code = ""
-        return f"{error.code} {code}".strip()
 
 
 def main():
@@ -85,16 +71,6 @@ def main():
             "accuracy:",
             None if accuracy is None else round(accuracy, 4),
         )
-
-    print("== FILES (LocalStack S3)")
-    for run in sorted(runs, key=lambda r: r["info"]["run_id"]):
-        run_id = run["info"]["run_id"]
-        path = f"/api/v1/experiments/artifacts/list?{urllib.parse.urlencode({'run_id': run_id})}"
-        failure = answer_code(path)
-        if failure:
-            print(" ", run_id, "files: could not list,", failure)
-        else:
-            print(" ", run_id, "files:", len(call(path).get("files", [])))
 
 
 if __name__ == "__main__":

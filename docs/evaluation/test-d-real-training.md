@@ -3,8 +3,11 @@
 **Measured:** Sun 22 Nov 2026, 11:20–11:43 (UTC+4), by Adel on the laptop in section 0 of `EVALUATION.md`.
 **Versions:** `main` at `7b77c76`, with the real training worker (#93, Abdullah), the scheduler's machine types
 (#105, #139, Maitha) and the monitoring stack (#115). All 15 containers healthy after `make up`.
-**Workload:** the walk-through's job (steps 4–7): model `tabular_mlp` on the Wisconsin breast-cancer data
-(decision 0008), real training on the laptop CPU, metrics in MLflow, model saved to LocalStack S3.
+**Workload:** the walk-through's job (steps 4–7): model `tabular_mlp`, really trained on the laptop CPU (1 epoch),
+metrics in MLflow, model logged through MLflow. **The data is the walk-through's tiny 8-row CSV in the shape of
+the Wisconsin data** (`tiny_tabular_dataset()` in `tests/integration/conftest.py`), not the full Wisconsin
+breast-cancer dataset of decision 0008. *(Corrected on 22 Nov: this line first said "the Wisconsin
+breast-cancer data"; Test B part 3 showed the runs' accuracy is 0.5 on these 8 rows, which made it clear.)*
 
 ## 1. The walk-through, 10 times
 
@@ -93,5 +96,6 @@ this test. **`job-07` to `job-16` are today's 10 real training jobs.**
 | GPU-hours and estimated cost | 0.0 GPU-hours, **$0.00** for every job: the real price of `local-cpu` in `contracts/pricing.yaml`, not a missing value |
 | Jobs counted by the scheduler | 3 for runs 1–3, so the first jobs are counted (#138, fixed in #139) |
 
-Laptop CPU, small tabular model: these numbers show the platform's own overhead, not GPU training speed
-(that is `docs/BENCHMARKS.md`, Ahmed + Abdulla).
+Laptop CPU, small tabular model, 8 rows of data: these numbers show the platform's own overhead (queue,
+scheduling, start, MLflow logging), not training speed on real data and not GPU speed (that is
+`docs/BENCHMARKS.md`, Ahmed + Abdulla). The accuracy of these runs (0.5) says nothing about the model.
