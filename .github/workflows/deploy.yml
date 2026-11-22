@@ -177,6 +177,14 @@ jobs:
               print(f"  {s}:\n    image: {prefix}/{s}:{tag}\n    pull_policy: always")
           PY
           cp .env.example .env
+          # Containers that are not deployed images (e.g. the local job-events-monitor) are built here
+          extra=$(docker compose -f docker-compose.yml -f deployed-images.yml config --format json | python3 -c "
+          import json, sys
+          deployed = sys.argv[1]
+          services = json.load(sys.stdin)['services']
+          print(' '.join(n for n, s in services.items() if 'build' in s and not s.get('image', '').startswith(deployed)))
+          " "$PREFIX/")
+          if [ -n "$extra" ]; then echo "Built locally (not deployed): $extra"; docker compose build $extra; fi
           docker compose -f docker-compose.yml -f deployed-images.yml up -d --no-build --wait
           make e2e PYTHON=python
           echo "Smoke test passed on the images \`$TAG\`." >> "$GITHUB_STEP_SUMMARY"
