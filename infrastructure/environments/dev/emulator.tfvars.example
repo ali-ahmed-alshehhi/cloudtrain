@@ -38,6 +38,13 @@ enable_training_compute = true
 gpu_instance_type       = "g4dn.xlarge"
 worker_desired_capacity = 1
 
+# Multi-GPU workers (#36): g4dn.12xlarge (4 GPUs). 0 machines unless you scale it (demo 4).
+multi_gpu_instance_type    = "g4dn.12xlarge"
+multi_gpu_desired_capacity = 0
+
+# One internal load balancer per pool: worker_urls gives the Scheduler one address per machine type.
+enable_worker_load_balancers = true
+
 # One least-privilege task role per service, for ECS in #36.
 enable_service_roles = true
 

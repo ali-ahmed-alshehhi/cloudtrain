@@ -2,11 +2,14 @@
 
 Start everything first with `make up`. Settings come from the environment, or from .env:
   GATEWAY_URL     (default http://localhost:5810)
-  DEV_AUTH_TOKEN  the local test token (until Salem's real login is plugged in)
+  DEV_AUTH_TOKEN  the laptop dev token, used by `make up` (AUTH_MODE=dev)
+  LOGIN=real      log in for real instead: a Cognito ID token for test user Alice, from Salem's
+                  security/login on the AWS Emulator (`make e2e-login` sets this up)
 """
 
 import io
 import os
+import subprocess
 import tarfile
 import time
 from pathlib import Path
@@ -32,11 +35,26 @@ def setting(name: str, default: str = "") -> str:
     return default
 
 
+def real_login() -> bool:
+    return setting("LOGIN") == "real"
+
+
+def login_token() -> str:
+    """The token every test sends: a real Cognito ID token for Alice, or the laptop dev token."""
+    if not real_login():
+        return setting("DEV_AUTH_TOKEN")
+    script = REPO / "security" / "login" / "token.sh"
+    done = subprocess.run([str(script), "alice"], capture_output=True, text=True, timeout=60)
+    if done.returncode != 0:
+        pytest.exit(f"Real login failed ({done.stderr.strip()}). Run `make e2e-login`.", returncode=1)
+    return done.stdout.strip()
+
+
 @pytest.fixture(scope="session")
 def gateway() -> httpx.Client:
     """An HTTP client logged in through the gateway."""
     url = setting("GATEWAY_URL", "http://localhost:5810")
-    token = setting("DEV_AUTH_TOKEN")
+    token = login_token()
     with httpx.Client(base_url=url, headers={"Authorization": f"Bearer {token}"}, timeout=30) as client:
         try:
             client.get("/health").raise_for_status()
@@ -70,14 +88,37 @@ def tiny_image_dataset() -> bytes:
     return archive.getvalue()
 
 
+def tiny_tabular_dataset() -> bytes:
+    """A tiny Wisconsin-style CSV for the laptop/LocalStack walk-through."""
+    rows = ["radius,texture,perimeter,diagnosis"]
+    for value, label in (
+        (1.0, "B"),
+        (1.1, "B"),
+        (0.9, "B"),
+        (1.2, "B"),
+        (8.0, "M"),
+        (8.1, "M"),
+        (7.9, "M"),
+        (8.2, "M"),
+    ):
+        rows.append(f"{value},{value + 0.1},{value + 0.2},{label}")
+    return ("\n".join(rows) + "\n").encode()
+
+
 def small_job(project_id: str, dataset_id: str) -> dict:
     """A job form for the walk-through (CPU only, so it runs on a laptop)."""
     return {
         "project_id": project_id,
         "dataset_id": dataset_id,
         "dataset_version": 1,
-        "model": "resnet18",
-        "hyperparameters": {"epochs": 1, "batch_size": 32, "learning_rate": 0.001},
+        "model": "tabular_mlp",
+        "hyperparameters": {
+            "epochs": 1,
+            "batch_size": 4,
+            "learning_rate": 0.05,
+            "seed": 7,
+            "hidden_size": 8,
+        },
         "resources": {"gpu_count": 0, "cpu_cores": 2, "memory_gb": 4},
         "parallelism": {"strategy": "single", "world_size": 1},
         "execution": {"max_runtime_minutes": 10, "retry_limit": 2},

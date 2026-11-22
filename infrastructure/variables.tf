@@ -169,6 +169,30 @@ variable "enable_service_roles" {
   default     = false
 }
 
+variable "multi_gpu_instance_type" {
+  description = "Multi-GPU worker machine type (#36), a key of contracts/pricing.yaml. g4dn.12xlarge has 4 GPUs."
+  type        = string
+  default     = "g4dn.12xlarge"
+}
+
+variable "multi_gpu_desired_capacity" {
+  description = "How many multi-GPU workers run. Change it and re-apply to scale (demo 4). 0 = none."
+  type        = number
+  default     = 0
+}
+
+variable "multi_gpu_max_size" {
+  description = "Upper limit of multi-GPU workers (the most expensive machines: keep it low)."
+  type        = number
+  default     = 1
+}
+
+variable "enable_worker_load_balancers" {
+  description = "One internal load balancer per worker pool, so the Scheduler gets one address per machine type (worker_urls)."
+  type        = bool
+  default     = false
+}
+
 variable "enable_monitoring" {
   description = "Create the CloudWatch log groups (one per ECS service) and alarms."
   type        = bool
