@@ -50,7 +50,8 @@ the workers, and any of them can be down or late. These are the choices that kee
 7. **Not now (decided in #89): a way out of `QUEUED` and `SCHEDULED`.** Today the only
    exits are `RUNNING` and `CANCELLED`. A job whose queue message SQS moved to `training-jobs-dlq`
    is put back on the queue up to `JOB_DLQ_MAX_REQUEUES` times, then logged as an error and left
-   `QUEUED` (the user can cancel). A step `QUEUED`/`SCHEDULED` → `FAILED` ("could not be scheduled") was
+   where it is (the user can cancel). Since #167 this also covers a `SCHEDULED` job that no worker
+   ever took (no worker, no heartbeat): it stays `SCHEDULED`, so no new state is needed. A step `QUEUED`/`SCHEDULED` → `FAILED` ("could not be scheduled") was
    proposed; Ali decided the re-queue is enough for this project, to revisit with Maitha after the
    scheduler capacity work.
 

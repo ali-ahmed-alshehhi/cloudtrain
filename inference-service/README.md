@@ -24,6 +24,37 @@ from training and does not call MLflow while serving.
 
 **Calls:** `GET model-registry:8006/models/{id}/production`.
 
+## Where it runs: "on AWS" here means the AWS Emulator
+Our "AWS" is the AWS Emulator, not an AWS account ([decision 0011](../docs/decisions/0011-aws-emulator-instead-of-aws-account.md)).
+The emulator does not run real containers on ECS, so **this service does not serve traffic on real
+AWS**. Two separate things are true:
+
+1. **In Terraform:** `infrastructure/modules/application-services` defines an ECS service and task
+   definition for `inference-service` (image from the ECR repository, port 8007, the shared service
+   environment, and a `/health` container check). It is meant to apply cleanly on the emulator; that
+   proves the definition is valid, not that predictions are served from it.
+2. **In the local stack:** the prediction API really runs in `docker compose` (`make up`), behind the
+   gateway. This is what the portal calls.
+
+### Call the prediction API (local stack, through the gateway)
+```bash
+curl -X POST http://localhost:5810/api/v1/predict \
+  -H "Authorization: Bearer $DEV_AUTH_TOKEN" \
+  -F "file=@cat.png" \
+  -F "model_id=model-01"
+```
+- URL: `http://localhost:5810/api/v1/predict` (the gateway strips `/api/v1`; port 8007 is not reachable from outside).
+- Header: `Authorization: Bearer <token>`. Locally, `DEV_AUTH_TOKEN` from `.env`; with the real login, a Cognito ID token.
+- Body: `multipart/form-data` with `file` (PNG or JPEG, up to 10 MB) and optionally `model_id`
+  (default `INFERENCE_DEFAULT_MODEL_ID`, `model-01`). It takes an image, not a row of features.
+- Answer, `200`: the live model's `INFERENCE_TOP_K` (3) most likely labels, best first:
+  ```json
+  {"model_id": "model-01", "version": 1,
+   "predictions": [{"label": "cat", "score": 0.91}, {"label": "dog", "score": 0.05}, {"label": "deer", "score": 0.02}]}
+  ```
+  (the scores above are only an example of the shape).
+- `503 NO_MODEL_LOADED` until a version of that model has been promoted (see the Model Registry README); `400` for an unknown `model_id` or a file that is not an image.
+
 ## The health check, and why a bad version never takes traffic
 A version is served only after it loaded and one prediction on a fixed test image gave exactly one
 finite score per label. A candidate is checked before the registry promotes it. If the registry
