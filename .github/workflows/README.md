@@ -23,6 +23,8 @@ its GitHub Actions page.
 
 - `login.yml` — Salem's real-login test: starts the AWS Emulator, creates Cognito and test users,
   starts CloudTrain with `AUTH_MODE=jwt` and runs `security/tests` ([`security/login/README.md`](../../security/login/README.md)).
+- `deploy.yml` — Salem's deploy: after every image push on `main`, staging (deploy + smoke test of
+  the exact images), then production after an approval. Rollback: Run workflow → rollback.
 - `images.yml` — Salem's image push: builds the 10 images, blocks CRITICAL vulnerabilities, pushes
   each tagged with its commit to ghcr.io (ECR once there is an AWS account). On every push to `main`.
 - `security.yml` — Salem's security checks, next to CI: secrets (Gitleaks), libraries (pip-audit,

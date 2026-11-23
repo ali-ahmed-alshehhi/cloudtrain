@@ -78,6 +78,7 @@ function ComparisonBox({ identity, projectId, experimentsApi, jobsApi }) {
                   <tr style={{ borderBottom: "1px solid #e4e3df" }}>
                     <th style={cell}>GPUs</th>
                     <th style={cell}>Strategy</th>
+                    <th style={cell}>Where it ran</th>
                     <th style={num}>Runs</th>
                     <th style={num}>Time per epoch</th>
                     <th style={num}>Throughput (images/s)</th>
@@ -94,6 +95,9 @@ function ComparisonBox({ identity, projectId, experimentsApi, jobsApi }) {
                     <tr key={row.gpus} data-gpus={row.gpus}>
                       <td style={cell}>{row.gpus}</td>
                       <td style={cell}>{row.strategy}</td>
+                      <td style={cell} data-testid="result-label">
+                        {row.labels.length ? row.labels.join(" / ") : <span style={{ color: "#6b7280" }}>not labelled</span>}
+                      </td>
                       <td style={num}>{row.repeats}</td>
                       <td style={num}>{formatSeconds(row.timePerEpoch)}</td>
                       <td style={num}>{formatThroughput(row.imagesPerSecond)}</td>

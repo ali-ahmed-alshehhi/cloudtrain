@@ -50,6 +50,26 @@ create selects the returned project. The form reuses its idempotency key when an
 unchanged submission is retried after an error. Loading and request errors are
 shown explicitly, including the backend's request reference when available.
 
+### Comparison and usage & cost pages (Adel)
+
+Two pages of their own, next to Hilal's projects page (which they do not change):
+
+| Page | Walk-through step | Shows | Data (all through the gateway) |
+|---|---|---|---|
+| `/compare` | 8 | 1 GPU vs multi-GPU DDP runs of one project: time per epoch, throughput, speedup, efficiency, accuracy, GPU-hours, cost (`components/experiments/RunComparison.js`) | `/api/v1/experiments/*` (MLflow) and `/api/v1/jobs/{id}` |
+| `/usage` | 12 | Every job of one project with machine, GPU-hours and estimated cost, and the project total (`components/usage/ProjectUsage.js`) | `/api/v1/jobs?project_id=…` |
+
+Both use `components/pages/WorkspacePage.js`: the portal's sidebar plus a project picker
+(`GET /api/v1/projects`). The chosen project is kept in the address (`/usage?project=project-04`),
+so a reload or a shared link shows the same one; a project the user does not have is ignored and
+the first project is shown (`lib/pages/project-choice.mjs`). GPU-hours and cost are only the
+values Training Jobs returns: a missing price shows "Price unknown", never $0. CPU-only runs
+(local `local-cpu` jobs) are left out of the comparison, so locally it says there is nothing
+to compare until 1-GPU and DDP runs exist on the cloud stack.
+
+The projects page sidebar does not link to these pages yet (that file is Hilal's); open
+http://localhost:3000/compare and http://localhost:3000/usage directly.
+
 ### Dataset workflow
 
 Select a project to load its datasets. New dataset uploads send `project_id`,
@@ -98,6 +118,8 @@ it should appear in Your projects and become selected. Refresh the project list;
 the project should remain. Select another project to switch its alert feed.
 Check an empty name is rejected. With the gateway unavailable, refresh should
 show an error rather than claiming there are no projects.
+Open http://localhost:3000/compare and http://localhost:3000/usage, pick a project and
+reload: the same project stays selected.
 
 With Node 24 installed:
 
@@ -128,7 +150,9 @@ executable. These tests create small test projects and datasets in the local
 backend. They cover project creation/refresh, blank-name validation, network
 recovery, CSV/ZIP/TAR.GZ uploads, invalid CSV rejection, a lost upload response and
 safe retry, new versions, old-version checksums, version-service errors and retry,
-project switching, unauthenticated API rejection, and mobile width. Error cases
+project switching, unauthenticated API rejection, and mobile width. `pages.test.cjs`
+covers the comparison and usage pages: project kept in the address and after a reload,
+an unknown project ignored, and no browser request to anything but the portal and gateway. Error cases
 that simulate a broken network/service use browser interception; the successful
 uploads and reads use the real gateway and service. Screenshots are written to
 `portal/test-results/` (ignored by Git).

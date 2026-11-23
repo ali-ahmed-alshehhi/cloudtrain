@@ -22,4 +22,5 @@ or make a choice others must live with. Copy the shape of `0001-microservices-an
 | 0010 | How models are saved, served and deployed | proposed |
 | 0011 | The AWS Emulator stands in for an AWS account | accepted |
 | 0012 | Training workers run on EC2 in an Auto Scaling group | accepted |
-| 0013 | A small Pulumi layer above Terraform (CloudWatch dashboard) | proposed (#147) |
+| 0013 | A small Pulumi layer above Terraform (CloudWatch dashboard) | accepted (#147) |
+| 0014 | Monitoring: one job-events reader, Prometheus and Grafana, matching alarms in CloudWatch | proposed |
