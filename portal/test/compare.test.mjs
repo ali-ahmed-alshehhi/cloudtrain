@@ -67,7 +67,7 @@ test("1 GPU vs 2 GPUs: mean of repeats, speedup and efficiency against the 1-GPU
   assert.equal(calls[0].filter, "tags.project_id = 'project-01' and attributes.status = 'FINISHED'");
   assert.equal(result.groups.length, 1);
   const [group] = result.groups;
-  assert.equal(group.label, "resnet18 · dataset-1 v1 · 3 epochs · batch 128 per GPU");
+  assert.equal(group.label, "resnet18 · dataset-1 v1 · 3 epochs · batch 128 per process");
   assert.deepEqual(group.problems, []);
   const [one, two] = group.rows;
   assert.deepEqual([one.gpus, one.strategy, one.repeats, two.gpus, two.strategy, two.repeats], [1, "single", 2, 2, "ddp", 2]);

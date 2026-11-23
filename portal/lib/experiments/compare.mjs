@@ -58,7 +58,7 @@ export function workloadKey(workload) {
 export function workloadLabel(workload) {
   const parts = [workload.model, workload.dataset_id && `${workload.dataset_id} v${workload.dataset_version ?? "?"}`];
   if (workload.epochs) parts.push(`${workload.epochs} epochs`);
-  if (workload.batch_size) parts.push(`batch ${workload.batch_size} per GPU`);
+  if (workload.batch_size) parts.push(`batch ${workload.batch_size} per process`); // DDP splits the work into processes, on GPUs or on CPU
   if (workload.num_workers) parts.push(`${workload.num_workers} data workers`);
   return parts.filter(Boolean).join(" · ");
 }
