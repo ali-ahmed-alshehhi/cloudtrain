@@ -15,11 +15,14 @@
 // Time per epoch needs two per-epoch MLflow metrics (step = epoch): EPOCH_SECONDS and EPOCH_IMAGES.
 // When a run does not log them, those columns say so; nothing is estimated in their place.
 // GPU-hours and cost are Training Jobs' numbers (all attempts of the job), never computed here.
+// Where a result ran comes from the run's MLflow tag RESULT_LABEL, set by whoever ran it (Ahmed + Abdulla, #76),
+// e.g. "2 processes on CPU, local stack". A run without it is shown as not labelled, with a note.
 
 import { DEFAULT_EXPERIMENT, normalizeRun } from "./mlflow.mjs";
 
 export const EPOCH_SECONDS = "epoch_seconds";
 export const EPOCH_IMAGES = "epoch_images";
+export const RESULT_LABEL = "result_label";
 // The benchmark tool's SAME_WORKLOAD, with the names the training runtime logs as MLflow params.
 export const SAME_WORKLOAD = Object.freeze(["model", "dataset_id", "dataset_version", "epochs", "batch_size", "num_workers"]);
 export const MAX_RUNS = 50;
@@ -86,6 +89,12 @@ export function summariseRun({ run, seconds, images }) {
  * Rows of one workload group, like scaling_rows() in training/distributed/metrics.py.
  * entries: [{ run, summary, gpus, job: { gpuHours, cost } | null }]
  */
+/** The run's RESULT_LABEL tag, trimmed, or null when it has none. */
+export function resultLabelOf(run) {
+  const label = run.tags?.[RESULT_LABEL];
+  return typeof label === "string" && label.trim() ? label.trim() : null;
+}
+
 export function scalingRows(entries) {
   const byGpus = new Map();
   for (const entry of entries) {
@@ -104,6 +113,9 @@ export function scalingRows(entries) {
         strategy: gpus === 1 ? "single" : "ddp",
         repeats: runs.length,
         runIds: runs.map((e) => e.run.runId),
+        // Where these runs ran, as their people labelled them; several if the repeats differ.
+        labels: [...new Set(runs.map((e) => resultLabelOf(e.run)).filter(Boolean))],
+        unlabelled: runs.filter((e) => resultLabelOf(e.run) === null).length,
         timePerEpoch,
         imagesPerSecond: meanOfAll(runs.map((e) => e.summary.imagesPerSecond)),
         totalSeconds: meanOfAll(runs.map((e) => e.summary.totalSeconds)),
@@ -121,6 +133,16 @@ export function scalingRows(entries) {
     problems.push(
       `Time per epoch and throughput need the per-epoch MLflow metrics "${EPOCH_SECONDS}" and "${EPOCH_IMAGES}", which these runs do not log yet. Speedup is not shown without them.`,
     );
+  }
+  const unlabelled = rows.reduce((sum, r) => sum + r.unlabelled, 0);
+  if (unlabelled > 0) {
+    problems.push(
+      `${unlabelled} of ${entries.length} runs do not say where they ran (MLflow tag "${RESULT_LABEL}"), so do not read them as GPU or cloud numbers.`,
+    );
+  }
+  const places = new Set(rows.flatMap((r) => r.labels));
+  if (places.size > 1) {
+    problems.push(`These runs ran in different places (${[...places].join("; ")}), so the speedup compares different setups.`);
   }
   return { rows, problems };
 }

@@ -65,3 +65,7 @@ import RunComparison from "../components/experiments/RunComparison";
 - **Needs two per-epoch MLflow metrics** (step = epoch): `epoch_seconds` and `epoch_images`, the same per-epoch
   `seconds` and `images` the benchmark tool records. Until the training runtime logs them, those columns say
   "not logged" and no speedup is shown.
+- **Where it ran** comes from the run's MLflow tag `result_label`, set by whoever ran it (Ahmed + Abdulla, agreed on
+  #76), e.g. `2 processes on CPU, local stack` or `measured on Kaggle 2x T4, not on AWS`. A run without it shows
+  "not labelled" and a note says not to read it as GPU or cloud numbers; runs from different places are flagged, so
+  the speedup is not read as like for like.

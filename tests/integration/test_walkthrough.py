@@ -1,8 +1,10 @@
 """The final-demo walk-through (docs/ARCHITECTURE.md, section 18), run through the gateway.
 
-Steps 2-7 and 12 run for real now. Step 6 asserts Abdullah's live MLflow metrics after the
-real training worker finishes. Step 1 runs with the real login (`make e2e-login`, and the
-Login workflow in CI); `make e2e` uses the laptop dev token and skips it. The other steps
+Steps 2-7 and 9-12 run for real now. Step 6 asserts Abdullah's live MLflow metrics after the
+real training worker finishes, and step 9 registers that run's model. Steps 10-11 serve the
+small image test model (see `image_model`), because /predict takes an image and the walk-through
+job is tabular. Step 1 runs with the real login (`make e2e-login`, and the Login workflow in
+CI); `make e2e` uses the laptop dev token and skips it. The other steps
 are written but SKIPPED, with the owner and the hand-off date: when you deliver, remove
 the `skip` line of your step and make it pass.
 
@@ -13,10 +15,14 @@ import base64
 import json
 import re
 
+import httpx
 import pytest
 
 from tests.integration.conftest import (
+    class_image,
     events_of,
+    links_of,
+    log_image_test_model,
     real_login,
     setting,
     small_job,
@@ -181,21 +187,83 @@ def test_step_08_compare_single_gpu_and_ddp(gateway):
     with time, throughput and GPU-hours to compare."""
 
 
-@pytest.mark.skip(
-    reason="Majed: register a real model from the MLflow run (needs Abdullah's model, Fri 20 Nov)"
-)
-def test_step_09_register_best_model(gateway, finished_job):
+def mlflow_run_id_of(gateway, job: dict) -> str:
+    experiment = gateway.get(
+        "/api/v1/experiments/experiments/get-by-name", params={"experiment_name": "cloudtrain"}
+    ).json()["experiment"]
+    response = gateway.post(
+        "/api/v1/experiments/runs/search",
+        json={
+            "experiment_ids": [experiment["experiment_id"]],
+            "filter": f"tags.job_id = '{job['job_id']}' and tags.project_id = '{job['project_id']}'",
+            "max_results": 1,
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["runs"][0]["info"]["run_id"]
+
+
+def register(gateway, job: dict, name: str, run_id: str) -> httpx.Response:
+    return gateway.post("/api/v1/models", json={**links_of(job), "name": name, "mlflow_run_id": run_id})
+
+
+@pytest.fixture(scope="module")
+def tabular_model(gateway, finished_job) -> dict:
+    """Step 9: the walk-through job's own run (the tabular MLP) registered as version 1."""
+    response = register(gateway, finished_job, "wisconsin-mlp", mlflow_run_id_of(gateway, finished_job))
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture(scope="module")
+def image_model(gateway, finished_job) -> dict:
+    """Steps 10-11: /predict takes an image, so they use the small CIFAR-10-shaped image model
+    (inference-service/app/fixture_model.py), logged as an MLflow run linked to the same job."""
+    response = register(gateway, finished_job, "cifar10-classifier", log_image_test_model(finished_job))
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_step_09_register_best_model(gateway, finished_job, tabular_model):
     """POST /api/v1/models with the job's MLflow run ID -> 201, version 1."""
+    assert tabular_model["version"] == 1
+    assert tabular_model["mlflow_run_id"] == mlflow_run_id_of(gateway, finished_job)
+    assert tabular_model["job_id"] == finished_job["job_id"]
+    assert tabular_model["dataset_id"] == finished_job["spec"]["dataset_id"]
+    assert {"accuracy", "f1"} <= set(tabular_model["metrics"])
+    assert tabular_model["artifact_uri"].startswith("s3://"), tabular_model
+    assert tabular_model["stage"] == "none"
 
 
-@pytest.mark.skip(reason="Majed: promote v1; inference passes /health before taking traffic — Tue 24 Nov")
-def test_step_10_promote_version_1(gateway):
-    """POST /api/v1/models/{id}/versions/1/promote -> 200; GET .../production shows version 1."""
+def test_step_10_promote_version_1(gateway, tabular_model, image_model):
+    """POST /api/v1/models/{id}/versions/1/promote -> 200; GET .../production shows version 1.
+    A version that fails inference's health check never takes traffic: the tabular model
+    cannot classify an image, so its promotion is refused and nothing goes live."""
+    refused = gateway.post(f"/api/v1/models/{tabular_model['model_id']}/versions/1/promote")
+    assert refused.status_code == 503, refused.text
+    assert refused.json()["error"]["code"] == "DEPLOYMENT_FAILED"
+    assert gateway.get(f"/api/v1/models/{tabular_model['model_id']}/production").status_code == 404
+
+    model_id = image_model["model_id"]
+    promoted = gateway.post(f"/api/v1/models/{model_id}/versions/1/promote")
+    assert promoted.status_code == 200, promoted.text
+    live = gateway.get(f"/api/v1/models/{model_id}/production")
+    assert live.status_code == 200, live.text
+    assert live.json()["version"] == 1
 
 
-@pytest.mark.skip(reason="Majed: inference loads the live version and predicts — Fri 20 Nov")
-def test_step_11_predict(gateway):
+def test_step_11_predict(gateway, image_model):
     """POST /api/v1/predict with an image -> 200 and a prediction from the live model version."""
+    response = gateway.post(
+        "/api/v1/predict",
+        files={"file": ("cat.png", class_image("cat"), "image/png")},
+        data={"model_id": image_model["model_id"]},
+    )
+    assert response.status_code == 200, response.text
+    answer = response.json()
+    assert answer["model_id"] == image_model["model_id"]
+    assert answer["version"] == 1
+    assert answer["predictions"][0]["label"] == "cat", answer
 
 
 def test_step_12_compute_usage_and_cost(gateway, finished_job):

@@ -111,9 +111,19 @@ Terraform creates the **place** the services run; Salem's pipeline puts the **im
   service, a public load balancer (gateway on 5810, portal on 3000), each service with its own task role
   (#128), the shared execution role (#129), its own `DATABASE_URL` secret and its log group (#134). The
   Scheduler gets `TRAINING_WORKER_URLS` from `worker_urls`. The training workers stay on EC2, not Fargate.
-- **Pipeline (Salem, #54):** builds the images, pushes them, registers a new task definition revision with
-  the commit's image tag and updates the services. Terraform ignores `task_definition` and `desired_count`
-  after creation, so a later `terraform apply` doesn't roll a deploy back.
+- **Pipeline (Salem, #54):** `images.yml` builds and pushes the images of every commit on `main`; then
+  `deploy.yml` deploys them. For each service it copies the running task definition, changes only the
+  image to `<service>:<commit>`, registers a new revision and updates the service. Terraform ignores
+  `task_definition` and `desired_count` after creation, so a later `terraform apply` doesn't roll a
+  deploy back.
+
+  | Step | When | What happens |
+  |---|---|---|
+  | Staging | automatically after the images are pushed | deploy, then a smoke test runs **those images** with the demo walk-through |
+  | Production | after a reviewer clicks **Approve** on the run | the same images, no rebuild |
+  | Rollback | Actions → Deploy → Run workflow → **rollback** | production goes back to the version it ran before |
+
+  Each run's page shows a table per service: the image before and after, and the new revision.
 - **On the emulator:** `ecs_desired_count = 0`. The services exist but run no tasks, because the emulator's
   ECR refuses image uploads (images are on ghcr.io today). Services keep using `make up` for their work.
 

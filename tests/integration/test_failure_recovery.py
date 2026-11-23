@@ -1,21 +1,21 @@
 """The failure-recovery scenario of the final demo: a worker is killed in the middle of a job,
-its heartbeat stops, the job goes FAILED, is retried, and finishes.
+its heartbeat stops, the job goes FAILED, is retried, and finishes. Mariam (dead-worker detection,
+retries) + Maitha (the Scheduler places the retry again) + Abdullah (the real worker's heartbeats).
 
-SKIPPED until Mariam (dead-worker detection by missing heartbeats, retries) and Maitha (worker
-recovery) deliver: Sat 21 - Tue 24 Nov. Remove the `skip` line to switch it on.
-
-Run it with short settings in .env, so it takes about a minute instead of several:
+It runs when the heartbeat settings are short, as in CI (.github/workflows/ci.yml sets them), and
+takes about a minute. With the default 120-second timeout it would take many minutes, so it skips.
+To run it on a laptop, put these in .env, then `make reset && make up`:
     HEARTBEAT_INTERVAL_SECONDS=2
     HEARTBEAT_TIMEOUT_SECONDS=6
-    STANDIN_TRAINING_SECONDS=30   (only while the stand-in worker is in use: a job long enough to kill)
-then `make up` again.
+    JOB_SWEEP_INTERVAL_SECONDS=2
+    SQS_VISIBILITY_TIMEOUT_SECONDS=20
 """
 
 import subprocess
 
 import pytest
 
-from tests.integration.conftest import REPO, events_of, small_job, tiny_image_dataset, wait_for
+from tests.integration.conftest import REPO, events_of, setting, small_job, tiny_tabular_dataset, wait_for
 
 
 def compose(*args: str) -> None:
@@ -23,19 +23,25 @@ def compose(*args: str) -> None:
     subprocess.run(["docker", "compose", *args], cwd=REPO, check=True, capture_output=True)
 
 
-@pytest.mark.skip(
-    reason="Mariam (dead-worker detection, retries) + Maitha (worker recovery) — Sat 21 to Tue 24 Nov"
+SHORT_HEARTBEAT = float(setting("HEARTBEAT_TIMEOUT_SECONDS", "120")) <= 30
+
+
+@pytest.mark.skipif(
+    not SHORT_HEARTBEAT,
+    reason="needs short heartbeat settings (HEARTBEAT_TIMEOUT_SECONDS<=30), as in CI: see the docstring",
 )
 def test_killed_worker_job_is_retried_and_finishes(gateway):
     project = gateway.post("/api/v1/projects", json={"name": "Failure recovery"}).json()
     dataset = gateway.post(
         "/api/v1/datasets",
-        data={"project_id": project["project_id"], "name": "sample", "format": "tar_gz"},
-        files={"file": ("sample.tar.gz", tiny_image_dataset(), "application/gzip")},
+        data={"project_id": project["project_id"], "name": "wisconsin", "format": "csv"},
+        files={"file": ("wisconsin.csv", tiny_tabular_dataset(), "text/csv")},
     ).json()
-    job_id = gateway.post(
-        "/api/v1/jobs", json=small_job(project["project_id"], dataset["dataset_id"])
-    ).json()["job_id"]
+    form = small_job(project["project_id"], dataset["dataset_id"])
+    # The real worker trains the tiny table in ~10 s with 1 epoch: too fast to kill it in time.
+    # 300 epochs keep it running ~30 s on a laptop, so the worker is killed in the middle of the job.
+    form["hyperparameters"]["epochs"] = 300
+    job_id = gateway.post("/api/v1/jobs", json=form).json()["job_id"]
 
     def status() -> str:
         return gateway.get(f"/api/v1/jobs/{job_id}").json()["status"]

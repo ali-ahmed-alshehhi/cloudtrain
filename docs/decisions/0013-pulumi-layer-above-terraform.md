@@ -1,6 +1,6 @@
 # 0013 — A small Pulumi layer above Terraform
 
-- **Status:** proposed (contract change #147; accepted once agreed there)
+- **Status:** accepted (contract change #147: agreed by Ali, 22 Nov 2026; built in #149)
 - **Date:** 2026-11-22
 - **Decided by:** Fatma and Hamda (Student 6), at the professor's request
 

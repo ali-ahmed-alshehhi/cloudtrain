@@ -5,7 +5,8 @@ Order of work for every forwarded request:
   2. refuse /internal/ paths (404)
   3. find its route in routes.yaml (404 if none) and check the method (405)
   4. check the login token (401)
-  5. forward it with X-User-Id and X-Request-Id (503 if the service is down or slow)
+  5. forward it with X-User-Id and X-Request-Id (503 if the service is down or slow);
+     MLflow runs only for members of the run's project (mlflow_access.py, #107)
   6. write one JSON log line and update the metrics
 """
 
@@ -21,7 +22,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
-from app import auth, proxy
+from app import auth, mlflow_access, proxy
 from app.config import Settings, load_settings
 from app.errors import error_response, install_error_handlers
 from app.logs import SERVICE_NAME, setup_logging
@@ -43,6 +44,7 @@ def create_app(
     """`transport` lets the tests replace the real network with fake services."""
     settings = settings or load_settings()
     routes = load_routes()
+    projects_url = next(route.target for route in routes if route.name == "projects")
     logger = setup_logging(settings.log_level)
 
     @asynccontextmanager
@@ -141,6 +143,10 @@ def create_app(
 
         is_upload = request.headers.get("content-type", "").startswith("multipart/")
         timeout = settings.upload_timeout_seconds if is_upload else settings.timeout_seconds
+        if route.name == "experiments":
+            return await mlflow_access.forward(
+                app.state.http, request, route, projects_url, user_id, request_id, timeout
+            )
         return await proxy.forward(app.state.http, request, route, user_id, request_id, timeout)
 
     return app

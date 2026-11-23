@@ -75,7 +75,7 @@ even if SQS is down for a while. Why: [docs/decisions/0007-job-service-design.md
 ## Run and test
 
 ```bash
-make test                         # all unit tests (this folder: 63 tests, ~4 s, no Docker needed)
+make test                         # all unit tests (this folder: 90 tests, ~9 s, no Docker needed)
 cd job-service && .venv/bin/python -m pytest -q    # only this service
 make up && make e2e               # the walk-through through the gateway
 ```
@@ -83,10 +83,33 @@ make up && make e2e               # the walk-through through the gateway
 Building the image outside Compose (for example a deploy pipeline) needs the contracts folder too:
 `docker build --build-context contracts=contracts job-service`. Without it the build stops.
 
-The failure-recovery demo (`tests/integration/test_failure_recovery.py`) passes with this service and
-the stand-in scheduler and worker. Run it with short settings in `.env`, then `make reset && make up`:
-`HEARTBEAT_INTERVAL_SECONDS=2`, `HEARTBEAT_TIMEOUT_SECONDS=6`, `JOB_SWEEP_INTERVAL_SECONDS=2`,
-`STANDIN_TRAINING_SECONDS=30`, `SQS_VISIBILITY_TIMEOUT_SECONDS=20`. It takes about one minute.
+The failure-recovery demo (`tests/integration/test_failure_recovery.py`) runs in CI on every pull
+request, with the real Scheduler and the real training worker: the worker is killed mid-job, the job
+fails after the heartbeat timeout, is retried and succeeds on attempt 2. CI uses short settings; to
+run it on a laptop put them in `.env`, then `make reset && make up`: `HEARTBEAT_INTERVAL_SECONDS=2`,
+`HEARTBEAT_TIMEOUT_SECONDS=6`, `JOB_SWEEP_INTERVAL_SECONDS=2`, `SQS_VISIBILITY_TIMEOUT_SECONDS=20`.
+It takes about one minute.
+
+### What the tests cover (98% of the code)
+
+| File | What it checks |
+|---|---|
+| `test_submit.py` | `POST /jobs`: the form, membership, dataset and version, idempotency, the queue message, SQS down |
+| `test_lifecycle.py` | every status step, 409 for a step out of order, cancel, heartbeats, the stale-worker guard |
+| `test_recovery.py` | silent worker, time limit, retries, retries used up → dead-letter report, a repeated `SCHEDULED` |
+| `test_dead_letters.py` | reading `training-jobs-dlq`: stuck jobs queued again, stale and unreadable messages dropped |
+| `test_cost.py` | GPU-hours and cost over every attempt, unknown price → `null`, the pricing file missing |
+| `test_access_and_feed.py` | members only, the alert feed (`after`, `limit`, only your projects) |
+| `test_internal_status.py` | `GET /internal/jobs/{id}` for the Scheduler |
+| `test_failure_paths.py` | other services broken (503), the database down, two identical submits at once, the background loops surviving a crash, 404/405/500 in the shared format, the SQS code |
+| `test_service.py` | the service's addresses equal the contract's, metrics, request IDs, unsafe settings |
+
+Coverage: `cd job-service && .venv/bin/pip install pytest-cov && .venv/bin/python -m pytest --cov=app`.
+
+## Demo
+
+The failure-recovery demo, step by step, with what to say and what to do if something goes wrong:
+[DEMO.md](DEMO.md).
 
 ## Acceptance test
 A submitted job enters the queue, is scheduled, runs and reaches a correct final state.
