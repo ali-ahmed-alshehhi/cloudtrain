@@ -62,6 +62,7 @@ ever names a version that fails here (e.g. another copy of this service checked 
 keeps serving the version it has. If the registry is down, the loaded version keeps serving.
 `GET /health` is 503 only when the loaded default model fails its check; with no model yet it is 200
 (the service is up; `/predict` answers 503 `NO_MODEL_LOADED`).
+See model-registry README “Issue #48 — done on main” for the gate, tests, and walk-through pointers.
 
 ## Which models work
 Any model saved with `mlflow.pytorch.log_model` (MLflow's `pickle` format, or `pt2` exported with a
