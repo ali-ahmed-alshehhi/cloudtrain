@@ -325,3 +325,38 @@ def test_worker_routing_falls_back_to_default():
             os.environ.pop("TRAINING_WORKER_URLS", None)
         else:
             os.environ["TRAINING_WORKER_URLS"] = old_urls
+
+
+def test_no_capacity_triggers_short_visibility():
+    """When all slots are full, the message gets a short visibility timeout."""
+    cap = CapacityTracker(max_workers=1)
+    cap.reserve("job-00", "local-cpu")  # fill the only slot
+
+    sqs = FakeSqs([FORM])
+    services = FakeServices(statuses={"job-00": "RUNNING"})
+    app = make_app(sqs, services, capacity=cap)
+    app.state.scheduler.read_queue_once()
+
+    changes = getattr(sqs, "visibility_changes", [])
+    assert len(changes) == 1, f"expected 1 visibility change, got {changes}"
+    assert changes[0]["handle"] == "r0"
+    assert changes[0]["timeout"] == app.state.scheduler.retry_visibility_seconds
+
+
+def test_worker_error_keeps_original_visibility():
+    """When the worker is unreachable, the message keeps its original visibility timeout."""
+
+    class WorkerDown(FakeServices):
+        def handle(self, request):
+            if request.url.host == "training-worker":
+                raise httpx.ConnectError("worker is down", request=request)
+            return super().handle(request)
+
+    sqs = FakeSqs([FORM])
+    services = WorkerDown(job_answers=(200,) * 2)
+    app = make_app(sqs, services)
+    app.state.scheduler.read_queue_once()
+
+    changes = getattr(sqs, "visibility_changes", [])
+    worker_changes = [c for c in changes if c["handle"] == "r0"]
+    assert worker_changes == [], f"worker error should NOT trigger change_message_visibility, got {changes}"

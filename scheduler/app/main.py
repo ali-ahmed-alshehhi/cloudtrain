@@ -113,8 +113,8 @@ class Scheduler:
         metrics["workers_busy"].set(self.capacity.active_count)
         metrics["gpus_in_use"].set(self.capacity.gpu_in_use())
 
-    def handle_job(self, form: dict) -> bool:
-        """Place one job. Returns True when the queue message can be deleted."""
+    def handle_job(self, form: dict) -> bool | str:
+        """Place one job. Returns True to delete, "no_capacity" for fast retry, False for errors."""
         job_id = form["job_id"]
         gpu_count = form.get("resources", {}).get("gpu_count", 0)
         machine = pick_machine(gpu_count)
@@ -128,7 +128,7 @@ class Scheduler:
                 "no capacity; message stays on queue",
                 extra={"job_id": job_id, "active": self.capacity.active_count},
             )
-            return False
+            return "no_capacity"
 
         self._update_metrics()
         try:
@@ -212,14 +212,19 @@ class Scheduler:
             except httpx.HTTPError:
                 self.logger.exception("could not reach the job service or the worker")
                 done = False
-            if done:
+            if done is True:
                 self.sqs.delete_message(QueueUrl=self.queue_url(), ReceiptHandle=message["ReceiptHandle"])
-            else:
+            elif done == "no_capacity":
+                # No GPUs free right now — retry fast so the job is picked up
+                # as soon as a slot opens instead of waiting the full 300 s.
                 self.sqs.change_message_visibility(
                     QueueUrl=self.queue_url(),
                     ReceiptHandle=message["ReceiptHandle"],
                     VisibilityTimeout=self.retry_visibility_seconds,
                 )
+            # else: worker/job-service unreachable — leave the original
+            # visibility timeout so the message is not retried too fast
+            # and does not hit MAX_RECEIVE_COUNT before the worker restarts.
 
 
 def create_app(
