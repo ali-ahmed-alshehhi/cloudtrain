@@ -1,10 +1,10 @@
 # Evaluation: performance, reliability and cloud cost
 
-**Owners:** Hilal + Adel (Student 10). **Status on 22 Nov 2026: Tests A, B, C (speed, upload/download, alert),
-D (real training), E (alert delay in the portal), F (a burst of jobs), G (prediction latency) and H (worker killed mid-job) measured on a laptop; GPU, prediction and worker-failure numbers still pending.** Every
+**Owners:** Hilal + Adel (Student 10). **Status on 23 Nov 2026: Tests A, B, C (speed, upload/download, alert),
+D (real training), E (alert delay in the portal), F (a burst of jobs), G (prediction latency) and H (worker killed mid-job) measured on a laptop; only the 1 GPU vs 2-GPU numbers are still pending (Ahmed + Abdulla, #76).** The
 ⏳ row names who it waits on and when. Final version: Fri 27 Nov.
 
-## Headline results (so far)
+## Headline results
 
 All measured on one laptop with Docker Compose (section 0), so they show how the platform behaves, not cloud
 speed. Each links to its row below and to the raw output.
@@ -61,7 +61,7 @@ results are always labelled as such ([decision 0011](decisions/0011-aws-emulator
 
 | Scenario | Expected behaviour | Status | Result | Evidence |
 |---|---|---|---|---|
-| Worker killed mid-job | Heartbeat stops → FAILED after the timeout (120 s, 6 s in the demo settings) → retried → SUCCEEDED; time to detect and time to recover | 🧪 Tested in job-service (fake clock), and **end to end in CI** since #145 (Mariam, merged 22 Nov): the real worker is killed mid-job, the job is marked FAILED for its stopped heartbeat, retried, and finishes on attempt 2 (short heartbeat settings). ✅ **Times measured on a laptop** (22 Nov, `1bb2326`, short settings: 6 s timeout, 20 s visibility), 3 runs | Marked FAILED **4.9–6.1 s** after the kill and retried at once; running again after **25–27 s** (about 20 s waiting, most likely the 20 s visibility timeout, as in #158); finished after 42.5–43.9 s; **3 of 3** on attempt 2. With the normal settings: about 2 min to detect and up to 5 min more (derived, not measured) | [`docs/evaluation/test-h-recovery.md`](evaluation/test-h-recovery.md) | `job-service/tests/test_recovery.py`, `tests/integration/test_failure_recovery.py` (runs in CI; on a laptop only with the short settings) |
+| Worker killed mid-job | Heartbeat stops → FAILED after the timeout (120 s, 6 s in the demo settings) → retried → SUCCEEDED; time to detect and time to recover | 🧪 Tested in job-service (fake clock), and **end to end in CI** since #145 (Mariam, merged 22 Nov): the real worker is killed mid-job, the job is marked FAILED for its stopped heartbeat, retried, and finishes on attempt 2 (short heartbeat settings). ✅ **Times measured on a laptop** (22 Nov, `1bb2326`, short settings: 6 s timeout, 20 s visibility), 3 runs | Marked FAILED **4.9–6.1 s** after the kill and retried at once; running again after **25–27 s** (about 20 s waiting, most likely the 20 s visibility timeout, as in #158); finished after 42.5–43.9 s; **3 of 3** on attempt 2. With the normal settings: about 2 min to detect and up to 5 min more (derived, not measured) | [`docs/evaluation/test-h-recovery.md`](evaluation/test-h-recovery.md); `job-service/tests/test_recovery.py`, `tests/integration/test_failure_recovery.py` (runs in CI; on a laptop only with the short settings) |
 | Retries used up | FAILED for good and reported to the dead-letter queue; dashboard alert `CloudTrainDeadLetters` | 🧪 Tested (job-service, alert rule) | | `test_retries_used_up_stays_failed_and_reports_to_the_dlq`, `monitoring/prometheus/alerts.test.yml` |
 | A service stopped or too slow | The gateway answers 503 in the shared error format, nothing hangs; alert `CloudTrainServiceDown` after 1 min | ✅ Measured in Compose: Projects (19 Nov, `f8d8dab`), then datasets, jobs, models and MLflow (21 Nov, `b404125`). ✅ Alert in Compose (20 Nov, #115 at `aa6cc8b`): pending after 26–31 s, **firing after 83–88 s** (rule: 1 min, checks every 15 s), cleared 26–31 s after the restart | **Stopped:** 503 × 5, median 4.1 ms, `SERVICE_UNAVAILABLE` + `request_id`; gateway `/health` stays 200. **Frozen:** 503 × 3 after 10.01 s (the 10 s timeout). **Back:** 200 on the first request, 4.7 ms median, no restart. Normal: 7.2 ms median. **The same for datasets, jobs, models and MLflow:** stopped 503 in 6–29 ms, frozen 503 after 10.004–10.007 s, back 200 at once | [`docs/evaluation/test-a-service-stopped-or-frozen.md`](evaluation/test-a-service-stopped-or-frozen.md), [`docs/evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) (alert), `gateway/tests/test_gateway.py::test_503_when_a_service_is_down_or_slow` |
 | Duplicate or out-of-order job events | Counted once; durations right in any order (at-least-once SQS, confirmed by Mariam on #109) | 🧪 Tested, including a recording of what job-service sends | | `monitoring/job-events-monitor/tests/` |
@@ -95,7 +95,7 @@ All three are on `main` since 18 Nov.
 
 | What | Status | Result | Evidence |
 |---|---|---|---|
-| Cost per job and per project | ✅ Real jobs (22 Nov): the scheduler chose `local-cpu` for all 10, so 0.0 GPU-hours and **$0.00** each, the real price of `local-cpu` (not a missing value). Portal views on `main` (#117), tested with FIXTURE jobs for GPU prices; shown on the pages `/usage` and `/compare` (#156, in review). A GPU job's cost needs a GPU machine, which the laptop and the AWS Emulator do not have | | `portal/components/usage/`, `portal/test/usage.test.mjs` |
+| Cost per job and per project | ✅ Real jobs (22 Nov): the scheduler chose `local-cpu` for all 10, so 0.0 GPU-hours and **$0.00** each, the real price of `local-cpu` (not a missing value). Portal views on `main` (#117), tested with FIXTURE jobs for GPU prices; shown on the pages `/usage` and `/compare` (#156, merged 22 Nov). A GPU job's cost needs a GPU machine, which the laptop and the AWS Emulator do not have | | `portal/components/usage/`, `portal/test/usage.test.mjs` |
 | Cost of the 1 GPU vs 2 GPU benchmark | ⏳ Waiting on: Ahmed + Abdulla, 2-GPU run (Tue 24 Nov) | | `docs/BENCHMARKS.md` |
 | Total cloud spend | **$0: no AWS account.** The team uses the AWS Emulator (decision 0011), so all costs in this report are **estimates of what the same work would cost on AWS**, not bills | | [decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md) |
 | Keeping cost down | ✅ Checked in the code (20 Nov, `main` at `474a732`). **1. Smallest machine that fits:** the scheduler picks 0 GPU → `c6i.2xlarge`, 1 → `g4dn.xlarge`, 2–4 → `g4dn.12xlarge`, 5–8 → `g4dn.metal` (`scheduler/app/machines.py`, #105); locally always `local-cpu` ($0). **2. Machines are not started and stopped per job:** each GPU pool has a fixed size set in Terraform (`worker_desired_capacity`, 1 in the dev settings; the 4-GPU pool 0; min 0), with no autoscaling, so a machine costs money while idle: one idle `g4dn.xlarge` ≈ **$12.62 a day** (24 h × $0.526). Saving money is manual: set the capacity to 0 when nobody trains, `terraform destroy` after use. **3.** The scheduler frees a job's slot only when the next job needs one ("Busy workers" stays 1 after a job); that affects placement, not the bill | | `scheduler/app/machines.py`, `infrastructure/main.tf`, `infrastructure/README.md` ("Demo 4"), `contracts/pricing.yaml` |
@@ -129,7 +129,6 @@ All three are on `main` since 18 Nov.
   counters start again from 0. Prometheus treats that as a counter reset, so `rate()` and `increase()` stay
   right; events are not lost (unread ones wait in SQS).
 - Tensor and pipeline parallelism are not evaluated (`docs/BENCHMARKS.md`: never simulated).
-- _To be completed with the results._
 
 ## 7. How to reproduce
 
