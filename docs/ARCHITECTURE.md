@@ -365,7 +365,7 @@ least-privilege IAM everywhere. Folder layout and the 7 mandatory Terraform demo
 | 7 | Job Succeeded, alert shown in the portal, machine released | Mariam, Maitha, Hilal + Adel |
 | 8 | Compare a single-GPU run with a DDP run | Hilal + Adel; Ahmed + Abdulla |
 | 9 | Register the walk-through job's model from its MLflow run: `POST /api/v1/models` → 201 v1 | Majed |
-| 10 | Promote v1; inference passes `/health` before taking traffic (a model that fails it never goes live) | Majed |
+| 10 | Promote v1; inference checks the version first (`POST /internal/models/{id}/candidates`), and a model that fails the check never goes live | Majed |
 | 11 | Send an image: `POST /api/v1/predict` → 200 prediction from the live image model | Majed |
 | 12 | View compute usage, GPU-hours and estimated cost | Hilal + Adel |
 
@@ -373,7 +373,7 @@ The walk-through uses the tabular use case (Wisconsin Breast Cancer, `tabular_ml
 in seconds on a laptop and in CI; agreed on #93 (22 Nov). Image classification (CIFAR-10 + ResNet-18)
 stays in the training worker for longer runs. `/api/v1/predict` takes an image, so steps 10-11 serve a
 small CIFAR-10-shaped test model logged to MLflow for the job (agreed on #150); step 10 also shows that
-the tabular model, which fails inference's health check, is never promoted.
+the tabular model, which fails inference's candidate check, is never promoted.
 
 The final demo also shows the Terraform-provisioned infrastructure, the CI/CD pipeline, and **one
 failure-recovery scenario**: a worker is killed mid-job, the heartbeat stops, the job is retried and finishes.
