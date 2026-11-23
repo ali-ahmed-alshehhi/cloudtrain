@@ -72,7 +72,6 @@ class Scheduler:
         urls_json = os.environ.get("TRAINING_WORKER_URLS", "{}")
         self.worker_urls: dict[str, str] = json.loads(urls_json)
         self.max_wait_for_worker = float(os.environ.get("SQS_VISIBILITY_TIMEOUT_SECONDS", "300"))
-        self.retry_visibility_seconds = int(os.environ.get("SQS_RETRY_VISIBILITY_SECONDS", "5"))
         self._queue_url: str | None = None
         max_w = int(os.environ.get("SCHEDULER_MAX_WORKERS", "1"))
         max_gpus_str = os.environ.get("SCHEDULER_MAX_GPUS")
@@ -113,8 +112,8 @@ class Scheduler:
         metrics["workers_busy"].set(self.capacity.active_count)
         metrics["gpus_in_use"].set(self.capacity.gpu_in_use())
 
-    def handle_job(self, form: dict) -> bool | str:
-        """Place one job. Returns True to delete, "no_capacity" for fast retry, False for errors."""
+    def handle_job(self, form: dict) -> bool:
+        """Place one job. Returns True when the queue message can be deleted."""
         job_id = form["job_id"]
         gpu_count = form.get("resources", {}).get("gpu_count", 0)
         machine = pick_machine(gpu_count)
@@ -128,7 +127,7 @@ class Scheduler:
                 "no capacity; message stays on queue",
                 extra={"job_id": job_id, "active": self.capacity.active_count},
             )
-            return "no_capacity"
+            return False
 
         self._update_metrics()
         try:
@@ -203,28 +202,40 @@ class Scheduler:
             self.logger.info("released machine", extra={"job_id": job_id, "machine": released})
 
     def read_queue_once(self) -> None:
+        # Do not take a message while every slot is occupied. Free finished
+        # jobs first; if still full, wait a short interval and return so the
+        # loop retries without burning an SQS receive (which counts toward
+        # MAX_RECEIVE_COUNT and would eventually send the message to the DLQ).
+        if not self.capacity.has_capacity():
+            self.free_finished_slots()
+            if not self.capacity.has_capacity():
+                time.sleep(BUSY_RETRY_SECONDS)
+                return
+
         answer = self.sqs.receive_message(
             QueueUrl=self.queue_url(), MaxNumberOfMessages=1, WaitTimeSeconds=20
         )
-        for message in answer.get("Messages", []):
+        messages = answer.get("Messages", [])
+
+        # Queue empty: free finished slots so Prometheus gauges update
+        # promptly instead of waiting for the next job to need a slot.
+        if not messages:
+            if self.capacity.active_jobs:
+                self.free_finished_slots()
+                self._update_metrics()
+            return
+
+        for message in messages:
             try:
                 done = self.handle_job(json.loads(message["Body"]))
             except httpx.HTTPError:
                 self.logger.exception("could not reach the job service or the worker")
                 done = False
-            if done is True:
-                self.sqs.delete_message(QueueUrl=self.queue_url(), ReceiptHandle=message["ReceiptHandle"])
-            elif done == "no_capacity":
-                # No GPUs free right now — retry fast so the job is picked up
-                # as soon as a slot opens instead of waiting the full 300 s.
-                self.sqs.change_message_visibility(
+            if done:
+                self.sqs.delete_message(
                     QueueUrl=self.queue_url(),
                     ReceiptHandle=message["ReceiptHandle"],
-                    VisibilityTimeout=self.retry_visibility_seconds,
                 )
-            # else: worker/job-service unreachable — leave the original
-            # visibility timeout so the message is not retried too fast
-            # and does not hit MAX_RECEIVE_COUNT before the worker restarts.
 
 
 def create_app(

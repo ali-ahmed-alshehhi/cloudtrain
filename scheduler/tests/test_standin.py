@@ -327,36 +327,51 @@ def test_worker_routing_falls_back_to_default():
             os.environ["TRAINING_WORKER_URLS"] = old_urls
 
 
-def test_no_capacity_triggers_short_visibility():
-    """When all slots are full, the message gets a short visibility timeout."""
+def test_full_capacity_skips_receive():
+    """When all slots are full and no job has ended, receive_message is not called."""
     cap = CapacityTracker(max_workers=1)
-    cap.reserve("job-00", "local-cpu")  # fill the only slot
+    cap.reserve("job-00", "local-cpu")
 
     sqs = FakeSqs([FORM])
     services = FakeServices(statuses={"job-00": "RUNNING"})
-    app = make_app(sqs, services, capacity=cap)
-    app.state.scheduler.read_queue_once()
+    scheduler = make_app(sqs, services, capacity=cap).state.scheduler
 
-    changes = getattr(sqs, "visibility_changes", [])
-    assert len(changes) == 1, f"expected 1 visibility change, got {changes}"
-    assert changes[0]["handle"] == "r0"
-    assert changes[0]["timeout"] == app.state.scheduler.retry_visibility_seconds
+    # Patch time.sleep so the test doesn't actually wait
+    import unittest.mock
+
+    with unittest.mock.patch("time.sleep") as mock_sleep:
+        scheduler.read_queue_once()
+
+    # SQS was never called — message stays untouched
+    assert sqs.deleted == []
+    assert len(sqs.messages) == 1  # still in the queue, never popped
+    mock_sleep.assert_called_once_with(5)
 
 
-def test_worker_error_keeps_original_visibility():
-    """When the worker is unreachable, the message keeps its original visibility timeout."""
-
-    class WorkerDown(FakeServices):
-        def handle(self, request):
-            if request.url.host == "training-worker":
-                raise httpx.ConnectError("worker is down", request=request)
-            return super().handle(request)
+def test_slot_freed_then_receives():
+    """When capacity is full but a tracked job has ended, the slot is freed and the next job is received."""
+    cap = CapacityTracker(max_workers=1)
+    cap.reserve("job-00", "local-cpu")
 
     sqs = FakeSqs([FORM])
-    services = WorkerDown(job_answers=(200,) * 2)
-    app = make_app(sqs, services)
-    app.state.scheduler.read_queue_once()
+    services = FakeServices(statuses={"job-00": "SUCCEEDED"})
+    scheduler = make_app(sqs, services, capacity=cap).state.scheduler
+    scheduler.read_queue_once()
 
-    changes = getattr(sqs, "visibility_changes", [])
-    worker_changes = [c for c in changes if c["handle"] == "r0"]
-    assert worker_changes == [], f"worker error should NOT trigger change_message_visibility, got {changes}"
+    # job-00 was freed, then the queued job was placed
+    assert cap.active_count == 1  # the new job took the slot
+    assert "job-00" not in cap.active_jobs
+    assert sqs.deleted == ["r0"]  # message was processed and deleted
+
+
+def test_empty_queue_frees_finished_slots():
+    """When the queue returns no messages and a tracked job has finished, its slot is freed."""
+    cap = CapacityTracker(max_workers=1)
+    cap.reserve("job-00", "local-cpu")
+
+    sqs = FakeSqs([])  # empty queue
+    services = FakeServices(statuses={"job-00": "SUCCEEDED"})
+    scheduler = make_app(sqs, services, capacity=cap).state.scheduler
+    scheduler.read_queue_once()
+
+    assert cap.active_count == 0  # slot was freed even though no new job arrived
