@@ -1,6 +1,6 @@
 # Web Portal — `portal/`
 
-> **In progress.** Projects and dataset upload/version selection are implemented through the gateway. Run `make check` before opening a PR. Job submission, model and prediction workflows are next.
+> **In progress.** Projects and dataset upload/version selection are implemented through the gateway. Run `make check` before opening a PR. Job list, submission and detail pages now cover the CPU training workflow. Model and prediction pages remain next.
 
 | Owners (partners) | Port | Contracts |
 |---|---|---|
@@ -41,8 +41,7 @@ Adel owns the upcoming monitoring, experiment comparison, usage/cost and evaluat
 features. Adel's merged `JobAlerts` and `useAlertFeed` components are integrated through
 `app/components/project-alerts.js`, using the shared gateway client's `fetchEvents`
 adapter. One feed runs for the selected project; remounting on project changes
-prevents previous-project state from being shown. Future live job badges should
-share this feed's state when the job page is built.
+prevents previous-project state from being shown. The jobs list and detail page each share one project event feed between live badges and alerts.
 
 The project form follows `contracts/openapi/project-service.yaml`: name is required
 (maximum 100 characters), description is optional (maximum 1000). A successful
@@ -67,8 +66,22 @@ values Training Jobs returns: a missing price shows "Price unknown", never $0. C
 (local `local-cpu` jobs) are left out of the comparison, so locally it says there is nothing
 to compare until 1-GPU and DDP runs exist on the cloud stack.
 
-The projects page sidebar does not link to these pages yet (that file is Hilal's); open
-http://localhost:3000/compare and http://localhost:3000/usage directly.
+The shared sidebar links to both pages. Direct links are http://localhost:3000/compare and http://localhost:3000/usage.
+
+
+### Training jobs (Hilal, #58 / #59)
+
+- `/jobs?project=project-01`: list that project's jobs, with one shared live event feed, status badges and links to each run. New project jobs/status changes trigger a list refresh through that feed; a manual refresh handles recovery.
+- `/jobs/new?project=project-01`: select a dataset and its exact version. The public version endpoint supplies size/checksum before submission. Choose `tabular_mlp` for numeric CSV or `resnet18` for the supported image workload, strategy, resources, training settings and execution limits. Extra hyperparameters accept only scalar JSON values. The browser rejects invalid DDP world size/GPU counts and numeric limits before the backend's own validation.
+- `/jobs/job-104`: show the authorised job, complete status history with reasons, Adel's live badge and per-job alerts, usage/cost and MLflow results. Events refresh the job snapshot and results. Transient errors have explicit retry; a denied/missing job does not display a previous job. Active jobs can be cancelled after confirmation. Late reads cannot overwrite a newer cancellation response.
+
+Every call uses the gateway. The submission sends JSON with `Idempotency-Key`, never an invented job ID. An unchanged failed submission keeps its key in memory and, when available, `sessionStorage`, keyed by the full submission. Reloading/re-entering an identical form reuses it. Changing the dataset version/settings makes a different request. Session storage contains only form metadata/retry keys, never login tokens. Project selection and fields are disabled during submission. Navigation/reload can lose an in-flight response, so unchanged retries must use the saved key.
+
+A small laptop smoke run: upload an 8-row CSV with numeric `radius,texture,perimeter` and target `diagnosis` containing four `B` and four `M` rows. Choose `tabular_mlp`, one epoch, batch size 4, GPU count 0 and default extras. Submit, then follow QUEUED / SCHEDULED / RUNNING / SUCCEEDED and the logged MLflow results. Real GPU/DDP performance is not claimed on the emulator.
+
+The shared navigation now links Projects, Training jobs, Compare runs and Usage & cost. The home page's project alerts link to job details. Model promotion/prediction pages and portal real sign-in remain separate work. MLflow parallelism labels now describe processes rather than infer GPUs from world size, so laptop CPU runs are not labelled as GPU training.
+
+`tests/e2e/jobs.test.cjs` uses clearly labelled fixture gateway responses for version choice, DDP validation, a lost POST response plus reload/safe retry, cancellation, access denial and project switching. `tests/e2e/jobs-live.test.cjs` creates a real small project/dataset, submits through the form and verifies history and MLflow through the running local gateway/worker. Its setup uses `.env`'s local token without printing it. These tests create local test records. Run with the stack healthy using `npm run test:e2e`.
 
 ### Dataset workflow
 
@@ -197,3 +210,7 @@ The portal's JavaScript tests and browser tests must also be run explicitly with
 `public/brand/cloudtrain-logo-dark.png` and `app/icon.svg` are unchanged copies
 of the team's assets in `docs/brand/` (PR #80). The portal image copies `public/`
 so the approved wordmark is served in production as well as development.
+
+### Jobs verification on 23 November 2026
+
+91 portal unit tests pass. All 6 browser scenarios pass, including a real CPU job submitted through the form, history, MLflow results, original projects/dataset workflows and Adel's comparison/cost pages. After correcting the CPU/process label, the live CPU-job scenario passed again. The production image builds. Full `make check` passes: all service suites and contracts, integration 25 passed / 4 existing skips (short-settings recovery test, real-login step in dev mode, scheduler release and benchmark comparison). No skipped step was removed by this portal change.

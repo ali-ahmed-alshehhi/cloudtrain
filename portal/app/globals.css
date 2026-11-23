@@ -59,3 +59,16 @@ input[type="file"] { font-size: 13px; }
 #datasets { scroll-margin-top: 24px; }
 
 .brand img { display: block; width: 100%; max-width: 168px; height: auto; }
+
+nav a { background: transparent; }
+nav a[aria-current="page"] { background: #29474e; }
+main { min-width: 0; }
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+.button-link { display: inline-block; padding: 11px 17px; background: #334155; color: white; border-radius: 9px; text-decoration: none; font-weight: 600; }
+.history { padding-left: 24px; }
+.history li { padding: 12px 0; border-bottom: 1px solid #e7edef; }
+.history time { color: #536771; font-size: 13px; display: block; }
+.job-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 20px 0; }
+@media (max-width: 640px) { .field-grid { grid-template-columns: 1fr; } }
+
+.notice { overflow-wrap: anywhere; }

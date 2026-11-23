@@ -129,3 +129,15 @@ test("Adel's alert adapter leaves network errors for the feed's back-off", async
   assert.equal(result.status, 502);
   assert.equal(result.body.error.code, "INVALID_RESPONSE");
 });
+
+test("job submission, list, read and cancellation stay on the public gateway", async () => {
+  const calls = [];
+  const api = client(async (url, options) => { calls.push({ url, options }); return new Response('{}', { status: 200 }); });
+  await api.listJobs("project-01"); await api.getJob("job-104");
+  await api.submitJob({ project_id: "project-01" }, "retry-job"); await api.cancelJob("job-104");
+  assert.equal(calls[0].url, "http://localhost:5810/api/v1/jobs?project_id=project-01");
+  assert.equal(calls[1].url, "http://localhost:5810/api/v1/jobs/job-104");
+  assert.equal(calls[2].options.headers.get("Idempotency-Key"), "retry-job");
+  assert.equal(calls[3].url, "http://localhost:5810/api/v1/jobs/job-104/cancel");
+  assert.equal(calls[3].options.method, "POST");
+});
