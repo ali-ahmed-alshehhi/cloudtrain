@@ -44,6 +44,11 @@ def json_answer(status_code: int, body: dict) -> httpx.Response:
     return httpx.Response(status_code, headers=headers, stream=NetworkBody(data))
 
 
+def fake_run(run_id: str, project_id: str | None) -> dict:
+    tags = [{"key": "project_id", "value": project_id}] if project_id else []
+    return {"info": {"run_id": run_id}, "data": {"tags": tags}}
+
+
 class FakeServices:
     def __init__(self) -> None:
         self.received: list[httpx.Request] = []
@@ -66,6 +71,19 @@ class FakeServices:
             "has_authorization": "authorization" in request.headers,
             "body_size": len(request.content),
         }
+        # user-1 is a member of project-01 only; MLflow runs are tagged with their project.
+        if host == "project-service" and request.method == "GET" and request.url.path == "/projects":
+            echo["items"] = [{"project_id": "project-01"}] if echo["user_id"] == "user-1" else []
+        if host == "mlflow" and request.url.path.endswith("/runs/get"):
+            run_id = request.url.params.get("run_id")
+            echo["run"] = fake_run(run_id, "project-02" if run_id == "other" else "project-01")
+        if host == "mlflow" and request.url.path.endswith("/runs/search"):
+            echo["runs"] = [
+                fake_run("mine", "project-01"),
+                fake_run("theirs", "project-02"),
+                fake_run("untagged", None),
+            ]
+            echo["next_page_token"] = "page-2"
         return json_answer(200, echo)
 
     @property
