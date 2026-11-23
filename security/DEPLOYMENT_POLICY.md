@@ -1,20 +1,19 @@
 # Deployment policy: environments, approval, rollback, secrets
 
-Owner: Salem (Student 9). Draft for Checkpoint 1; the AWS parts start when Hamda + Fatma have ECR
-and ECS ready (Wed 18 and Sun 22 Nov). Changes to this file: pull request reviewed by Ali.
+Owner: Salem (Student 9). In force on `main` since 22 Nov (deploy pipeline #151). Changes to this
+file: pull request reviewed by Ali.
 
 ## Environments
 | Environment | Where | How code gets there | Who can deploy | Data |
 |---|---|---|---|---|
 | **local** | each laptop, `docker compose` | `make up` | anyone | fake values from `.env.example`, `AUTH_MODE=dev` |
 | **CI** | GitHub Actions, thrown away after each run | every pull request and push | automatic | fake values |
-| **staging** | AWS (Terraform `environments/staging`) | **automatically** after a merge to `main` passes CI and the security checks | the pipeline only | test data, real login (`AUTH_MODE=jwt`) |
-| **production** (the demo) | AWS | **promotion** of an image already tested on staging, after **approval** | the pipeline only, after a reviewer approves | demo data, real login |
+| **staging** | AWS (today the AWS Emulator) | **automatically** after a merge to `main` passes CI and its images pass the Trivy gate | the pipeline only | test data, real login (`AUTH_MODE=jwt`) |
+| **production** (the demo) | AWS (today the AWS Emulator) | **promotion** of an image already tested on staging, after **approval** | the pipeline only, after Ali or Salem approves | demo data, real login |
 
-> **Open question for Hamda + Fatma:** Terraform has `dev` and `staging` folders. Proposal: `dev` is
-> your playground for trying Terraform changes, `staging` receives every merge, and the demo runs on
-> a `prod` copy of `staging` for the last week only (cost). Alternative: promote inside one
-> environment. To agree before Sat 21 Nov.
+Terraform has `dev` and `staging` folders: `dev` is Hamda + Fatma's playground for Terraform changes
+and is what the pipeline builds on the emulator today; with an AWS account staging and production
+each get their own cluster (repository variables `STAGING_CLUSTER`, `PRODUCTION_CLUSTER`).
 
 ## Where the images are (task #52)
 `.github/workflows/images.yml` builds the 10 images, refuses any with a CRITICAL vulnerability that
@@ -52,7 +51,9 @@ jobs sign in with GitHub OIDC and wait until every service passes its `/health` 
    `gateway:4999c59`). Production receives exactly the image that passed on staging. Never `latest`.
 3. **Only `main` can deploy.** Branches and pull requests are tested, never deployed.
 4. **Approval:** the GitHub environment `production` requires one approval from **Ali or Salem**
-   (not the person who merged). The deploy waits on the run page until someone clicks *Approve*.
+   (set as required reviewers). The deploy waits on the run page (*Review deployments*) until
+   someone clicks *Approve*. While it waits, newer commits still deploy to staging: each
+   environment has its own queue, and the newest waiting production deploy replaces an older one.
 5. **Freeze:** from Wed 25 Nov only bug fixes are deployed (feature freeze in the team plan).
 
 ## Rollback
@@ -80,7 +81,7 @@ jobs sign in with GitHub OIDC and wait until every service passes its `/health` 
 - A leaked secret is rotated first, then removed (see `SECURITY_CHECKS.md`). Gitleaks checks every
   pull request.
 
-## Least privilege (with Hamda + Fatma, from Thu 19 Nov)
+## Least privilege (with Hamda + Fatma; `infrastructure/modules/iam`)
 - One IAM role per service; each gets only the buckets, queues and secrets it uses (e.g. the dataset
   service: the datasets bucket; the scheduler: the training queue).
 - The GitHub deploy role can push to ECR and update ECS services. Nothing else: it cannot create or

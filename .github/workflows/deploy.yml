@@ -41,9 +41,8 @@ permissions:
   contents: read
   actions: read # find the latest images and the previous production version
 
-concurrency:
-  group: deploy-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
-  cancel-in-progress: false # never stop a deploy halfway
+# No workflow-wide queue: one production deploy waiting for approval must not hold back the
+# automatic staging deploys of newer commits. Each environment has its own queue (in the jobs).
 
 env:
   AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
@@ -110,6 +109,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
+    concurrency: # one staging deploy at a time; never stop one halfway
+      group: deploy-staging-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: read # pull the images for the smoke test
@@ -216,6 +218,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production # required reviewers: the run waits here until someone approves
+    concurrency: # one production deploy at a time; a newer one waiting replaces an older one waiting
+      group: deploy-production
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
