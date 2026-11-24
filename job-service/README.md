@@ -23,7 +23,9 @@ to the kitchen and follows it until it is served or sent back.
 - **Retries** a failed job while `retry_limit` allows (event `job.retrying`, `attempt` + 1). When the
   retries are used up, it stays `FAILED` and a failure report goes to `training-jobs-dlq`.
 - **Reads `training-jobs-dlq`**: a job the Scheduler could not handle is put back on the queue
-  (at most `JOB_DLQ_MAX_REQUEUES` times) instead of waiting in `QUEUED` forever.
+  (at most `JOB_DLQ_MAX_REQUEUES` times) instead of waiting forever. This covers a `QUEUED` job,
+  and a `SCHEDULED` job that no worker ever took because every hand-off failed (#167). That job
+  stays `SCHEDULED`: the Scheduler reports `SCHEDULED` again (200) and retries the hand-off.
 - **GPU-hours and cost** per job from `contracts/pricing.yaml`, summed over every attempt
   (a failed attempt still paid for its machine). A running job shows its cost so far. If a machine
   type that ran has no price in `pricing.yaml`, `estimated_cost_usd` is `null` ("unknown"), never 0 (#108).
@@ -75,7 +77,7 @@ even if SQS is down for a while. Why: [docs/decisions/0007-job-service-design.md
 ## Run and test
 
 ```bash
-make test                         # all unit tests (this folder: 90 tests, ~9 s, no Docker needed)
+make test                         # all unit tests (this folder: 93 tests, ~9 s, no Docker needed)
 cd job-service && .venv/bin/python -m pytest -q    # only this service
 make up && make e2e               # the walk-through through the gateway
 ```
@@ -97,7 +99,7 @@ It takes about one minute.
 | `test_submit.py` | `POST /jobs`: the form, membership, dataset and version, idempotency, the queue message, SQS down |
 | `test_lifecycle.py` | every status step, 409 for a step out of order, cancel, heartbeats, the stale-worker guard |
 | `test_recovery.py` | silent worker, time limit, retries, retries used up → dead-letter report, a repeated `SCHEDULED` |
-| `test_dead_letters.py` | reading `training-jobs-dlq`: stuck jobs queued again, stale and unreadable messages dropped |
+| `test_dead_letters.py` | reading `training-jobs-dlq`: stuck `QUEUED` and never-handed-off `SCHEDULED` jobs queued again (#167), stale and unreadable messages dropped |
 | `test_cost.py` | GPU-hours and cost over every attempt, unknown price → `null`, the pricing file missing |
 | `test_access_and_feed.py` | members only, the alert feed (`after`, `limit`, only your projects) |
 | `test_internal_status.py` | `GET /internal/jobs/{id}` for the Scheduler |

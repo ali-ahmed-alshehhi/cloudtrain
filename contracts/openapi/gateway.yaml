@@ -23,6 +23,12 @@ info:
     adds X-User-Id and X-Request-Id, and waits at most 10 seconds (300 for uploads).
     A service that is down or slow gives 503 SERVICE_UNAVAILABLE. Any path containing /internal/
     gives 404. Unknown paths give 404. A method not allowed on a route gives 405.
+
+    MLflow (/api/v1/experiments/*, #107): only these read endpoints are public:
+    experiments/get, experiments/get-by-name, experiments/search, runs/search, runs/get and
+    metrics/get-history (others give 404). Runs are only for members of the run's project
+    (its `project_id` tag): runs/search returns only the caller's runs, and runs/get or
+    metrics/get-history on another project's run give 404 RESOURCE_DOES_NOT_EXIST.
 servers:
   - url: http://localhost:5810
 
