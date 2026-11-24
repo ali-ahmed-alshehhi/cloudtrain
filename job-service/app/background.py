@@ -53,6 +53,20 @@ def watchdog_once(sessions: sessionmaker, queues, lifecycle: Lifecycle) -> int:
     return ended
 
 
+def waiting_for_a_worker(job: Job) -> bool:
+    """True if no worker has this job yet, so putting its message back on the queue is safe.
+
+    QUEUED: the Scheduler never placed it. SCHEDULED with no worker and no heartbeat: the
+    Scheduler placed it, but every hand-off to a worker failed (#167). Its message goes back
+    and the job stays SCHEDULED: the Scheduler reports SCHEDULED again (200, contract #89)
+    and retries the hand-off. If a worker took it meanwhile, that report gets 409 and the
+    Scheduler drops the message, so a job never runs twice.
+    """
+    if job.status == "QUEUED":
+        return True
+    return job.status == "SCHEDULED" and job.worker_id is None and job.last_heartbeat_at is None
+
+
 def read_dead_letters_once(
     sessions: sessionmaker, queues, lifecycle: Lifecycle, wait_seconds: int, max_requeues: int
 ) -> int:
@@ -68,7 +82,7 @@ def read_dead_letters_once(
         action = "dropped_unknown"
         with sessions() as session:
             job = session.scalar(select(Job).where(Job.id == number).with_for_update()) if number else None
-            if job is not None and job.status != "QUEUED":
+            if job is not None and not waiting_for_a_worker(job):
                 action = "dropped_already_handled"  # cancelled or picked up meanwhile
             elif job is not None and job.dlq_requeues < max_requeues:
                 job.dlq_requeues += 1
@@ -83,8 +97,9 @@ def read_dead_letters_once(
             elif job is not None:
                 action = "gave_up"
                 logger.error(
-                    "job could not be scheduled after %s tries; it stays QUEUED until cancelled",
+                    "job could not be scheduled after %s tries; it stays %s until cancelled",
                     max_requeues,
+                    job.status,
                     extra={"job_id": job.public_id},
                 )
             session.commit()
