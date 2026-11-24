@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createGatewayClient } from "./lib/gateway.mjs";
 import Problem from "./components/problem";
+import Navigation from "./components/navigation";
 import Datasets from "./components/datasets";
 import ProjectAlerts from "./components/project-alerts";
 
@@ -82,11 +83,7 @@ export default function Dashboard({ gatewayUrl, devToken }) {
   }
 
   return <div className="shell">
-    <aside className="sidebar">
-      <a className="brand" href="/"><img src="/brand/cloudtrain-logo-dark.png" alt="CloudTrain" width="168" height="69" /><span>ML workspace</span></a>
-      <nav aria-label="Main navigation"><a href="#projects" aria-current="page">Projects</a><a href="#datasets">Datasets</a></nav>
-      <p className="sidebar-note">Organize your data, training and models in one workspace.</p>
-    </aside>
+    <Navigation active="projects" projectId={selectedId} />
     <main id="projects">
       <header className="page-header"><div><p className="eyebrow">YOUR WORKSPACE</p><h1>Projects</h1>
         <p>Create a project to keep your datasets and training runs together.</p></div>

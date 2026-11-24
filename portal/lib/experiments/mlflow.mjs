@@ -244,10 +244,11 @@ export function formatDuration(seconds) {
 /** "single GPU", "DDP on 2 GPUs", or null when the run has no such tags. */
 export function describeParallelism(run) {
   if (!run?.strategy) return null;
-  const gpus = run.worldSize ? `${run.worldSize} GPU${run.worldSize === 1 ? "" : "s"}` : null;
-  if (run.strategy === "single") return gpus ? `single process, ${gpus}` : "single process";
-  if (run.strategy === "ddp") return gpus ? `DDP on ${gpus}` : "DDP";
-  return gpus ? `${run.strategy}, ${gpus}` : run.strategy;
+  // world_size counts processes, including CPU/gloo runs. It does not establish GPU hardware.
+  const processes = run.worldSize ? `${run.worldSize} process${run.worldSize === 1 ? "" : "es"}` : null;
+  if (run.strategy === "single") return "single process";
+  if (run.strategy === "ddp") return processes ? `DDP, ${processes}` : "DDP";
+  return processes ? `${run.strategy}, ${processes}` : run.strategy;
 }
 
 /** The message for a results state (or null when there are results to show). */
