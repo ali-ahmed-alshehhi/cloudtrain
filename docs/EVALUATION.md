@@ -34,6 +34,18 @@ speed. Each links to its row below and to the raw output.
 No number in this report is invented, estimated by hand or taken from FIXTURE data. Simulated or emulated
 results are always labelled as such ([decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md): AWS Emulator, no AWS account).
 
+## What the evaluation found
+
+Measuring the running system also found problems. Each was reported to its owner with the commands and the
+raw output, and most are fixed:
+
+| Found by | Problem | Issue | Fix |
+|---|---|---|---|
+| Checking the Grafana dashboard (#115), 20 Nov | The scheduler's metrics were created only when the first job arrived, so the first jobs were missing from "jobs placed" | #138 | #139 (Maitha), merged 21 Nov |
+| Test B (restart), 21 Nov | A dataset file missing from S3 was reported as "Object storage is not reachable" (503), not as missing (404) | #126 | #142 (Faisal), merged 22 Nov |
+| Test F (burst), 22 Nov | A job that arrives while the only worker is busy waits for the 300 s queue timeout: 3 short jobs took 12 min | #158 | #161 (Maitha), in review: re-tested on the laptop, 3 jobs in 13.2 s |
+| Re-testing the first version of #161, 23 Nov | A retried job stays `SCHEDULED` forever when every hand-off to a worker fails (`dropped_already_handled` = 1) | #167 | #168 (Mariam), merged 23 Nov |
+
 ## 0. Setup
 
 | | Value |
