@@ -115,12 +115,12 @@ test("normalizeRun: duration from start/end, GPU tags, missing values stay null 
   const run = normalizeRun(fixtureRun({ strategy: "ddp", worldSize: 2 }));
   assert.equal(run.durationSeconds, 200);
   assert.equal(run.worldSize, 2);
-  assert.equal(describeParallelism(run), "DDP on 2 GPUs");
+  assert.equal(describeParallelism(run), "DDP, 2 processes");
   const running = normalizeRun(fixtureRun({ status: "RUNNING", end: null, metrics: [] }));
   assert.equal(running.durationSeconds, null);
   assert.deepEqual(running.metrics, {});
   assert.equal(normalizeRun({}).worldSize, null);
-  assert.equal(describeParallelism(normalizeRun(fixtureRun())), "single process, 1 GPU");
+  assert.equal(describeParallelism(normalizeRun(fixtureRun())), "single process");
 });
 
 test("summarizeMetrics: final values win; per-epoch value otherwise; unknown metrics kept; missing ones omitted", () => {
