@@ -63,6 +63,10 @@ export function createGatewayClient({ gatewayUrl, getToken = () => "", fetchImpl
         return { status: error.status, body: { error: { code: error.code, message: error.message, request_id: error.requestId } } };
       }
     },
+    listJobs: (projectId, signal) => request(`/api/v1/jobs?${new URLSearchParams({ project_id: projectId })}`, { signal }),
+    getJob: (jobId, signal) => request(`/api/v1/jobs/${encodeURIComponent(jobId)}`, { signal }),
+    submitJob: (body, key) => request("/api/v1/jobs", { method: "POST", body, headers: { "Idempotency-Key": key } }),
+    cancelJob: (jobId) => request(`/api/v1/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }),
     listProjects: (signal) => request("/api/v1/projects", { signal }),
     listDatasets: (projectId, signal) => request(`/api/v1/datasets?${new URLSearchParams({ project_id: projectId })}`, { signal }),
     uploadDataset: (form, idempotencyKey, signal) => request("/api/v1/datasets", {
