@@ -202,17 +202,40 @@ class Scheduler:
             self.logger.info("released machine", extra={"job_id": job_id, "machine": released})
 
     def read_queue_once(self) -> None:
+        # Do not take a message while every slot is occupied. Free finished
+        # jobs first; if still full, wait a short interval and return so the
+        # loop retries without burning an SQS receive (which counts toward
+        # MAX_RECEIVE_COUNT and would eventually send the message to the DLQ).
+        if not self.capacity.has_capacity():
+            self.free_finished_slots()
+            if not self.capacity.has_capacity():
+                time.sleep(BUSY_RETRY_SECONDS)
+                return
+
         answer = self.sqs.receive_message(
             QueueUrl=self.queue_url(), MaxNumberOfMessages=1, WaitTimeSeconds=20
         )
-        for message in answer.get("Messages", []):
+        messages = answer.get("Messages", [])
+
+        # Queue empty: free finished slots so Prometheus gauges update
+        # promptly instead of waiting for the next job to need a slot.
+        if not messages:
+            if self.capacity.active_jobs:
+                self.free_finished_slots()
+                self._update_metrics()
+            return
+
+        for message in messages:
             try:
                 done = self.handle_job(json.loads(message["Body"]))
             except httpx.HTTPError:
                 self.logger.exception("could not reach the job service or the worker")
                 done = False
             if done:
-                self.sqs.delete_message(QueueUrl=self.queue_url(), ReceiptHandle=message["ReceiptHandle"])
+                self.sqs.delete_message(
+                    QueueUrl=self.queue_url(),
+                    ReceiptHandle=message["ReceiptHandle"],
+                )
 
 
 def create_app(
