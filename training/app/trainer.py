@@ -4,6 +4,7 @@ import io
 import json
 import tempfile
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -260,6 +261,7 @@ def _train_context(ctx, job, dataset_dir: Path, resume: bytes | None, publish, c
         model.train()
         training_loss = 0.0
         seen = 0
+        epoch_start = _clock(ctx.device)
         for inputs, labels in train_loader:
             if cancel_check():
                 raise TrainingCancelled("training stopped by cancellation or timeout")
@@ -270,6 +272,7 @@ def _train_context(ctx, job, dataset_dir: Path, resume: bytes | None, publish, c
             optimizer.step()
             training_loss += loss.item() * labels.size(0)
             seen += labels.size(0)
+        epoch_seconds = _clock(ctx.device) - epoch_start
         totals = torch.tensor([training_loss, seen], dtype=torch.float64, device=ctx.device)
         if ctx.distributed:
             ddp.dist.all_reduce(totals)
@@ -296,7 +299,10 @@ def _train_context(ctx, job, dataset_dir: Path, resume: bytes | None, publish, c
         best_loss = min(best_loss, final["validation_loss"])
         if ctx.is_main:
             checkpoint = _checkpoint_bytes(ddp.unwrap(model), optimizer, epoch + 1, best_loss)
-            publish(epoch + 1, final, checkpoint, is_best)
+            # For the 1 vs N comparison (#76): the main process's training time, and the images
+            # of all processes together (`totals` is already summed over them).
+            timing = {"epoch_seconds": epoch_seconds, "epoch_images": float(totals[1].item())}
+            publish(epoch + 1, {**final, **timing}, checkpoint, is_best)
 
     if not ctx.is_main:
         return TrainingOutcome(final, None, None, b""), []
@@ -313,6 +319,15 @@ def _train_context(ctx, job, dataset_dir: Path, resume: bytes | None, publish, c
         bundle = _cifar_bundle(plain_model)
         example = torch.zeros(1, 3, 32, 32).numpy()
     return TrainingOutcome(final, plain_model.cpu(), example, bundle), []
+
+
+def _clock(device) -> float:
+    """Seconds now; on a GPU, first wait for the work already queued, or the time would be too short."""
+    import torch
+
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    return time.perf_counter()
 
 
 def _checkpoint_bytes(model, optimizer, epoch: int, best_loss: float) -> bytes:
