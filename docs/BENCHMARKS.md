@@ -3,11 +3,16 @@
 **Owners:** Ahmed + Abdulla (Student 5). **Real** measurements only.
 Tensor and pipeline parallelism must never be simulated and presented as real GPU scaling.
 
-> **Status on 14 Nov 2026: the mandatory benchmark on 2 GPUs has not run yet.** It needs the team's cloud
-> machine with 2 or more GPUs (issue #30). The numbers below come from **local runs** on a workstation
-> with one GPU: on real CIFAR-10 images, and on synthetic images. They show that the tools work and give
-> first results for sections 3, 4 and 6. Everything that still waits for the cloud run is marked
-> **pending**.
+> **Status on 25 Nov 2026: no 2-GPU run has been measured.** Under decision 0011 the team's AWS is an
+> emulator that starts no real machines, so there is no cloud GPU (issue #35). What is measured:
+> - **Single vs DDP through the whole platform** (gateway → Training Jobs → Scheduler → worker → MLflow), with
+>   2 processes on CPU on the local stack: section 2, "Through the platform". This is what the portal's
+>   comparison page (demo step 8) shows. It is **not** GPU scaling and is labelled so everywhere.
+> - **Local runs on a workstation with one GPU**, on real CIFAR-10 images and on synthetic images: sections 2
+>   to 4. They show that the tools work and how data loading behaves.
+>
+> Every number is labelled with where it was measured. Nothing here is measured on AWS. Results that need 2
+> real GPUs are marked **not measured**.
 
 Every number here comes from a result file in [`docs/benchmarks/`](benchmarks/). To print the tables of a
 file again, run `python -m distributed.benchmark report ../docs/benchmarks/<file>` from `training/`.
@@ -26,17 +31,18 @@ file again, run `python -m distributed.benchmark report ../docs/benchmarks/<file
 | Seeds | 0, 1, 2 | 0, 1, 2 for every GPU count |
 | DataLoader workers per process | 8 on CIFAR-10, 4 on synthetic images | The best value of the DDP sweep in section 3 |
 
-The tabular use case is not benchmarked yet: its training script belongs to the training runtime
-(Abdullah), which is not written yet.
+The tabular use case (Wisconsin Breast Cancer, `tabular_mlp`) is measured through the whole platform on
+CPU: its setup is in section 2, "Through the platform".
 
 ## 2. 1 GPU vs multi-GPU DDP (mandatory)
 
-**Pending: the run on 2 GPUs.**
+**Not measured on 2 GPUs:** there is no machine with 2 real GPUs (decision 0011, issue #35). The single vs
+DDP comparison that ran is on CPU, through the platform, further down in this section.
 
 | Run | GPUs | Time per epoch | Total time | Throughput (images/s) | Speedup | Efficiency | GPU-hours | Cost (USD) | Final accuracy |
 |---|---|---|---|---|---|---|---|---|---|
-| single | 1 | pending | | | 1.0 | 100% | | | |
-| ddp | 2 | pending | | | | | | | |
+| single | 1 | not measured | | | 1.0 | 100% | | | |
+| ddp | 2 | not measured | | | | | | | |
 
 - **Speedup** = time on 1 GPU / time on N GPUs.
 - **Efficiency** = speedup / N.
@@ -80,7 +86,48 @@ Cost is n/a because the workstation is not a machine type in the pricing contrac
 [`local-cifar10-1gpu-baseline.json`](benchmarks/local-cifar10-1gpu-baseline.json) and
 [`local-1gpu-baseline.json`](benchmarks/local-1gpu-baseline.json).
 
-### Command for the cloud run
+### Through the platform: single vs DDP, 2 processes on CPU, local stack
+
+**Label: "2 processes on CPU, local stack". Not GPUs, not AWS.** Measured on 25 Nov 2026 on a MacBook Pro
+(Apple silicon, 18 CPU cores), with the whole platform running in Docker (Colima VM: 8 CPUs, 16 GB). Every
+job went through the gateway, Training Jobs, the Scheduler (machine `local-cpu`) and the training worker, and
+logged to MLflow. The DDP job ran 2 worker processes that share gradients over gloo.
+
+| Run | Processes | Seeds | Time per epoch (ms) | Throughput (rows/s) | Speedup | Efficiency | Job wall time (s) | GPU-hours (as billed) | Accuracy |
+|---|---|---|---|---|---|---|---|---|---|
+| single | 1 | 3 | 13.6 | 34,031 | 1.00 | 100% | 3.8 | 0.0011 | 0.968 |
+| ddp | 2 | 3 | 14.2 | 31,606 | 0.96 | 48% | 5.2 | 0.0029 | 0.968 |
+
+- **Workload, the same in every run:** `tabular_mlp` on the Wisconsin Breast Cancer data (569 rows, 30
+  features; decision 0008), 455 rows for training and 114 held out, 10 epochs, batch size 16 per process,
+  learning rate 0.05, 0 DataLoader workers, seeds 0, 1 and 2. Each epoch trained on 448 rows in both runs
+  (the last incomplete batch is dropped), so `epoch_images` is equal and the times compare the same work.
+- **Time per epoch and throughput** come from the MLflow metrics `epoch_seconds` and `epoch_images`, the first
+  epoch left out, the same arithmetic as `metrics.py` and the comparison page. **Job wall time** is Training
+  Jobs' `started_at` to `finished_at`, with start-up and evaluation.
+- **GPU-hours (as billed)** are Training Jobs' numbers: `gpu_count` × hours. No GPU was used: locally the
+  Scheduler runs every job on `local-cpu`. Cost is 0 because `local-cpu` is priced at 0 in `pricing.yaml`.
+- **Spread between seeds (standard deviation of the time per epoch):** single 13.6 ± 3.0 ms (22%), ddp
+  14.2 ± 0.6 ms (4%). One single run had a slow later epoch (17.0 ms against 11.3 and 12.4 ms).
+
+**What this shows.** The 4% difference in time per epoch is far inside the 22% spread, so on this job a second
+process gives **no measurable speedup**. What it does change is clear and the same in every seed: a DDP job
+took 1.3 to 1.6 s longer from start to finish (5.1 to 5.3 s against 3.7 to 3.9 s), the cost of starting two
+processes and their process group. The model has 1,058 parameters, and an epoch is 28 small steps (14 per process under DDP):
+sharing gradients after every step costs as much as the step itself, which is what the CPU check in section 4
+found. This is the case the selector (section 5) keeps on one worker. Accuracy was the same per seed.
+
+Result file: [`platform-cpu-single-vs-ddp.json`](benchmarks/platform-cpu-single-vs-ddp.json), with the job IDs,
+the MLflow run IDs and every epoch. To run it again on the local stack (`make up` first):
+
+```bash
+cd training
+CLOUDTRAIN_TOKEN=<DEV_AUTH_TOKEN from ../.env> python -m distributed.platform_compare \
+    --csv <wisconsin.csv> --label "2 processes on CPU, local stack" --epochs 10 \
+    --out ../docs/benchmarks/platform-cpu-single-vs-ddp.json
+```
+
+### Command for a run on 2 real GPUs (not measured)
 
 ```bash
 cd training
@@ -287,7 +334,11 @@ When DDP is worth it, and when it is not. **So far, from the local runs only:**
    up to 11%. A difference of that size between two settings means nothing without more runs.
 6. **Small models lose with DDP.** In the CPU check, sharing gradients took three times as long as the
    rest of the step. It is a CPU result, so it is a warning, not a GPU number.
+7. **Through the whole platform, a small job gains nothing from DDP and pays for it in start-up.** On the
+   tabular job (section 2, "Through the platform"), 2 processes were not faster per epoch than 1, and every
+   DDP job took 1.3 to 1.6 s longer from start to finish. The platform part works end to end: the job form,
+   the Scheduler, the worker's DDP path and the per-epoch MLflow metrics that the comparison page reads.
 
-**Not known until the cloud run:** the real speedup and efficiency on 2 or more GPUs, the cost of sharing
+**Not measured, because there is no machine with 2 real GPUs (decision 0011):** the real speedup and efficiency on 2 or more GPUs, the cost of sharing
 gradients over NCCL, the start-up time of a DDP job, the best number of workers under DDP, and whether a
 DDP job costs more or less than the same job on one GPU.
