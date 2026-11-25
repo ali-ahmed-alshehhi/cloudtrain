@@ -9,7 +9,8 @@ info:
     (deployments, which version is live, rollback history).
 
     Internal: Inference calls `GET /models/{model_id}/production` to know which version to load.
-    A new version must pass the inference `/health` check before it takes traffic; a failed
+    A new version must pass inference's candidate check
+    (`POST /internal/models/{id}/candidates`) before it takes traffic; a failed
     deployment never replaces the healthy one.
 servers:
   - url: http://model-registry:8006
