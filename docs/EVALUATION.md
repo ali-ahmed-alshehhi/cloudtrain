@@ -1,8 +1,7 @@
 # Evaluation: performance, reliability and cloud cost
 
-**Owners:** Hilal + Adel (Student 10). **Status on 23 Nov 2026: Tests A, B, C (speed, upload/download, alert),
-D (real training), E (alert delay in the portal), F (a burst of jobs), G (prediction latency), H (worker killed mid-job) and I (the whole website, end to end) measured on a laptop; only the 1 GPU vs 2-GPU numbers are still pending (Ahmed + Abdulla, #76).** The
-⏳ row names who it waits on and when. Final version: Fri 27 Nov.
+**Owners:** Hilal + Adel (Student 10). **Status on 25 Nov 2026: Tests A to J measured on a laptop, including single vs DDP
+through the platform (J, 2 processes on CPU). Not measured: DDP on real GPUs (no AWS account, decision 0011).** Final version: Fri 27 Nov.
 
 ## Headline results
 
@@ -22,7 +21,8 @@ speed. Each links to its row below and to the raw output.
 | Alert delay in the portal | an alert is on the Projects page **2.3 s** (median) after the job event, never more than **5.0 s** (the page's 5 s poll); 40 of 40 alerts shown (Test E) |
 | 10 real training jobs | **10 of 10 succeeded**; time per job median **3.05 s** on the laptop CPU, with the walk-through's tiny 8-row CSV (platform overhead, not training on real data); queue wait average 36 ms (runs 1–3) (Test D) |
 | Cost | **$0 spent** (no AWS account, decision 0011). Local jobs run on `local-cpu`, priced $0. GPU costs in this report are estimates of what AWS would charge |
-| Still pending | 1 GPU vs 2-GPU DDP (Ahmed + Abdulla, Tue 24) |
+| Single vs DDP | through the whole platform, **2 processes on CPU, local stack**: each epoch **1.50× faster** (26.6 → 17.8 ms, 75% efficiency), but each DDP job **0.7 s longer** end to end; the comparison page shows the same numbers (Test J). On Abdulla's laptop: 0.96×. Not on GPUs |
+| Not measured | DDP on real GPUs, and anything on AWS (no account, decision 0011) |
 
 **How to read the status column**
 
@@ -52,7 +52,7 @@ raw output, and most are fixed:
 | | Value |
 |---|---|
 | Where everything runs | Docker Compose on a laptop (`make up`): 12 containers, i.e. the 9 CloudTrain services plus Postgres, LocalStack (S3, SQS) and MLflow; 15 with the monitoring stack (#115, on `main` since 22 Nov) |
-| Laptop used for Tests A to I | MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM, macOS 27.2.1; Docker Engine 29.9.2 and Docker Compose v5.6.1, with 7.7 GiB of memory for the containers |
+| Laptop used for Tests A to J | MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM, macOS 27.2.1; Docker Engine 29.9.2 and Docker Compose v5.6.1, with 7.7 GiB of memory for the containers |
 | "Cloud" | The AWS Emulator with the same Terraform ([decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md), merged in #112): checks the infrastructure, runs no real machines |
 | GPUs | Real GPU runs only on a team workstation (Ahmed + Abdulla, `docs/BENCHMARKS.md`). No cloud GPU |
 | Monitoring | Prometheus + Grafana dashboard "CloudTrain overview" and `job-events-monitor` (`monitoring/`, #115, #109) |
@@ -87,7 +87,7 @@ raw output, and most are fixed:
 |---|---|---|---|
 | What scales separately and how | ✅ Read from the code (22 Nov, `main` at `a21d01c`); not measured on AWS (no account) | **Training:** GPU workers in two EC2 Auto Scaling groups (decision 0012): `gpu-1` (`g4dn.xlarge`, `worker_desired_capacity`, at most `worker_max_size` = 2) and `gpu-4` (`g4dn.12xlarge`, at most 1). The size changes with one `terraform apply`; nothing scales it automatically. **Services:** each is its own ECS Fargate service, but Terraform gives all of them the same `ecs_desired_count` (1 in the dev settings) and no autoscaling; the gateway and portal sit behind the load balancer. **Between them:** SQS. `POST /jobs` answers 202 at once and the job waits in `training-jobs`, so a burst of submissions never blocks the API. **Limit:** the scheduler places only `SCHEDULER_MAX_WORKERS` jobs at once (default 1, not set in Terraform), so more GPU machines alone do not run more jobs at once (Test F) | `infrastructure/main.tf`, `infrastructure/README.md`, decision 0012, `scheduler/app/main.py` |
 | A burst of jobs with one worker | ✅ Measured on a laptop (22 Nov, `db26b20`): 3 small CPU jobs submitted at the same moment | Waits **0.1 s, 300.3 s and 729.2 s**; together they needed about 11 s of training and took **732 s**. A job that arrives while the worker is busy is turned away and SQS hides it for the 300 s visibility timeout (3 "no capacity" lines in the scheduler log). The 729 s includes a pause of the laptop of about 3.5 min; the code predicts about 600 s. Fixes are the Scheduler owner's call (Maitha): reported as #158 | [`docs/evaluation/test-f-burst.md`](evaluation/test-f-burst.md) |
-| 1 GPU vs 2-GPU DDP: speedup, efficiency, throughput, GPU-hours | ⏳ Waiting on: Ahmed + Abdulla, the run IDs on #76 (#30, Tue 24). Measured from those runs with `docs/evaluation/compare_runs.py` (the comparison page's arithmetic) and shown with **where they ran** (their `result_label`, e.g. "2 processes on CPU, local stack" or "Kaggle 2× T4, not on AWS"): never presented as cloud GPU numbers unless they are | | `docs/BENCHMARKS.md` section 2, #76 |
+| 1 vs 2-process DDP: speedup, efficiency, throughput, GPU-hours | ✅ Measured on a laptop (25 Nov, `b087330`): Abdulla's `platform_compare` (#173), 3 seeds each, read back with `compare_runs.py` and on `/compare`. **Where it ran: 2 processes on CPU, local stack**, not GPUs. ⏳ Not measured: DDP on real GPUs (no AWS account) | Time per epoch 26.6 → 17.8 ms: **speedup 1.50×, efficiency 75%**; throughput 16,822 → 25,194 rows/s; job wall time 4.9 → 5.6 s; accuracy 0.968 both. On Abdulla's laptop 0.96× (`docs/BENCHMARKS.md`): with 15–30 ms epochs the result depends on the machine | [`docs/evaluation/test-j-single-vs-ddp.md`](evaluation/test-j-single-vs-ddp.md), `docs/BENCHMARKS.md` section 2, #76 |
 | Local 1-GPU baseline (not the comparison) | ✅ Measured by Ahmed + Abdulla on 1× RTX 5090 | CIFAR-10, ResNet-18, 10 epochs: 2.0 s per epoch, 74.0% accuracy (3 seeds) | `docs/BENCHMARKS.md`, `docs/benchmarks/local-cifar10-1gpu-baseline.json` |
 
 ## 4. Cloud cost
@@ -109,7 +109,7 @@ All three are on `main` since 18 Nov.
 | What | Status | Result | Evidence |
 |---|---|---|---|
 | Cost per job and per project | ✅ Real jobs (22 Nov): the scheduler chose `local-cpu` for all 10, so 0.0 GPU-hours and **$0.00** each, the real price of `local-cpu` (not a missing value). Portal views on `main` (#117), tested with FIXTURE jobs for GPU prices; shown on the pages `/usage` and `/compare` (#156, merged 22 Nov). A GPU job's cost needs a GPU machine, which the laptop and the AWS Emulator do not have | | `portal/components/usage/`, `portal/test/usage.test.mjs` |
-| Cost of the 1 GPU vs 2 GPU benchmark | ⏳ Waiting on: Ahmed + Abdulla, 2-GPU run (Tue 24 Nov) | | `docs/BENCHMARKS.md` |
+| Cost of the single vs DDP runs | ✅ From Training Jobs for the Test J runs | GPU-hours as billed 0.0014 (single) and 0.0031 (DDP) per job; cost **$0.00**, because `local-cpu` is priced $0. On GPUs it would be GPU-hours × the price in `contracts/pricing.yaml`: not measured | [`docs/evaluation/test-j-single-vs-ddp.md`](evaluation/test-j-single-vs-ddp.md) |
 | Total cloud spend | **$0: no AWS account.** The team uses the AWS Emulator (decision 0011), so all costs in this report are **estimates of what the same work would cost on AWS**, not bills | | [decision 0011](decisions/0011-aws-emulator-instead-of-aws-account.md) |
 | Keeping cost down | ✅ Checked in the code (20 Nov, `main` at `474a732`). **1. Smallest machine that fits:** the scheduler picks 0 GPU → `c6i.2xlarge`, 1 → `g4dn.xlarge`, 2–4 → `g4dn.12xlarge`, 5–8 → `g4dn.metal` (`scheduler/app/machines.py`, #105); locally always `local-cpu` ($0). **2. Machines are not started and stopped per job:** each GPU pool has a fixed size set in Terraform (`worker_desired_capacity`, 1 in the dev settings; the 4-GPU pool 0; min 0), with no autoscaling, so a machine costs money while idle: one idle `g4dn.xlarge` ≈ **$12.62 a day** (24 h × $0.526). Saving money is manual: set the capacity to 0 when nobody trains, `terraform destroy` after use. **3.** The scheduler frees a job's slot only when the next job needs one ("Busy workers" stays 1 after a job); that affects placement, not the bill | | `scheduler/app/machines.py`, `infrastructure/main.tf`, `infrastructure/README.md` ("Demo 4"), `contracts/pricing.yaml` |
 
@@ -164,6 +164,7 @@ open http://localhost:3001                # Grafana, dashboard "CloudTrain overv
 | G | Prediction latency through the gateway, 100 requests | [`evaluation/test-g-predict-latency.md`](evaluation/test-g-predict-latency.md) |
 | H | Worker killed mid-job: time to detect, retry and finish, 3 runs | [`evaluation/test-h-recovery.md`](evaluation/test-h-recovery.md) |
 | I | The whole website, end to end: all six browser tests and the walk-through on the real stack | [`evaluation/test-i-website-e2e.md`](evaluation/test-i-website-e2e.md) |
+| J | Single vs DDP through the platform (2 processes on CPU), read on the comparison page | [`evaluation/test-j-single-vs-ddp.md`](evaluation/test-j-single-vs-ddp.md) |
 
 The automatic checks behind the "🧪 Tested" lines:
 
@@ -178,7 +179,7 @@ cd portal && npm test                                       # portal unit tests
 
 | Who | Part of this evaluation |
 |---|---|
-| Adel | This report and its methods; Tests A to I on a laptop; the job-events reader, Prometheus alerts and Grafana dashboard (#115, contract #125, decision 0014 in #152); live job status and alerts (#96, #100), MLflow results (#98), cost views (#117), the 1-GPU vs multi-GPU comparison (#124) and their pages `/compare` and `/usage` (#156) in the portal. Problems found and reported while measuring: #126 (Faisal), #138 (Maitha, fixed in #139) |
+| Adel | This report and its methods; Tests A to J on a laptop; the job-events reader, Prometheus alerts and Grafana dashboard (#115, contract #125, decision 0014 in #152); live job status and alerts (#96, #100), MLflow results (#98), cost views (#117), the 1-GPU vs multi-GPU comparison (#124) and their pages `/compare` and `/usage` (#156) in the portal. Problems found and reported while measuring: #126 (Faisal), #138 (Maitha, fixed in #139) |
 | Hilal | Portal pages (#99: projects, datasets, job alerts on the Projects page; #165: submit a training job, the jobs list and the live job page) and their browser tests (functional checks, passing). ⏳ Browser timings: recorded here once measured |
 | Ahmed + Abdulla | GPU benchmarks (`docs/BENCHMARKS.md`) |
 | Mariam | Job timings, retries and cost fields (Training Jobs) |
