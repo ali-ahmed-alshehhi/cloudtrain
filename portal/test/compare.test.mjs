@@ -195,6 +195,10 @@ test("formatting", () => {
   assert.equal(formatThroughput(null), "not logged");
   assert.equal(formatSeconds(1.25), "1.25 s");
   assert.equal(formatSeconds(31), "31.0 s");
+  assert.equal(formatSeconds(0.0178), "17.8 ms");
+  assert.equal(formatSeconds(0.0266), "26.6 ms");
+  assert.equal(formatSeconds(0.999), "999.0 ms");
+  assert.equal(formatSeconds(1), "1.00 s");
 });
 
 test("groupComparable alone: a lone run is shown with what is missing", () => {

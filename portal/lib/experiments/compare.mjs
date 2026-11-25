@@ -290,5 +290,7 @@ export function formatThroughput(value) {
 }
 export function formatSeconds(value) {
   if (value === null) return "not logged";
+  // Under one second (small CPU epochs: 17.8 vs 26.6 ms) whole hundredths hide the difference: show ms.
+  if (value < 1) return `${(value * 1000).toFixed(1)} ms`;
   return value < 10 ? `${value.toFixed(2)} s` : `${value.toFixed(1)} s`;
 }
