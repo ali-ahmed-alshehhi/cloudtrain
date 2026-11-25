@@ -40,7 +40,7 @@ If capacity is full the message stays on the queue for the next poll.
 
 ## Tests
 
-- `tests/test_standin.py` — 8 integration tests (job placement, cancellation, error paths, capacity)
+- `tests/test_standin.py` — 33 integration tests (job placement, cancellation, error paths, capacity)
 - `tests/test_capacity.py` — 6 unit tests for `CapacityTracker`
 - `tests/test_machine.py` — 5 unit tests for machine-type selection
 
