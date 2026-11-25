@@ -1,0 +1,22 @@
+# LocalStack for Student 6 Terraform practice (same tool as the app — decision 0005 / 0009).
+# Does not replace root docker-compose.yml; this only publishes a host port for terraform apply.
+#
+#   cd infrastructure
+#   docker compose -f docker-compose.localstack.yml up -d
+#   terraform apply -var-file=environments/dev/localstack.tfvars.example
+
+services:
+  localstack:
+    image: localstack/localstack:4.14 # same pin as root docker-compose.yml
+    ports:
+      # Host 4568 avoids clashing with other labs on 4566
+      - "4568:4566"
+    environment:
+      SERVICES: s3,sqs
+      SQS_ENDPOINT_STRATEGY: path
+      DEBUG: "0"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

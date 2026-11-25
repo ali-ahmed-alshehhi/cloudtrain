@@ -3,6 +3,9 @@
 One short file per important decision, numbered in order: `NNNN-short-title.md`.
 Each one says: **context** (the problem), **decision**, **why**, **trade-offs**.
 
+**Numbering:** when you open the pull request, take the next free number on `main`. If two pull
+requests pick the same number, whoever merges second renumbers. Gaps are fine; a number is never reused.
+
 Write one when you change a default (portal framework, login provider, EC2 vs Batch), change a contract,
 or make a choice others must live with. Copy the shape of `0001-microservices-and-gateway.md`.
 
@@ -14,3 +17,10 @@ or make a choice others must live with. Copy the shape of `0001-microservices-an
 | 0004 | Public GitHub repository | accepted (instructors to confirm) |
 | 0005 | LocalStack S3 instead of MinIO on laptops | accepted |
 | 0006 | Amazon Cognito as the login provider | accepted |
+| 0007 | How the Training Jobs service stays correct when things fail | accepted (contract change #89) |
+| 0009 | Terraform local practice uses LocalStack (not AWS Emulator) | superseded by 0011 |
+| 0010 | How models are saved, served and deployed | proposed |
+| 0011 | The AWS Emulator stands in for an AWS account | accepted |
+| 0012 | Training workers run on EC2 in an Auto Scaling group | accepted |
+| 0013 | A small Pulumi layer above Terraform (CloudWatch dashboard) | accepted (#147) |
+| 0014 | Monitoring: one job-events reader, Prometheus and Grafana, matching alarms in CloudWatch | proposed |

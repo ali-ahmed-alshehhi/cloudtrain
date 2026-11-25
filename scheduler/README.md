@@ -1,31 +1,52 @@
 # Scheduler — `scheduler/`
 
-> **Stand-in.** Maitha: Replace this stand-in with your real service. Keep the contract. Run `make check` before opening a PR.
->
-> What the stand-in already does, and what it does not, is written at the top of `app/main.py`. Its tests in `tests/` show the contract in action: keep them passing (or replace them with better ones).
-
 | Owner | Port | Contract |
 |---|---|---|
 | Maitha (Student 7) | 8004 (internal only) | `contracts/openapi/scheduler.yaml`, `contracts/training-job.schema.json` |
 
-## What it must do
-Decide where and when each training job runs: CPU or GPU, which machine type, placement and capacity,
-quotas and concurrency limits, waiting when capacity is full, starting workers on the infrastructure
-from Hamda and Fatma, releasing machines after each job, and watching worker health.
+## What it does
+
+Reads the `training-jobs` SQS queue (long polling, 20 s wait) and places each job on a worker.
+For every message it picks a machine type based on `gpu_count` (CPU or GPU, see `app/machines.py`),
+checks capacity (concurrency limit via `CapacityTracker` in `app/capacity.py`), reports SCHEDULED
+to Training Jobs, hands the job to the worker, reports RUNNING, and deletes the queue message.
+
+If the worker is busy (409) it retries every 5 seconds up to the SQS visibility timeout.
+If Training Jobs returns 409, the job was cancelled — the slot is released and the message deleted.
+If capacity is full the message stays on the queue for the next poll.
 
 ## Endpoints
+
 **Public:** none (internal only). **Own:** `GET /health`, `GET /metrics`.
 
 **Calls (internal):**
-- `POST training-worker:8010/internal/run` (local) — or starts an EC2 instance with the job form (cloud)
-- `POST job-service:8003/internal/jobs/{id}/status` — SCHEDULED / RUNNING, with machine type and times.
-  A 409 answer means the job was cancelled: stop the worker and release the machine.
 
-## Reads and writes
-- Queue: the **only reader** of `training-jobs`. Deletes the message once a worker has accepted the job;
-  after that the job is protected by the heartbeat lease, not by the queue.
-- Writes: PostgreSQL schema `scheduler` (workers, capacity, quotas).
+- `POST training-worker:8010/internal/run` — hand the full job form to the local worker
+- `POST job-service:8003/internal/jobs/{id}/status` — SCHEDULED and RUNNING, with `machine_type` and `started_at`
 
-## Acceptance test
-CPU and GPU jobs land on the right machines, jobs wait when capacity is full, and machines are
-released after use.
+## Configuration (environment variables)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ENVIRONMENT` | `local` | `local` or `cloud` — controls machine-type selection |
+| `SCHEDULER_MAX_WORKERS` | `1` | Maximum concurrent jobs (capacity limit) |
+| `SQS_ENDPOINT` | *(none)* | LocalStack endpoint for local development |
+| `TRAINING_JOBS_QUEUE` | `training-jobs` | SQS queue name |
+| `JOB_SERVICE_URL` | `http://job-service:8003` | Training Jobs service base URL |
+| `TRAINING_WORKER_URL` | `http://training-worker:8010` | Training Worker base URL (fallback for machine types not in TRAINING_WORKER_URLS) |
+| `TRAINING_WORKER_URLS` | `{}` | JSON dict mapping machine types to worker pool URLs, e.g. `{"g4dn.xlarge": "http://gpu-lb:8010"}` |
+| `SCHEDULER_MAX_GPUS` | *(none)* | Maximum total GPUs the scheduler will commit; unlimited if unset |
+| `SQS_VISIBILITY_TIMEOUT_SECONDS` | `300` | Max time to wait for a busy worker |
+
+## Tests
+
+- `tests/test_standin.py` — 33 integration tests (job placement, cancellation, error paths, capacity)
+- `tests/test_capacity.py` — 6 unit tests for `CapacityTracker`
+- `tests/test_machine.py` — 5 unit tests for machine-type selection
+
+Run: `make test` (Docker) or `pytest scheduler/` from the service directory.
+
+## Queue contract
+
+The scheduler is the **only reader** of `training-jobs`. Once a worker accepts the job, the message
+is deleted — after that the job is protected by the heartbeat lease, not the queue.

@@ -1,0 +1,11 @@
+# Real AWS remote state. Copy and fill after the state bucket exists:
+#   cp backends/dev.s3.backend.hcl.example backends/dev.s3.backend.hcl
+#   terraform init -backend-config=backends/dev.s3.backend.hcl
+#
+# Never commit the filled .hcl if it contains account-specific secrets.
+
+bucket       = "cloudtrain-tfstate-CHANGE-ME"
+key          = "cloudtrain/dev/terraform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true

@@ -1,0 +1,33 @@
+# Copy to terraform.tfvars (git-ignored) for a real AWS apply:
+#   cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
+# Then fill in the region and unique bucket names.
+
+environment = "dev"
+owner       = "hamda-fatma"
+aws_region  = "us-east-1" # confirm with instructors (OPEN_DECISIONS #1)
+
+use_localstack            = false
+enable_networking         = true
+enable_container_registry = true
+enable_database           = true
+enable_identity           = true
+enable_ecs_roles          = true
+
+# S3 names must be globally unique on real AWS.
+datasets_bucket_name  = "cloudtrain-dev-datasets-CHANGE-ME"
+artifacts_bucket_name = "cloudtrain-dev-artifacts-CHANGE-ME"
+
+sqs_visibility_timeout_seconds = 300
+sqs_max_receive_count          = 3
+
+db_instance_class      = "db.t4g.micro"
+db_multi_az            = false
+db_deletion_protection = false
+
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+enable_service_roles         = true
+enable_application_services  = true
+enable_ecs_service_discovery = true
+ecs_desired_count            = 1
+# ecs_image_tag = "<commit sha from images.yml>"

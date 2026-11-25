@@ -11,31 +11,39 @@ DatasetId = Annotated[str, Field(pattern=r"^dataset-[0-9]+$")]
 class Hyperparameters(BaseModel):
     model_config = ConfigDict(extra="allow")  # extra settings (e.g. momentum) are allowed
 
-    epochs: int = Field(ge=1, le=1000)
-    batch_size: int = Field(ge=1, le=4096)
+    epochs: int = Field(ge=1, le=1000, strict=True)
+    batch_size: int = Field(ge=1, le=4096, strict=True)
     learning_rate: float = Field(gt=0, le=10)
+
+    @model_validator(mode="after")
+    def extra_settings_are_plain_values(self) -> "Hyperparameters":
+        # The contract allows extra settings only as a number, string or boolean (not null, lists or objects)
+        for name, value in (self.model_extra or {}).items():
+            if not isinstance(value, (bool, int, float, str)):
+                raise ValueError(f"hyperparameter {name!r} must be a number, string or boolean")
+        return self
 
 
 class Resources(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    gpu_count: int = Field(ge=0, le=8)
-    cpu_cores: int = Field(ge=1, le=96)
-    memory_gb: int = Field(ge=1, le=768)
+    gpu_count: int = Field(ge=0, le=8, strict=True)
+    cpu_cores: int = Field(ge=1, le=96, strict=True)
+    memory_gb: int = Field(ge=1, le=768, strict=True)
 
 
 class Parallelism(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     strategy: Literal["single", "ddp"]
-    world_size: int = Field(ge=1, le=8)
+    world_size: int = Field(ge=1, le=8, strict=True)
 
 
 class Execution(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    max_runtime_minutes: int = Field(ge=1, le=1440)
-    retry_limit: int = Field(ge=0, le=5)
+    max_runtime_minutes: int = Field(ge=1, le=1440, strict=True)
+    retry_limit: int = Field(ge=0, le=5, strict=True)
 
 
 class JobSubmission(BaseModel):
@@ -43,7 +51,7 @@ class JobSubmission(BaseModel):
 
     project_id: ProjectId
     dataset_id: DatasetId
-    dataset_version: int = Field(ge=1)
+    dataset_version: int = Field(ge=1, strict=True)
     model: str = Field(pattern=r"^[a-z0-9_]+$", min_length=1, max_length=64)
     hyperparameters: Hyperparameters
     resources: Resources

@@ -7,6 +7,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY next.config.mjs ./
 COPY app ./app
+COPY public ./public
+COPY lib ./lib
+COPY components ./components
 RUN npm run build
 
 # 2. Run only the built server (much smaller image).
@@ -17,6 +20,7 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 COPY --from=build /portal/.next/standalone ./
 COPY --from=build /portal/.next/static ./.next/static
+COPY --from=build /portal/public ./public
 # Run as the image's normal "node" user, not root.
 USER node
 # 3000 is the portal's port in the contract (contracts/ports.md).

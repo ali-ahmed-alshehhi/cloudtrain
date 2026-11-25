@@ -1,20 +1,48 @@
 # Deployment policy: environments, approval, rollback, secrets
 
-Owner: Salem (Student 9). Draft for Checkpoint 1; the AWS parts start when Hamda + Fatma have ECR
-and ECS ready (Wed 18 and Sun 22 Nov). Changes to this file: pull request reviewed by Ali.
+Owner: Salem (Student 9). In force on `main` since 22 Nov (deploy pipeline #151). Changes to this
+file: pull request reviewed by Ali.
 
 ## Environments
 | Environment | Where | How code gets there | Who can deploy | Data |
 |---|---|---|---|---|
 | **local** | each laptop, `docker compose` | `make up` | anyone | fake values from `.env.example`, `AUTH_MODE=dev` |
 | **CI** | GitHub Actions, thrown away after each run | every pull request and push | automatic | fake values |
-| **staging** | AWS (Terraform `environments/staging`) | **automatically** after a merge to `main` passes CI and the security checks | the pipeline only | test data, real login (`AUTH_MODE=jwt`) |
-| **production** (the demo) | AWS | **promotion** of an image already tested on staging, after **approval** | the pipeline only, after a reviewer approves | demo data, real login |
+| **staging** | AWS (today the AWS Emulator) | **automatically** after a merge to `main` passes CI and its images pass the Trivy gate | the pipeline only | test data, real login (`AUTH_MODE=jwt`) |
+| **production** (the demo) | AWS (today the AWS Emulator) | **promotion** of an image already tested on staging, after **approval** | the pipeline only, after Ali or Salem approves | demo data, real login |
 
-> **Open question for Hamda + Fatma:** Terraform has `dev` and `staging` folders. Proposal: `dev` is
-> your playground for trying Terraform changes, `staging` receives every merge, and the demo runs on
-> a `prod` copy of `staging` for the last week only (cost). Alternative: promote inside one
-> environment. To agree before Sat 21 Nov.
+Terraform has `dev` and `staging` folders: `dev` is Hamda + Fatma's playground for Terraform changes
+and is what the pipeline builds on the emulator today; with an AWS account staging and production
+each get their own cluster (repository variables `STAGING_CLUSTER`, `PRODUCTION_CLUSTER`).
+
+## Where the images are (task #52)
+`.github/workflows/images.yml` builds the 10 images, refuses any with a CRITICAL vulnerability that
+has a fix, and pushes each one tagged with its commit (`gateway:4999c59`) on every push to `main`.
+
+- **Today: GitHub Container Registry**, `ghcr.io/ali-ahmed-alshehhi/cloudtrain/<service>:<commit>`.
+  There is no AWS account (decision 0011), and the AWS Emulator's ECR keeps repositories and rules
+  but refuses image uploads ("the operation is unsupported", checked in CI on 18 Nov). The run uses
+  its own short-lived token: no password is stored.
+- **With an AWS account:** set the repository variables `AWS_DEPLOY_ROLE_ARN` and `AWS_REGION`. The
+  same workflow signs in with GitHub OIDC and pushes to ECR (`cloudtrain/dev/<service>`). Nothing
+  else changes.
+
+## The deploy pipeline (task #54)
+`.github/workflows/deploy.yml` with `.github/deploy/deploy.sh`:
+
+1. **Staging**, automatically after `images.yml` pushed a commit's images on `main`: copy each
+   service's running task definition, change **only** the image to `<service>:<commit>`, register
+   it as a new revision and switch the service. Then a **smoke test** runs those exact images with
+   the demo walk-through (`make e2e`).
+2. **Production**, the same images, after a reviewer approves the GitHub environment
+   `production` (Settings → Environments → production → Required reviewers: Ali, Salem).
+3. **Rollback**, see below.
+
+Today it runs on the AWS Emulator (decision 0011): each job starts the emulator and builds the dev
+environment with Terraform, so staging and production are separate runs of it, told apart by the
+approval gate; services run no tasks there (`ecs_desired_count = 0`). With an AWS account, set the
+repository variables `AWS_DEPLOY_ROLE_ARN`, `STAGING_CLUSTER` and `PRODUCTION_CLUSTER`: the same
+jobs sign in with GitHub OIDC and wait until every service passes its `/health` check.
 
 ## Rules
 1. **Nobody deploys from a laptop** to staging or production. Only the pipeline does, with a GitHub
@@ -23,7 +51,9 @@ and ECS ready (Wed 18 and Sun 22 Nov). Changes to this file: pull request review
    `gateway:4999c59`). Production receives exactly the image that passed on staging. Never `latest`.
 3. **Only `main` can deploy.** Branches and pull requests are tested, never deployed.
 4. **Approval:** the GitHub environment `production` requires one approval from **Ali or Salem**
-   (not the person who merged). The deploy waits on the run page until someone clicks *Approve*.
+   (set as required reviewers). The deploy waits on the run page (*Review deployments*) until
+   someone clicks *Approve*. While it waits, newer commits still deploy to staging: each
+   environment has its own queue, and the newest waiting production deploy replaces an older one.
 5. **Freeze:** from Wed 25 Nov only bug fixes are deployed (feature freeze in the team plan).
 
 ## Rollback
@@ -32,8 +62,10 @@ and ECS ready (Wed 18 and Sun 22 Nov). Changes to this file: pull request review
 - **Old images must still exist.** ECR keeps every image under its commit tag. Its cleanup rule
   (lifecycle policy, in Terraform by Hamda + Fatma) keeps the **last 20 images of each service** and
   deletes only older ones, so there is always something to roll back to.
-- **Manual (one click):** GitHub → Actions → *Deploy* → *Run workflow* → choose the environment and
-  the last good commit. The pipeline redeploys those images; nothing is rebuilt.
+- **Manual (one click):** GitHub → Actions → *Deploy* → *Run workflow* → tick **rollback**. The
+  pipeline finds the version production ran before (each production job is named
+  `Production (<commit>)`), waits for the usual approval, and redeploys those images; nothing is
+  rebuilt. To deploy any other version, enter its commit instead.
 - **Models** are separate: Majed's model registry keeps the previous live version and switches back
   (Student 8 acceptance test). A code rollback does not change the live model.
 - After any rollback: open a `bug` issue with what failed and link the run.
@@ -49,7 +81,7 @@ and ECS ready (Wed 18 and Sun 22 Nov). Changes to this file: pull request review
 - A leaked secret is rotated first, then removed (see `SECURITY_CHECKS.md`). Gitleaks checks every
   pull request.
 
-## Least privilege (with Hamda + Fatma, from Thu 19 Nov)
+## Least privilege (with Hamda + Fatma; `infrastructure/modules/iam`)
 - One IAM role per service; each gets only the buckets, queues and secrets it uses (e.g. the dataset
   service: the datasets bucket; the scheduler: the training queue).
 - The GitHub deploy role can push to ECR and update ECS services. Nothing else: it cannot create or

@@ -1,0 +1,97 @@
+# Terraform checks — owner: Salem (Student 9); the Terraform itself belongs to Hamda + Fatma.
+#
+# Until now only Checkov read the Terraform. This workflow also proves it WORKS:
+#   1. format and validate — `terraform fmt -check` and `terraform validate` (seconds, no emulator)
+#   2. apply on the AWS Emulator — builds the whole dev environment from
+#      environments/dev/emulator.tfvars.example (decision 0011), checks the outputs the team
+#      relies on, then destroys it again.
+name: Terraform
+
+on:
+  pull_request:
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: 1. Format and validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infrastructure
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive -diff
+      - name: terraform validate
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  emulator-apply:
+    name: 2. Apply the dev environment on the AWS Emulator
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Start the AWS Emulator
+        working-directory: infrastructure
+        run: |
+          mkdir -p ~/.aws/emulator && chmod 777 ~/.aws/emulator
+          docker compose -f docker-compose.emulator.yml up -d --build
+          # The emulator runs as user 1000 and writes private files; the GitHub runner is user 1001
+          for _ in $(seq 1 90); do sudo test -f ~/.aws/emulator/9297/ca.pem && break; sleep 2; done
+          sudo chown -R "$(id -u):$(id -g)" ~/.aws/emulator
+          test -f ~/.aws/emulator/9297/emulator_credentials
+
+      - name: terraform apply (environments/dev/emulator.tfvars.example)
+        working-directory: infrastructure
+        run: |
+          source scripts/emulator-env.sh
+          terraform init -input=false
+          terraform apply -input=false -auto-approve -var-file=environments/dev/emulator.tfvars.example
+          echo "Resources: $(terraform state list | wc -l)"
+
+      - name: The outputs the team relies on are set
+        working-directory: infrastructure
+        run: |
+          terraform output
+          missing=""
+          for name in datasets_bucket artifacts_bucket training_jobs_queue_url job_events_queue_url \
+                      ecr_repository_urls db_endpoint db_master_secret_arn \
+                      gpu_worker_autoscaling_group worker_instance_profile_name \
+                      ecs_task_execution_role_arn github_deploy_role_arn; do
+            value=$(terraform output -json "$name" 2>/dev/null || echo null)
+            if [ "$value" = "null" ] || [ -z "$value" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then echo "::error::Outputs not set:$missing"; exit 1; fi
+          echo "All outputs set."
+
+      - name: terraform destroy
+        if: always()
+        working-directory: infrastructure
+        run: |
+          source scripts/emulator-env.sh 2>/dev/null || true
+          terraform destroy -input=false -auto-approve -var-file=environments/dev/emulator.tfvars.example || true

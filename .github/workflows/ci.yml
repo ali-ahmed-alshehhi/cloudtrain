@@ -95,8 +95,15 @@ jobs:
           IMAGES: ${{ steps.changed.outputs.images }}
         run: |
           cp .env.example .env
-          # folder name -> docker-compose name (only the training folder differs)
-          read -ra names <<< "${SERVICES//training/training-worker} $IMAGES"
+          # Short heartbeats, so the failure-recovery test (a worker killed mid-job) runs in ~1 minute
+          sed -i -e 's/^HEARTBEAT_INTERVAL_SECONDS=.*/HEARTBEAT_INTERVAL_SECONDS=2/' \
+                 -e 's/^HEARTBEAT_TIMEOUT_SECONDS=.*/HEARTBEAT_TIMEOUT_SECONDS=6/' \
+                 -e 's/^JOB_SWEEP_INTERVAL_SECONDS=.*/JOB_SWEEP_INTERVAL_SECONDS=2/' \
+                 -e 's/^SQS_VISIBILITY_TIMEOUT_SECONDS=.*/SQS_VISIBILITY_TIMEOUT_SECONDS=20/' .env
+          # folder name -> docker-compose name (only training and monitoring/job-events-monitor differ)
+          compose_names=${SERVICES//training/training-worker}
+          compose_names=${compose_names//monitoring\/job-events-monitor/job-events-monitor}
+          read -ra names <<< "$compose_names $IMAGES"
           if [ ${#names[@]} -gt 0 ]; then docker compose build "${names[@]}"; fi
 
       - name: 3. Start everything

@@ -34,7 +34,10 @@ They run on every pull request, on every push to `main`, every Monday morning, a
 |---|---|---|---|
 | No `Authorization` header | 401 `NOT_AUTHENTICATED` | `gateway/tests/test_gateway.py` | ✅ exists (Ali) |
 | Wrong or malformed token | 401 | `gateway/tests/test_gateway.py` | ✅ exists (Ali) |
-| Expired or wrongly signed JWT | 401 | gateway, `AUTH_MODE=jwt` | to add with the real login (Fri 20 Nov) |
-| User opens another user's project or dataset | 403 | project and dataset services | after Ali's and Faisal's membership checks |
-| Role without permission (e.g. viewer submits a job) | 403 | gateway or job service | after roles exist (Cognito groups) |
+| Expired or wrongly signed JWT (fake key) | 401 | `gateway/tests/test_gateway.py` | ✅ exists (Ali) |
+| **Real Cognito token** accepted; changed, forged, unsigned, other-app and access tokens; the dev token once the real login is on | 200 / 401 | `security/tests/test_login.py` (Cognito on the AWS Emulator, whole system) | ✅ Salem, `login.yml` |
+| User opens or lists another user's project | 403 / not listed | `security/tests/test_login.py` | ✅ Salem |
+| Training job with a dataset of another project; alert feed of a project you're not in | 422 / 403 | `tests/integration/test_refusals.py` | ✅ Ali (#101) |
+| Writes and deletes through the MLflow route; MLflow without a login | 405 / 401 | `tests/integration/test_mlflow_route.py` | ✅ Ali (#118) |
+| Role without permission (e.g. viewer submits a job) | 403 | gateway or job service | roles now in the token (`cognito:groups`); the check itself is still to add |
 | Only the gateway (5810) and portal (3000) are reachable | other ports closed | `docker-compose.yml`, AWS security groups | to add (Checkpoint 3) |

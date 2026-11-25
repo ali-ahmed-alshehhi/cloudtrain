@@ -52,7 +52,7 @@ jobs:
         run: |
           python -m pip install --quiet "pip-audit>=2.9,<3"
           failed=""
-          for req in */requirements.txt; do
+          for req in */requirements.txt monitoring/*/requirements.txt; do
             echo "::group::${req%/requirements.txt}"
             pip-audit --requirement "$req" --progress-spinner off --desc || failed="$failed ${req%/requirements.txt}"
             echo "::endgroup::"

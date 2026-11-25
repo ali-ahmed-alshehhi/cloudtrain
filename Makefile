@@ -2,13 +2,13 @@
 # Owner: Ali. Python services use Python 3.11 (change with `make test PYTHON=python3.11`).
 
 PYTHON ?= python3.11
-PYTHON_SERVICES := gateway project-service dataset-service job-service scheduler training model-registry inference-service
+PYTHON_SERVICES := gateway project-service dataset-service job-service scheduler training model-registry inference-service monitoring/job-events-monitor
 TOOLS := .venv/bin
 
-.PHONY: help up down reset logs test tools lint contract e2e check
+.PHONY: help up down reset logs test tools lint contract e2e e2e-login check
 
 help: ## Show this list
-	@grep -E '^[a-z0-9]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  make %-9s %s\n", $$1, $$2}'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  make %-9s %s\n", $$1, $$2}'
 
 .env: ## (made automatically) your local settings, copied from .env.example
 	cp .env.example .env
@@ -50,5 +50,11 @@ contract: .env ## Check every running service against contracts/ (needs `make up
 
 e2e: $(TOOLS)/.installed ## The end-to-end walk-through through the gateway (needs `make up`)
 	$(TOOLS)/python -m pytest tests/integration -q -p no:warnings -rs  # -rs: list skipped steps and their owners
+
+e2e-login: $(TOOLS)/.installed ## The walk-through with the real login (Cognito on the AWS Emulator; needs Terraform + AWS CLI)
+	infrastructure/scripts/emulator-up.sh
+	security/login/setup.sh
+	docker compose -f docker-compose.yml -f security/login/compose.login.yml up --detach --build --wait
+	LOGIN=real $(TOOLS)/python -m pytest tests/integration -q -p no:warnings -rs
 
 check: lint test up contract e2e ## Everything: lint + unit + start + contract + end-to-end
