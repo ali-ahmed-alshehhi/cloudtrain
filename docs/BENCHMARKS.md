@@ -123,7 +123,7 @@ the MLflow run IDs and every epoch. To run it again on the local stack (`make up
 ```bash
 cd training
 CLOUDTRAIN_TOKEN=<DEV_AUTH_TOKEN from ../.env> python -m distributed.platform_compare \
-    --csv <wisconsin.csv> --label "2 processes on CPU, local stack" --epochs 10 \
+    --csv distributed/data/wisconsin.csv --label "2 processes on CPU, local stack" --epochs 10 \
     --out ../docs/benchmarks/platform-cpu-single-vs-ddp.json
 ```
 

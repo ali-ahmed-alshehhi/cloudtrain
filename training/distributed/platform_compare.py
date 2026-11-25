@@ -2,7 +2,7 @@
 
     cd training
     CLOUDTRAIN_TOKEN=<DEV_AUTH_TOKEN from ../.env> python -m distributed.platform_compare \
-        --csv wisconsin.csv --label "2 processes on CPU, local stack" \
+        --csv distributed/data/wisconsin.csv --label "2 processes on CPU, local stack" \
         --out ../docs/benchmarks/platform-cpu-single-vs-ddp.json
 
 It creates a project, uploads the CSV, then submits the same `tabular_mlp` job as `single` (1 process) and as
