@@ -1,6 +1,6 @@
 """The final-demo walk-through (docs/ARCHITECTURE.md, section 18), run through the gateway.
 
-Steps 2-7 and 9-12 run for real now. Step 6 asserts Abdullah's live MLflow metrics after the
+Steps 2-12 run for real now. Step 6 asserts Abdullah's live MLflow metrics after the
 real training worker finishes, and step 9 registers that run's model. Steps 10-11 serve the
 small image test model (see `image_model`), because /predict takes an image and the walk-through
 job is tabular. Step 1 runs with the real login (`make e2e-login`, and the Login workflow in
@@ -22,6 +22,7 @@ import httpx
 import pytest
 
 from tests.integration.conftest import (
+    REPO,
     class_image,
     events_of,
     links_of,
@@ -220,10 +221,51 @@ def test_step_07b_machine_released(gateway, finished_job):
 # ---------- 8-12: switched on as owners deliver ----------
 
 
-@pytest.mark.skip(reason="Hilal + Adel; Ahmed + Abdulla: single-GPU vs DDP comparison — Tue 24 Nov")
-def test_step_08_compare_single_gpu_and_ddp(gateway):
+def test_step_08_compare_single_gpu_and_ddp(gateway, project, finished_job):
     """Two finished runs of the same model, strategy 'single' and 'ddp', both visible in MLflow
-    with time, throughput and GPU-hours to compare."""
+    with time, throughput and GPU-hours to compare. Same form as Ahmed + Abdulla's comparison
+    (training/distributed/platform_compare.py, #30) on the full Wisconsin CSV, which is big enough
+    to split over 2 processes. On a laptop both processes run on the CPU (decision 0011), so this
+    checks the plumbing, not a speedup."""
+    csv = REPO / "training" / "distributed" / "data" / "wisconsin.csv"
+    uploaded = gateway.post(
+        "/api/v1/datasets",
+        data={"project_id": project["project_id"], "name": "wisconsin-breast-cancer", "format": "csv"},
+        files={"file": ("wisconsin.csv", csv.read_bytes(), "text/csv")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+
+    finished = {}
+    for strategy, processes in (("single", 1), ("ddp", 2)):
+        form = small_job(project["project_id"], uploaded.json()["dataset_id"])
+        form["hyperparameters"].update(epochs=2, batch_size=16)
+        form["resources"]["gpu_count"] = processes  # the contract: for ddp, world_size = gpu_count
+        form["parallelism"] = {"strategy": strategy, "world_size": processes}
+        submitted = gateway.post("/api/v1/jobs", json=form)
+        assert submitted.status_code == 202, submitted.text
+        job_id = submitted.json()["job_id"]
+
+        def final(job_id=job_id):
+            found = gateway.get(f"/api/v1/jobs/{job_id}").json()
+            return found if found["status"] in ("SUCCEEDED", "FAILED", "CANCELLED") else None
+
+        finished[strategy] = wait_for(final, f"the {strategy} job to finish", timeout_seconds=300)
+        assert finished[strategy]["status"] == "SUCCEEDED", finished[strategy]
+
+    for strategy, job in finished.items():
+        run_id = mlflow_run_id_of(gateway, job)
+        run = gateway.get("/api/v1/experiments/runs/get", params={"run_id": run_id})
+        assert run.status_code == 200, run.text
+        tags = {tag["key"]: tag["value"] for tag in run.json()["run"]["data"].get("tags", [])}
+        assert tags["strategy"] == strategy
+        for key in ("epoch_seconds", "epoch_images"):  # what the comparison page reads (#76)
+            history = gateway.get(
+                "/api/v1/experiments/metrics/get-history", params={"run_id": run_id, "metric_key": key}
+            )
+            assert history.status_code == 200, history.text
+            values = [point["value"] for point in history.json().get("metrics", [])]
+            assert len(values) == 2 and all(value > 0 for value in values), (strategy, key, values)
+        assert job["gpu_hours"] is not None and job["estimated_cost_usd"] is not None
 
 
 def mlflow_run_id_of(gateway, job: dict) -> str:
