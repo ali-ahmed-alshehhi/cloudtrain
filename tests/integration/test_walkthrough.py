@@ -176,7 +176,6 @@ def test_step_07_job_succeeded_and_alert_is_in_the_feed(gateway, finished_job):
     ), "the alert feed (what the portal shows) must contain job.succeeded"
 
 
-@pytest.mark.skip(reason="Maitha: the machine is released after the job — Fri 20 Nov")
 def test_step_07b_machine_released(gateway, finished_job):
     """After SUCCEEDED, the Scheduler has released the job's machine (no worker still running it)."""
     assert finished_job["status"] == "SUCCEEDED"
