@@ -28,8 +28,9 @@ In the job form: `parallelism.strategy` is `single` or `ddp`; for `ddp`, `world_
 | Benchmark tool | Done. Local runs on 1 GPU, with synthetic images and with real CIFAR-10, in `docs/BENCHMARKS.md` |
 | Parallelism selector | Done. Two of its values are assumptions until the cloud benchmark |
 | Plugged into the training runtime | Done (issue #28). The worker (`training/app/trainer.py`) runs a `ddp` job through `launch`, and logs `epoch_seconds` and `epoch_images` to MLflow every epoch for the comparison page. Tested with 2 processes on a CPU: `tests/test_distributed_worker.py`, and `python -m scripts.smoke_ddp_local` |
-| Mandatory benchmark, 1 vs 2 GPUs | Waiting for the cloud machine (issue #30) |
-| Results for the comparison page | Local result files are ready to build on. The 2-GPU numbers wait for the cloud run (issue #76) |
+| Single vs DDP through the platform | Done (issue #30), labelled "2 processes on CPU, local stack": `platform_compare.py`, results in `docs/BENCHMARKS.md`, section 2 |
+| Mandatory benchmark, 1 vs 2 real GPUs | Not measured: no machine with 2 GPUs under decision 0011. The command is ready in `docs/BENCHMARKS.md` |
+| Results for the comparison page | The platform runs are in MLflow with `epoch_seconds`, `epoch_images` and the tag `result_label` (issue #76) |
 
 ## What we need from teammates
 
@@ -61,6 +62,7 @@ The acceptance test stays open until the machine with 2 GPUs exists. The command
 | `benchmark.py` | Runs the comparisons (`scaling`, `workers`) and prints the tables for `docs/BENCHMARKS.md` (`report`) |
 | `metrics.py` | Speedup, efficiency, throughput, GPU-hours and cost, from saved results |
 | `selector.py` | The parallelism selector: `select(Workload(...))` returns the choice and its reason |
+| `platform_compare.py` | Sends the same job through the gateway as `single` and as `ddp`, once per seed, labels the MLflow runs with `result_label` and saves the comparison (local stack only) |
 
 ## Run it
 PyTorch is not in `training/requirements*.txt` yet, so install it next to the test tools.
