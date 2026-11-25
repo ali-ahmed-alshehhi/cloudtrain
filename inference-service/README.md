@@ -57,12 +57,19 @@ curl -X POST http://localhost:5810/api/v1/predict \
 
 ## The health check, and why a bad version never takes traffic
 A version is served only after it loaded and one prediction on a fixed test image gave exactly one
-finite score per label. A candidate is checked before the registry promotes it. If the registry
+finite score per label. A candidate is checked before the registry promotes it
+(`POST /internal/models/{id}/candidates` — that is the gate, not `GET /health`). If the registry
 ever names a version that fails here (e.g. another copy of this service checked it), this copy
 keeps serving the version it has. If the registry is down, the loaded version keeps serving.
 `GET /health` is 503 only when the loaded default model fails its check; with no model yet it is 200
 (the service is up; `/predict` answers 503 `NO_MODEL_LOADED`).
 See model-registry README “Issue #48 — done on main” for the gate, tests, and walk-through pointers.
+
+## Issue #49 — feature freeze
+No new features. Contract paths in `contracts/openapi/inference-service.yaml` match the endpoints
+above. `GET /health` and `GET /metrics` stay up; errors use the shared error format. Unit tests cover
+the main predict path and failure paths (unhealthy candidate, bad file, no model). Run
+`bash scripts/test_service.sh inference-service` (and `make check` when Docker is available).
 
 ## Which models work
 Any model saved with `mlflow.pytorch.log_model` (MLflow's `pickle` format, or `pt2` exported with a
