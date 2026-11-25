@@ -1,6 +1,6 @@
 # Web Portal — `portal/`
 
-> **In progress.** Projects and dataset upload/version selection are implemented through the gateway. Run `make check` before opening a PR. Job list, submission and detail pages now cover the CPU training workflow. Model and prediction pages remain next.
+> **In progress.** Projects and dataset upload/version selection are implemented through the gateway. Run `make check` before opening a PR. Job list, submission and detail pages now cover the CPU training workflow. Model registration, version promotion/rollback and image prediction pages are implemented.
 
 | Owners (partners) | Port | Contracts |
 |---|---|---|
@@ -79,9 +79,21 @@ Every call uses the gateway. The submission sends JSON with `Idempotency-Key`, n
 
 A small laptop smoke run: upload an 8-row CSV with numeric `radius,texture,perimeter` and target `diagnosis` containing four `B` and four `M` rows. Choose `tabular_mlp`, one epoch, batch size 4, GPU count 0 and default extras. Submit, then follow QUEUED / SCHEDULED / RUNNING / SUCCEEDED and the logged MLflow results. Real GPU/DDP performance is not claimed on the emulator.
 
-The shared navigation now links Projects, Training jobs, Compare runs and Usage & cost. The home page's project alerts link to job details. Model promotion/prediction pages and portal real sign-in remain separate work. MLflow parallelism labels now describe processes rather than infer GPUs from world size, so laptop CPU runs are not labelled as GPU training.
+The shared navigation now links Projects, Training jobs, Compare runs and Usage & cost. The home page's project alerts link to job details. Model and prediction pages are described below. Portal real sign-in remains separate work. MLflow parallelism labels now describe processes rather than infer GPUs from world size, so laptop CPU runs are not labelled as GPU training.
 
 `tests/e2e/jobs.test.cjs` uses clearly labelled fixture gateway responses for version choice, DDP validation, a lost POST response plus reload/safe retry, cancellation, access denial and project switching. `tests/e2e/jobs-live.test.cjs` creates a real small project/dataset, submits through the form and verifies history and MLflow through the running local gateway/worker. Its setup uses `.env`'s local token without printing it. These tests create local test records. Run with the stack healthy using `npm run test:e2e`.
+
+### Models and predictions (Hilal, #60)
+
+- `/models?project=project-01` lists that project's models and their versions, MLflow run IDs, dataset versions, artifact locations and recorded metrics.
+- Register a model by choosing a successful job and one of its finished MLflow runs. The MLflow experiment defaults to `cloudtrain`; change it when the run was recorded elsewhere (the synthetic smoke model uses `cloudtrain-test-models`). The job supplies exact project/job/dataset lineage. Using an existing name adds a version. An unchanged retry reuses its registration key across a lost response/reload when session storage is available; only request metadata and keys are stored, never tokens.
+- Promote a version or roll back after confirmation. The server performs its health gate; the portal shows failures without claiming the candidate is live. Refresh reads the current registry state. The server reports an error if rollback has no previous release.
+- `/predict?project=project-01` lists only live models in the selected project and sends a PNG/JPEG as multipart `file` plus `model_id` to `/api/v1/predict`. Results display the actual returned model version, labels and scores. A changed image/model/project clears previous results.
+- Project selection is locked during registration, deployment changes and prediction. Reads are cancelled/ignored on identity changes; denied or malformed responses hide prior version/prediction data. All requests use the gateway. No backend, API contract or dependency changes.
+
+**Image compatibility:** `tabular_mlp` can be registered but cannot serve this image-only prediction API. Its promotion fails the inference health gate. Use an image-compatible model for predictions. The local browser smoke test uses `inference-service/app/fixture_model.py`, the same explicitly synthetic, CPU-trained image model as the integration walkthrough. This verifies registry/inference integration, not natural-image accuracy or GPU performance. Serving runs in local Docker Compose; Terraform targets the AWS emulator (decision 0011), not real ECS traffic.
+
+`tests/e2e/models.test.cjs` uses labelled fixture responses to test exact lineage, safe registration retry after a lost response/reload, project locking/isolation, failed health gate, promotion, rollback, multipart prediction and stale-result clearing. `models-live.test.cjs` creates local project/dataset/job records, registers a real CPU training run through the browser and confirms image-incompatible promotion fails, then logs the synthetic image test run, registers/promotes it through the browser and obtains a live prediction. It creates records and model artifacts in the local test stack. The browser test command runs files sequentially because live scenarios share the local scheduler and worker. Run these after `make up`; browser tests use system Chrome when `PLAYWRIGHT_CHROME_EXECUTABLE` is set. Screenshots go to ignored `portal/test-results/`.
 
 ### Dataset workflow
 
