@@ -52,14 +52,23 @@ Same run twice under one model → 409. `Idempotency-Key` returns the first answ
 Rollback goes back to the previous live version and passes the same gate. Nothing before → 409.
 
 ## Issue #48 — done on main
-New versions must pass `/health` before taking traffic; a failed check keeps the old version.
-That behaviour, the failure-path tests, and the READMEs landed in [#97](https://github.com/ali-ahmed-alshehhi/cloudtrain/pull/97).
+New versions must pass inference's candidate check
+(`POST /internal/models/{id}/candidates`) before taking traffic; a failed check keeps the old
+version. (That gate is the candidate load + model check — not `GET /health`, which is the service
+readiness probe.) Behaviour, failure-path tests, and READMEs landed in
+[#97](https://github.com/ali-ahmed-alshehhi/cloudtrain/pull/97).
 Walk-through steps 9–11 (register, promote behind the gate, predict) are on in
 [`tests/integration/test_walkthrough.py`](../tests/integration/test_walkthrough.py)
 ([#150](https://github.com/ali-ahmed-alshehhi/cloudtrain/pull/150)).
 “On AWS” here is the AWS Emulator ([decision 0011](../docs/decisions/0011-aws-emulator-instead-of-aws-account.md));
 live promote/predict run in local `docker compose` behind the gateway. Prediction hand-off to
 Hilal + Adel is [#77](https://github.com/ali-ahmed-alshehhi/cloudtrain/issues/77).
+
+## Issue #49 — feature freeze
+No new features. Contract paths in `contracts/openapi/model-registry.yaml` match the endpoints
+above. `GET /health` and `GET /metrics` stay up; errors use the shared error format. Unit tests cover
+the main promote path and the failed-deployment path. Run
+`bash scripts/test_service.sh model-registry` (and `make check` when Docker is available).
 
 ## Tables (schema `registry`, migrations in `migrations/`)
 | Table | What |
