@@ -14,7 +14,7 @@ speed. Each links to its row below and to the raw output.
 | A service stops or freezes | the gateway answers **503 at once** (stopped) or **after 10 s** (frozen), never hangs, and works again on the first request after the restart; tested on 5 services (Test A). Alert "service down" fires after **83–88 s** |
 | Restart (`make down` + `make up`) | **records kept** (projects, jobs, datasets, MLflow experiments and runs); **local S3 files lost**, as decision 0005 expects (Test B) |
 | Dataset transfer | upload **154–161 MB/s**, download **253–270 MB/s** (medians of 3, 52 MB and 524 MB files; Test C) |
-| A burst of jobs | 3 jobs sent at once with one worker: waits **0.1 s, 300 s and 729 s** for about 4 s of training each. A job that finds the worker busy comes back only after the queue's 300 s visibility timeout; the cloud uses the same settings (Test F) |
+| A burst of jobs | 3 jobs sent at once with one worker: waits **0.0 s, 5.1 s and 10.1 s**, all done in **13.2 s**, with the scheduler code now on `main` (#161). Before #161 (22 Nov) the same test waited **0.1 s, 300 s and 729 s**, because a job that found the worker busy came back only after the queue's 300 s visibility timeout. Jobs still run one at a time (Test F) |
 | The whole website | with every page on `main`: **6 of 6 browser tests** pass on the real stack, including a training job submitted in the browser and followed to its MLflow results; `make e2e` 25 passed (Test I) |
 | Worker killed mid-job | detected in **about 5 s** (6 s timeout), retried at once, running again after **about 25 s** and finished, 3 of 3 runs (short test settings; Test H) |
 | Prediction | **p50 3.2 ms, p95 4.4 ms** through the gateway, 100 of 100 answered, with the walk-through's small test model: the platform's serving path, not a trained model (Test G) |
@@ -44,7 +44,7 @@ raw output, and most are fixed:
 |---|---|---|---|
 | Checking the Grafana dashboard (#115), 20 Nov | The scheduler's metrics were created only when the first job arrived, so the first jobs were missing from "jobs placed" | #138 | #139 (Maitha), merged 21 Nov |
 | Test B (restart), 21 Nov | A dataset file missing from S3 was reported as "Object storage is not reachable" (503), not as missing (404) | #126 | #142 (Faisal), merged 22 Nov |
-| Test F (burst), 22 Nov | A job that arrives while the only worker is busy waits for the 300 s queue timeout: 3 short jobs took 12 min | #158 | #161 (Maitha), in review: re-tested on the laptop, 3 jobs in 13.2 s |
+| Test F (burst), 22 Nov | A job that arrives while the only worker is busy waits for the 300 s queue timeout: 3 short jobs took 12 min | #158 | #161 (Maitha), merged 25 Nov as `53364f0`: re-tested on the laptop, 3 jobs in 13.2 s |
 | Re-testing the first version of #161, 23 Nov | A retried job stays `SCHEDULED` forever when every hand-off to a worker fails (`dropped_already_handled` = 1) | #167 | #168 (Mariam), merged 23 Nov |
 
 ## 0. Setup
@@ -86,7 +86,7 @@ raw output, and most are fixed:
 | What | Status | Result | Evidence |
 |---|---|---|---|
 | What scales separately and how | ✅ Read from the code (22 Nov, `main` at `a21d01c`); not measured on AWS (no account) | **Training:** GPU workers in two EC2 Auto Scaling groups (decision 0012): `gpu-1` (`g4dn.xlarge`, `worker_desired_capacity`, at most `worker_max_size` = 2) and `gpu-4` (`g4dn.12xlarge`, at most 1). The size changes with one `terraform apply`; nothing scales it automatically. **Services:** each is its own ECS Fargate service, but Terraform gives all of them the same `ecs_desired_count` (1 in the dev settings) and no autoscaling; the gateway and portal sit behind the load balancer. **Between them:** SQS. `POST /jobs` answers 202 at once and the job waits in `training-jobs`, so a burst of submissions never blocks the API. **Limit:** the scheduler places only `SCHEDULER_MAX_WORKERS` jobs at once (default 1, not set in Terraform), so more GPU machines alone do not run more jobs at once (Test F) | `infrastructure/main.tf`, `infrastructure/README.md`, decision 0012, `scheduler/app/main.py` |
-| A burst of jobs with one worker | ✅ Measured on a laptop (22 Nov, `db26b20`): 3 small CPU jobs submitted at the same moment | Waits **0.1 s, 300.3 s and 729.2 s**; together they needed about 11 s of training and took **732 s**. A job that arrives while the worker is busy is turned away and SQS hides it for the 300 s visibility timeout (3 "no capacity" lines in the scheduler log). The 729 s includes a pause of the laptop of about 3.5 min; the code predicts about 600 s. Fixes are the Scheduler owner's call (Maitha): reported as #158 | [`docs/evaluation/test-f-burst.md`](evaluation/test-f-burst.md) |
+| A burst of jobs with one worker | ✅ Measured on a laptop twice, 3 small CPU jobs submitted at the same moment: **before #161** (22 Nov, `db26b20`) and **after #161** (23 Nov, #161 at `9cdbaef`; its `scheduler/` is identical to `53364f0`, the merged #161, and to `main` today) | **Now (after #161):** waits **0.0 s, 5.1 s and 10.1 s**, all done in **13.2 s**, no dead letters. While every slot is busy, the scheduler first frees the slots of jobs that ended; if none is free, it waits 5 s and asks again, without taking the next message from SQS. **Before #161:** waits 0.1 s, 300.3 s and 729.2 s, **732 s** in all for about 11 s of training: a job that arrived while the worker was busy was turned away and SQS hid it for the 300 s visibility timeout (3 "no capacity" lines; the 729 s includes a laptop pause of about 3.5 min). Reported as #158, fixed by Maitha in #161. Jobs still run one at a time (`SCHEDULER_MAX_WORKERS` default 1) | [`docs/evaluation/test-f-burst.md`](evaluation/test-f-burst.md) |
 | 1 vs 2-process DDP: speedup, efficiency, throughput, GPU-hours | ✅ Measured on a laptop (25 Nov, `b087330`): Abdulla's `platform_compare` (#173), 3 seeds each, read back with `compare_runs.py` and on `/compare`. **Where it ran: 2 processes on CPU, local stack**, not GPUs. ⏳ Not measured: DDP on real GPUs (no AWS account) | Time per epoch 26.6 → 17.8 ms: **speedup 1.50×, efficiency 75%**; throughput 16,822 → 25,194 rows/s; job wall time 4.9 → 5.6 s; accuracy 0.968 both. On Abdulla's laptop 0.96× (`docs/BENCHMARKS.md`): with 15–30 ms epochs the result depends on the machine | [`docs/evaluation/test-j-single-vs-ddp.md`](evaluation/test-j-single-vs-ddp.md), `docs/BENCHMARKS.md` section 2, #76 |
 | Local 1-GPU baseline (not the comparison) | ✅ Measured by Ahmed + Abdulla on 1× RTX 5090 | CIFAR-10, ResNet-18, 10 epochs: 2.0 s per epoch, 74.0% accuracy (3 seeds) | `docs/BENCHMARKS.md`, `docs/benchmarks/local-cifar10-1gpu-baseline.json` |
 
@@ -135,9 +135,10 @@ All three are on `main` since 18 Nov.
 - **LocalStack serves both S3 and SQS on the laptop.** During the 500 MB uploads (Test C) the time since the
   last `job-events` read rose to about 55 s on the dashboard (normally 0–20 s), still under the 120 s alert.
   In the cloud, S3 and SQS are separate services.
-- **One job at a time.** With the current settings (local and cloud), the scheduler runs one job at once, and a
-  job that arrives while another runs waits about 300 s per turn (Test F). Until that changes, bursts of jobs
-  are slow and extra GPU machines stay idle.
+- **One job at a time.** With the current settings (local and cloud), the scheduler runs one job at once
+  (`SCHEDULER_MAX_WORKERS` default 1, not set in Terraform). Since #161 a waiting job starts at most about 5 s
+  after the one before it ends (Test F; before #161 it waited about 300 s per turn), but jobs still run one
+  after another, so extra GPU machines stay idle. Not measured with more than one worker.
 - `job-events-monitor` keeps durations and counters in memory: a restart forgets jobs in flight, and its
   counters start again from 0. Prometheus treats that as a counter reset, so `rate()` and `increase()` stay
   right; events are not lost (unread ones wait in SQS).
@@ -160,7 +161,7 @@ open http://localhost:3001                # Grafana, dashboard "CloudTrain overv
 | C | Gateway p50/p95, dataset upload and download speed | [`evaluation/test-c-speed-and-alert.md`](evaluation/test-c-speed-and-alert.md) |
 | D | 10 real training jobs: queue wait, training time, machine and cost per job | [`evaluation/test-d-real-training.md`](evaluation/test-d-real-training.md) |
 | E | Alert delay: job event → alert on the Projects page, 10 jobs | [`evaluation/test-e-alert-delay.md`](evaluation/test-e-alert-delay.md) |
-| F | A burst of 3 jobs with one worker: wait in the queue per job | [`evaluation/test-f-burst.md`](evaluation/test-f-burst.md) |
+| F | A burst of 3 jobs with one worker: wait in the queue per job, before and after #161 | [`evaluation/test-f-burst.md`](evaluation/test-f-burst.md) |
 | G | Prediction latency through the gateway, 100 requests | [`evaluation/test-g-predict-latency.md`](evaluation/test-g-predict-latency.md) |
 | H | Worker killed mid-job: time to detect, retry and finish, 3 runs | [`evaluation/test-h-recovery.md`](evaluation/test-h-recovery.md) |
 | I | The whole website, end to end: all six browser tests and the walk-through on the real stack | [`evaluation/test-i-website-e2e.md`](evaluation/test-i-website-e2e.md) |

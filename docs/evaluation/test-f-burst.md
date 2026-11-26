@@ -1,12 +1,19 @@
 # Test F: a burst of jobs at once (raw results)
 
+> **Two measurements.** Part 1 (22 Nov) is the scheduler **before #161**: the 300 s waits it found were
+> reported as #158 and fixed in #161, merged 25 Nov as `53364f0`. Part 2 (23 Nov) is the same test on #161's
+> version `9cdbaef`, whose `scheduler/` folder is identical to `53364f0` and to `main` today
+> (`git diff --quiet 9cdbaef origin/main -- scheduler/`). **Part 2 is the current behaviour.**
+
+## Part 1: before #161 (22 Nov)
+
 **Measured:** Sun 22 Nov 2026, 12:55–13:07 (UTC+4), by Adel on the laptop in section 0 of `EVALUATION.md`.
 **Versions:** branch `adel/compare-cost-pages` at `db26b20` (`main` at `0cf0f1c` + #156; the scheduler is
 `main`'s). Local settings from `.env.example`: one training worker, `SCHEDULER_MAX_WORKERS` not set (default 1),
 `SQS_VISIBILITY_TIMEOUT_SECONDS=300`.
 **Question:** what happens when several jobs arrive while the only worker is busy?
 
-## What the code says (`scheduler/app/main.py`, `main` at `a21d01c`)
+### What the code said then (`scheduler/app/main.py`, `main` at `a21d01c`)
 
 The scheduler reads `training-jobs` one message at a time. When no slot is free (`SCHEDULER_MAX_WORKERS`,
 default 1) and the running job has not ended yet, it logs `no capacity; message stays on queue` and leaves the
@@ -15,7 +22,7 @@ timeout (300 s, `local/localstack/init.sh`; the same variable in Terraform). So 
 runs is expected to wait about 300 s, even if the other job ends after a few seconds, and 300 s more each time it
 is turned away again.
 
-## Commands
+### Commands
 
 ```bash
 make e2e                                   # a fresh dataset in LocalStack S3 (Test B: files go on restart)
@@ -27,7 +34,7 @@ docker compose logs scheduler | grep -c "no capacity"
 [`burst.py`](burst.py) submits the walk-through's small CPU job 3 times in parallel and prints each job's wait
 (`started_at − created_at`) and run time from Training Jobs (one clock).
 
-## Output
+### Output
 
 ```
 Project project-56, dataset dataset-61 v1, 3 jobs
@@ -59,7 +66,7 @@ $ docker compose logs scheduler | grep -c "no capacity"
 
 (The progress lines between +15 s and +496 s are shortened here; each said the same as the line before.)
 
-## Summary
+### Summary
 
 | Job | Wait in the queue | Run | Turned away ("no capacity") |
 |---|---|---|---|
@@ -75,10 +82,66 @@ at +300 s, most likely when it came back together with `job-30`, which took the 
 expected): the laptop very likely paused (sleep). `job-31`'s 729 s therefore includes that pause; the code
 predicts about 600 s (two timeouts). `job-29` and `job-30` ended before the gap.
 
-**What it means.** With one slot, the waiting time comes from the queue's visibility timeout, not from the work:
+**What it meant.** With one slot, the waiting time comes from the queue's visibility timeout, not from the work:
 a burst of N short jobs takes about (N − 1) × 300 s. The same settings are used in the cloud (Terraform sets the
 same 300 s timeout, and nothing sets `SCHEDULER_MAX_WORKERS`, so it is 1 there too), so more GPU machines
-(`worker_desired_capacity`) would not run more jobs at once. Reported as #158. Possible fixes are the Scheduler owner's call
-(Maitha), for example: give a turned-away message back sooner (`ChangeMessageVisibility` to a few seconds), wait
+(`worker_desired_capacity`) would not run more jobs at once. Reported as #158 (fixed in #161: Part 2). The fixes suggested then, as the Scheduler owner's call
+(Maitha), were for example: give a turned-away message back sooner (`ChangeMessageVisibility` to a few seconds), wait
 for the running job to end, and set `SCHEDULER_MAX_WORKERS` (and `SCHEDULER_MAX_GPUS`) from the pool sizes in
 Terraform. Not measured with more than one worker: locally the scheduler has a single worker address.
+
+## Part 2: after #161 (23 Nov, current behaviour)
+
+**Measured:** Mon 23 Nov 2026, 18:26 (UTC+4), by Adel on the same laptop, while re-testing #161.
+**Versions:** #161 at `9cdbaef`. Its `scheduler/` is identical to the merged `53364f0` and to `main` today, so
+this is what `main` does now. Same local settings: one worker, `SCHEDULER_MAX_WORKERS` not set (default 1),
+`SQS_VISIBILITY_TIMEOUT_SECONDS=300`.
+
+### What the code says now (`scheduler/app/main.py`, `read_queue_once`)
+
+Before it takes a message from `training-jobs`, the scheduler checks for a free slot. If every slot is busy,
+it first frees the slots of jobs that have ended; if still none is free, it waits `BUSY_RETRY_SECONDS` (5 s)
+and asks again, **without receiving a message**. So a waiting job is no longer hidden for the 300 s visibility
+timeout, and its receives do not count towards the dead-letter limit.
+
+### Commands
+
+```bash
+export DEV_AUTH_TOKEN=$(grep '^DEV_AUTH_TOKEN=' .env | cut -d= -f2)
+python3 docs/evaluation/burst.py 3
+docker compose exec -T prometheus promtool query instant http://localhost:9090 'job_service_dead_letters_total'
+```
+
+### Output
+
+```
+Project project-73, dataset dataset-78 v1, 3 jobs
+submitted 3 jobs in 0.05 s: job-46, job-45, job-47
+  +     0 s: 0 of 3 ended
+  +    15 s: 3 of 3 ended
+
+job      status     created (UTC)  started   finished  wait s  run s  attempt
+job-46   SUCCEEDED  14:26:08       14:26:13  14:26:16     5.1    3.1  1
+job-45   SUCCEEDED  14:26:08       14:26:08  14:26:11     0.0    3.2  1
+job-47   SUCCEEDED  14:26:08       14:26:18  14:26:21    10.1    3.1  1
+
+all 3 done 13.2 s after the first was created
+wait in the queue: min 0.0 s, max 10.1 s
+```
+
+The dead-letter query returned no series: no job went to the dead-letter queue.
+
+### Summary
+
+| Job | Wait, before #161 (Part 1) | Wait, after #161 (Part 2) |
+|---|---|---|
+| 1st | 0.1 s | **0.0 s** |
+| 2nd | 300.3 s | **5.1 s** |
+| 3rd | 729.2 s | **10.1 s** |
+| All 3 done | 732 s | **13.2 s** |
+
+**What it means now.** Each waiting job starts 2 s after the one before it ends (within the 5 s retry), so
+the waits now come from the work, not from the queue timeout. Jobs still run **one at a time**: with
+`SCHEDULER_MAX_WORKERS` = 1 (local, and not set in Terraform), a burst of N jobs takes about the sum of their
+run times, and more GPU machines (`worker_desired_capacity`) would not run more jobs at once. Not measured
+with more than one worker: locally the scheduler has a single worker address.
