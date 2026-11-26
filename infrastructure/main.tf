@@ -178,6 +178,7 @@ locals {
       "model-registry",
       "inference-service",
       "mlflow",
+      "job-events-monitor",
     ] : name => "/cloudtrain/${var.environment}/${name}"
   }
 }

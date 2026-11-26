@@ -12,6 +12,7 @@ variable "repository_names" {
     "inference-service",
     "portal",
     "mlflow",
+    "job-events-monitor",
   ]
 }
 

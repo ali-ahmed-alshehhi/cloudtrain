@@ -15,15 +15,16 @@ locals {
 
   # service => database schema whose secret it reads (null = no database)
   services = {
-    "gateway"           = null
-    "portal"            = null
-    "project-service"   = "projects"
-    "dataset-service"   = "datasets"
-    "job-service"       = "jobs"
-    "scheduler"         = "scheduler"
-    "model-registry"    = "registry"
-    "inference-service" = null
-    "mlflow"            = "mlflow"
+    "gateway"            = null
+    "portal"             = null
+    "project-service"    = "projects"
+    "dataset-service"    = "datasets"
+    "job-service"        = "jobs"
+    "scheduler"          = "scheduler"
+    "model-registry"     = "registry"
+    "inference-service"  = null
+    "mlflow"             = "mlflow"
+    "job-events-monitor" = null
   }
 
 }
@@ -67,6 +68,10 @@ locals {
     "inference-service" = [
       { sid = "ReadModels", actions = ["s3:GetObject"], resources = ["${var.artifacts_bucket_arn}/*"] },
       { sid = "ListModels", actions = ["s3:ListBucket"], resources = [var.artifacts_bucket_arn] },
+    ]
+    # The only reader of job-events (decision 0014). Same as monitoring/aws/job-events-monitor-policy.json.tftpl.
+    "job-events-monitor" = [
+      { sid = "ReadAndDeleteJobEventsOnly", actions = ["sqs:GetQueueUrl", "sqs:ReceiveMessage", "sqs:DeleteMessage"], resources = [var.job_events_queue_arn] },
     ]
     # MLflow's server keeps run artifacts under s3://<artifacts>/mlflow/.
     "mlflow" = [
