@@ -106,7 +106,9 @@ The comparison page for project-88: [`test-j-compare-page.png`](test-j-compare-p
 | Speedup / efficiency | 1.00× / 100% | **1.50× / 75%** |
 | Job wall time (`platform_compare`) | 4.9 s | 5.6 s |
 | Final accuracy | 0.968 | 0.968 |
-| GPU-hours as billed / estimated cost | 0.0014 / $0.00 | 0.0031 / $0.00 (`local-cpu` is priced $0) |
+| GPU-hours (requested GPUs × hours) / estimated cost | 0.0014 / $0.00 | 0.0031 / $0.00 (`local-cpu` is priced $0) |
+
+GPU-hours here are Training Jobs' accounting value, `resources.gpu_count` × hours over every attempt (`job-service/app/pricing.py`): the jobs asked for 1 and 2 GPUs, but ran on CPU, so it is not GPU use. The cost is the machine's hourly price × machine-hours, $0 for `local-cpu`; neither is a bill.
 
 **The three readings agree:** `platform_compare`, `compare_runs.py` and the comparison page show the same
 throughput, speedup, efficiency and accuracy for the same six runs; the page labels both rows "2 processes on
