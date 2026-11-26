@@ -38,6 +38,10 @@ class FakeSqs:
     def delete_message(self, QueueUrl, ReceiptHandle):
         self.deleted.append(ReceiptHandle)
 
+    def change_message_visibility(self, QueueUrl, ReceiptHandle, VisibilityTimeout):
+        self.visibility_changes = getattr(self, "visibility_changes", [])
+        self.visibility_changes.append({"handle": ReceiptHandle, "timeout": VisibilityTimeout})
+
 
 class FakeServices:
     """Training Jobs and the worker."""
@@ -321,3 +325,53 @@ def test_worker_routing_falls_back_to_default():
             os.environ.pop("TRAINING_WORKER_URLS", None)
         else:
             os.environ["TRAINING_WORKER_URLS"] = old_urls
+
+
+def test_full_capacity_skips_receive():
+    """When all slots are full and no job has ended, receive_message is not called."""
+    cap = CapacityTracker(max_workers=1)
+    cap.reserve("job-00", "local-cpu")
+
+    sqs = FakeSqs([FORM])
+    services = FakeServices(statuses={"job-00": "RUNNING"})
+    scheduler = make_app(sqs, services, capacity=cap).state.scheduler
+
+    # Patch time.sleep so the test doesn't actually wait
+    import unittest.mock
+
+    with unittest.mock.patch("time.sleep") as mock_sleep:
+        scheduler.read_queue_once()
+
+    # SQS was never called — message stays untouched
+    assert sqs.deleted == []
+    assert len(sqs.messages) == 1  # still in the queue, never popped
+    mock_sleep.assert_called_once_with(5)
+
+
+def test_slot_freed_then_receives():
+    """When capacity is full but a tracked job has ended, the slot is freed and the next job is received."""
+    cap = CapacityTracker(max_workers=1)
+    cap.reserve("job-00", "local-cpu")
+
+    sqs = FakeSqs([FORM])
+    services = FakeServices(statuses={"job-00": "SUCCEEDED"})
+    scheduler = make_app(sqs, services, capacity=cap).state.scheduler
+    scheduler.read_queue_once()
+
+    # job-00 was freed, then the queued job was placed
+    assert cap.active_count == 1  # the new job took the slot
+    assert "job-00" not in cap.active_jobs
+    assert sqs.deleted == ["r0"]  # message was processed and deleted
+
+
+def test_empty_queue_frees_finished_slots():
+    """When the queue returns no messages and a tracked job has finished, its slot is freed."""
+    cap = CapacityTracker(max_workers=1)
+    cap.reserve("job-00", "local-cpu")
+
+    sqs = FakeSqs([])  # empty queue
+    services = FakeServices(statuses={"job-00": "SUCCEEDED"})
+    scheduler = make_app(sqs, services, capacity=cap).state.scheduler
+    scheduler.read_queue_once()
+
+    assert cap.active_count == 0  # slot was freed even though no new job arrived
