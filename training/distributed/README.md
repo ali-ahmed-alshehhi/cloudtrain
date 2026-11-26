@@ -20,16 +20,17 @@
 
 In the job form: `parallelism.strategy` is `single` or `ddp`; for `ddp`, `world_size` equals `resources.gpu_count`.
 
-## Status (14 Nov 2026)
+## Status (25 Nov 2026)
 
 | Part | State |
 |---|---|
 | DDP helpers | Done. Tested with two processes on a CPU. Not yet run on 2 GPUs |
 | Benchmark tool | Done. Local runs on 1 GPU, with synthetic images and with real CIFAR-10, in `docs/BENCHMARKS.md` |
 | Parallelism selector | Done. Two of its values are assumptions until the cloud benchmark |
-| Plugged into the training runtime | Waiting for the runtime (issue #28) |
-| Mandatory benchmark, 1 vs 2 GPUs | Waiting for the cloud machine (issue #30) |
-| Results for the comparison page | Local result files are ready to build on. The 2-GPU numbers wait for the cloud run (issue #76) |
+| Plugged into the training runtime | Done (issue #28). The worker (`training/app/trainer.py`) runs a `ddp` job through `launch`, and logs `epoch_seconds` and `epoch_images` to MLflow every epoch for the comparison page. Tested with 2 processes on a CPU: `tests/test_distributed_worker.py`, and `python -m scripts.smoke_ddp_local` |
+| Single vs DDP through the platform | Done (issue #30), labelled "2 processes on CPU, local stack": `platform_compare.py`, results in `docs/BENCHMARKS.md`, section 2 |
+| Mandatory benchmark, 1 vs 2 real GPUs | Not measured: no machine with 2 GPUs under decision 0011. The command is ready in `docs/BENCHMARKS.md` |
+| Results for the comparison page | The platform runs are in MLflow with `epoch_seconds`, `epoch_images` and the tag `result_label` (issue #76) |
 
 ## What we need from teammates
 
@@ -61,6 +62,7 @@ The acceptance test stays open until the machine with 2 GPUs exists. The command
 | `benchmark.py` | Runs the comparisons (`scaling`, `workers`) and prints the tables for `docs/BENCHMARKS.md` (`report`) |
 | `metrics.py` | Speedup, efficiency, throughput, GPU-hours and cost, from saved results |
 | `selector.py` | The parallelism selector: `select(Workload(...))` returns the choice and its reason |
+| `platform_compare.py` | Sends the same job through the gateway as `single` and as `ddp`, once per seed, labels the MLflow runs with `result_label` and saves the comparison (local stack only) |
 
 ## Run it
 PyTorch is not in `training/requirements*.txt` yet, so install it next to the test tools.
@@ -134,6 +136,18 @@ What the runtime needs to know (issue #28):
 - The image needs `COPY distributed ./distributed` in `training/Dockerfile`, and `torch` and `torchvision`
   in `training/requirements.txt`.
 - DataLoader workers need shared memory: start the container with `--shm-size=2g` or `--ipc=host`.
+
+## What the worker logs for the comparison page (#76)
+Every epoch, with `step` = the epoch number, next to `train_loss`, `validation_loss`, `accuracy` and `f1`:
+
+| MLflow metric | Meaning |
+|---|---|
+| `epoch_seconds` | Wall time of that epoch's training steps, measured by the main process (on a GPU, after the queued work finished). Evaluation is not included |
+| `epoch_images` | Training images of that epoch, all processes together |
+
+They are the `seconds` and `images` of `epochs_detail` in the result files, so the page computes time per epoch
+(the first epoch left out as warm-up), throughput, speedup and efficiency as `metrics.py` does. Use at least
+3 epochs, and the same `model`, dataset version, `epochs`, `batch_size` and `num_workers` in the runs you compare.
 
 ## Endpoints
 None of its own. Runs inside the worker.
