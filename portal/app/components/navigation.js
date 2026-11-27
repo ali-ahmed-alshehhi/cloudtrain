@@ -3,6 +3,8 @@ export const PAGES = [
   { key: "projects", href: "/", label: "Projects" },
   { key: "datasets", href: "/#datasets", label: "Datasets" },
   { key: "jobs", href: "/jobs", label: "Training jobs" },
+  { key: "models", href: "/models", label: "Models" },
+  { key: "predict", href: "/predict", label: "Try a prediction" },
   { key: "compare", href: "/compare", label: "Compare runs" },
   { key: "usage", href: "/usage", label: "Usage & cost" },
 ];

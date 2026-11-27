@@ -129,6 +129,10 @@ What the runtime needs to know (issue #28):
 - `launch` waits until training ends. If one process fails, it stops the others and raises the error.
 - `train` must be a function at the top of a module, and `job` must be picklable: every process is new.
 - `batch_size` is per process, so one step uses `batch_size × world_size` samples.
+- Every process needs at least one full batch: `ceil(training rows / world_size) ≥ batch_size`. The worker refuses
+  a smaller job before training with `DatasetTooSmall`, which reaches Training Jobs as a one-line FAILED reason.
+  Without that check every process trained no step and `train_loss` divided by zero (found by demo step 8, #177).
+  A DDP job that fails for any other reason also reports only the last line of the process's error.
 - Build the training DataLoader with `ddp.make_loader`. For a loader of your own, such as one for evaluation,
   pass `multiprocessing_context=ddp.worker_context(num_workers)`. Without it, the workers of a launched
   process are spawned, not forked: on CIFAR-10 that cost 2 seconds per worker (`docs/BENCHMARKS.md`, section 3).

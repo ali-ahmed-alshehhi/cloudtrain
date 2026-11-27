@@ -63,6 +63,12 @@ export function createGatewayClient({ gatewayUrl, getToken = () => "", fetchImpl
         return { status: error.status, body: { error: { code: error.code, message: error.message, request_id: error.requestId } } };
       }
     },
+    listModels: (projectId, signal) => request(`/api/v1/models?${new URLSearchParams({ project_id: projectId })}`, { signal }),
+    listModelVersions: (modelId, signal) => request(`/api/v1/models/${encodeURIComponent(modelId)}/versions`, { signal }),
+    registerModel: (body, key) => request("/api/v1/models", { method: "POST", body, headers: { "Idempotency-Key": key } }),
+    promoteModel: (modelId, version) => request(`/api/v1/models/${encodeURIComponent(modelId)}/versions/${version}/promote`, { method: "POST" }),
+    rollbackModel: (modelId) => request(`/api/v1/models/${encodeURIComponent(modelId)}/rollback`, { method: "POST" }),
+    predict: (form) => request("/api/v1/predict", { method: "POST", body: form }),
     listJobs: (projectId, signal) => request(`/api/v1/jobs?${new URLSearchParams({ project_id: projectId })}`, { signal }),
     getJob: (jobId, signal) => request(`/api/v1/jobs/${encodeURIComponent(jobId)}`, { signal }),
     submitJob: (body, key) => request("/api/v1/jobs", { method: "POST", body, headers: { "Idempotency-Key": key } }),
