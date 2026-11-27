@@ -174,7 +174,7 @@ In short:
 | 0011 | The AWS Emulator stands in for an AWS account | No real machines: no real GPU training, no running containers | No bill and no GPU quota wait; all Terraform demos run on a laptop and in CI |
 | 0012 | Workers on EC2 in an Auto Scaling group | We start and stop machines by capacity, not per job | Worker count is one number in a tfvars file |
 | 0013 | A small Pulumi layer above Terraform, for one dashboard | Two tools, two state files, destroy order matters | Answered the professor's request without touching the mandatory Terraform |
-| 0014 | One job-events reader, Prometheus and Grafana, matching CloudWatch alarms | The monitor is not deployed on AWS yet | 5 alert rules, unit-tested with promtool |
+| 0014 | One job-events reader, Prometheus and Grafana, matching CloudWatch alarms | On AWS the monitor is an ECS service in Terraform (#180), which the emulator does not run | 5 alert rules, unit-tested with promtool |
 
 The measured effect of 0007 and 0010, such as the time to detect a dead worker and to recover, is in
 Hilal + Adel's evaluation (`EVALUATION.md`, #119).
@@ -202,8 +202,9 @@ Benchmarks (`docs/BENCHMARKS.md`), evaluation (`docs/EVALUATION.md`), test resul
 - **Local storage is not kept.** LocalStack keeps uploaded files and queue messages in memory; a restart
   loses them (decision 0005). PostgreSQL records are kept.
 - **Alerts only in the portal.** No email or chat notifications (decision 0002).
-- **Monitoring on AWS is partial.** The three CloudWatch alarms and the dashboard exist; the job events
-  monitor does not run on AWS yet, so its metrics are only on laptops (decision 0014).
+- **Monitoring on AWS is only defined, not run.** The three CloudWatch alarms, the dashboard and, since
+  #180, the job events monitor as its own ECS service all exist in Terraform. The emulator runs no
+  containers, so the monitor's metrics have only been seen on laptops (decision 0014).
 - **Cost is an estimate.** It uses AWS on-demand prices for us-east-1 copied on 17 Nov
   (`contracts/pricing.yaml`) and the hours each machine ran, not an AWS bill.
 
