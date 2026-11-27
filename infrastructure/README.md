@@ -141,9 +141,11 @@ services, and from inside the VPC for the load balancer's health checks.
 | `<env>-cloudtrain-server-errors` | more than 5% of requests through the public load balancer answer 5xx (from the services or from the load balancer itself), 5 minutes | `CloudTrainHighErrorRate` |
 
 The server-errors alarm is created once `application-services` passes its load balancer (`alb_arn_suffix`).
-Alarms only show in CloudWatch for now (`alarm_actions` is empty). Not here yet: the CloudWatch dashboard and
-the "monitor down" alarm, which use Adil's files and `job-events-monitor` from #115 once it merges. On the
-emulator these resources are created, but receive no live data (decision 0011); the live view is the local Grafana.
+Alarms only show in CloudWatch for now (`alarm_actions` is empty). `job-events-monitor`, the only reader of
+`job-events`, runs as one more ECS service in `application-services` (#135), so its log lines reach CloudWatch
+as metrics (Embedded Metric Format). Not here yet: the CloudWatch dashboard and the "monitor down" alarm
+(`monitoring/aws/`). On the emulator these resources are created, but receive no live data (decision 0011);
+the live view is the local Grafana.
 
 ### Service roles for ECS (#35, with Salem; used in #36)
 
@@ -152,8 +154,8 @@ emulator these resources are created, but receive no live data (decision 0011); 
 service's code runs as it. Only these get permissions: `dataset-service` (read/write `datasets`),
 `job-service` (send to `training-jobs` and `job-events`, read the dead-letter queue), `scheduler`
 (read `training-jobs`), `inference-service` (read `artifacts`), `mlflow` (read/write
-`artifacts/mlflow/`). `gateway`, `portal`, `project-service` and `model-registry` call no AWS API, so
-their task roles have no permissions.
+`artifacts/mlflow/`), `job-events-monitor` (read and delete `job-events` only). `gateway`, `portal`,
+`project-service` and `model-registry` call no AWS API, so their task roles have no permissions.
 
 The **execution role** (ECS pulls the image, writes logs and injects the database secret) is one shared
 role in `modules/iam/ecs.tf` (Salem, #129). The database secrets are not created by Terraform:

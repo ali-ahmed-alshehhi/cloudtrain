@@ -17,6 +17,9 @@ local Grafana.
 (`monitoring/job-events-monitor/tests/test_consumer.py::test_emf_lines_are_valid_cloudwatch_records`).
 
 ## 2. The `job-events-monitor` service
+
+Done in #135: it is one more service in `infrastructure/modules/application-services` (task role in
+`modules/service-roles`, image in `container-registry`, log group from `modules/monitoring`).
 - One small ECS Fargate task (0.25 vCPU, 512 MB is plenty), image from `monitoring/job-events-monitor/Dockerfile`
   (build with `--build-context contracts=contracts`), port 8011, **not behind the load balancer**.
 - Environment: `JOB_EVENTS_QUEUE=job-events`, `AWS_REGION`, no `SQS_ENDPOINT` (real SQS), optional

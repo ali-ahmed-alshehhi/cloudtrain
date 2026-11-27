@@ -34,7 +34,7 @@ jobs:
       packages: write # push to ghcr.io with the run's own short-lived token
       id-token: write # GitHub OIDC, only used when an AWS account is configured
     env:
-      SERVICES: gateway project-service dataset-service job-service scheduler training-worker model-registry inference-service portal mlflow
+      SERVICES: gateway project-service dataset-service job-service scheduler training-worker model-registry inference-service portal mlflow job-events-monitor
       COMPOSE_PROJECT_NAME: cloudtrain
       AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}

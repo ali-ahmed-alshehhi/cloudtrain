@@ -23,6 +23,8 @@ locals {
     model-registry    = { port = 8006, cpu = "256", memory = "512", public = false }
     inference-service = { port = 8007, cpu = "512", memory = "1024", public = false }
     mlflow            = { port = 5000, cpu = "256", memory = "512", public = false }
+    # The only reader of job-events (#135, decision 0014): its log lines become CloudWatch metrics (EMF).
+    job-events-monitor = { port = 8011, cpu = "256", memory = "512", public = false }
   }
 
   alb_sg_id      = var.alb_security_group_id != "" ? var.alb_security_group_id : var.default_security_group_id
