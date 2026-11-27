@@ -67,7 +67,7 @@ test("1 GPU vs 2 GPUs: mean of repeats, speedup and efficiency against the 1-GPU
   assert.equal(calls[0].filter, "tags.project_id = 'project-01' and attributes.status = 'FINISHED'");
   assert.equal(result.groups.length, 1);
   const [group] = result.groups;
-  assert.equal(group.label, "resnet18 · dataset-1 v1 · 3 epochs · batch 128 per GPU");
+  assert.equal(group.label, "resnet18 · dataset-1 v1 · 3 epochs · batch 128 per process");
   assert.deepEqual(group.problems, []);
   const [one, two] = group.rows;
   assert.deepEqual([one.gpus, one.strategy, one.repeats, two.gpus, two.strategy, two.repeats], [1, "single", 2, 2, "ddp", 2]);
@@ -195,6 +195,10 @@ test("formatting", () => {
   assert.equal(formatThroughput(null), "not logged");
   assert.equal(formatSeconds(1.25), "1.25 s");
   assert.equal(formatSeconds(31), "31.0 s");
+  assert.equal(formatSeconds(0.0178), "17.8 ms");
+  assert.equal(formatSeconds(0.0266), "26.6 ms");
+  assert.equal(formatSeconds(0.999), "999.0 ms");
+  assert.equal(formatSeconds(1), "1.00 s");
 });
 
 test("groupComparable alone: a lone run is shown with what is missing", () => {
