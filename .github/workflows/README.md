@@ -9,7 +9,7 @@
 pull request ──► CI  + Security  (+ Login, + Terraform when their folders change)   all must be green
                           │ merge to main
                           ▼
-                 Images: build the 10 images, Trivy gate, push  <service>:<commit>
+                 Images: build the 11 images, Trivy gate, push  <service>:<commit>
                           │ automatic
                           ▼
                  Deploy ─► Staging: deploy that commit + smoke test of those exact images
@@ -25,7 +25,7 @@ Rollback: Actions → Deploy → Run workflow → tick "rollback" (also needs th
 | `security.yml` | every pull request, every push to `main`, Mondays 09:17 Abu Dhabi, on demand | 1. **Gitleaks**: secrets in the code or its history · 2. **pip-audit / npm audit**: libraries with known holes · 3. **Trivy**: holes inside every image · 4. **Checkov**: risky Terraform settings | a secret; a vulnerable library; a CRITICAL image hole that has a fix; a risky cloud setting. How to fix: [`security/SECURITY_CHECKS.md`](../../security/SECURITY_CHECKS.md) |
 | `login.yml` | pull requests touching login, gateway, projects or Cognito; every push to `main`; on demand | starts the AWS Emulator, creates the Cognito pool, groups and test users, runs CloudTrain with `AUTH_MODE=jwt`: 10 login tests (`security/tests`) + the demo walk-through with real tokens | a request without a valid login is NOT refused, or a real login does not work |
 | `terraform.yml` | pull requests touching `infrastructure/`, pushes to `main`, on demand | `terraform fmt` + `validate`, then applies the whole dev environment on the AWS Emulator, checks its outputs and destroys it | the Terraform does not format, validate or apply |
-| `images.yml` | every push to `main` (and pull requests that change it) | builds the 10 images, refuses any with a CRITICAL hole that has a fix, pushes each tagged with its commit: `ghcr.io/ali-ahmed-alshehhi/cloudtrain/<service>:<commit>` (ECR once there is an AWS account) | an image fails the Trivy gate |
+| `images.yml` | every push to `main` (and pull requests that change it) | builds the 11 images, refuses any with a CRITICAL hole that has a fix, pushes each tagged with its commit: `ghcr.io/ali-ahmed-alshehhi/cloudtrain/<service>:<commit>` (ECR once there is an AWS account) | an image fails the Trivy gate |
 | `deploy.yml` + [`../deploy/deploy.sh`](../deploy/deploy.sh) | automatically after `images.yml` succeeds on `main`; by hand (a commit, or rollback) | **Which version** → **Staging**: each ECS service gets a new task-definition revision with only the image changed, then a smoke test runs those images with `make e2e` → **Production**: the same, after approval | staging smoke test fails; production waits until a reviewer approves |
 | `assign-reviewers.yml` | a pull request is opened | asks the right teammate to review (`team.yml`, `scripts/pick_reviewers.py`) | — |
 
