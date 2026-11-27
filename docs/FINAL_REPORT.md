@@ -544,12 +544,14 @@ predictions. The monitoring stack turns `/metrics` and job events into a dashboa
 **Design.**
 - The portal calls only the gateway, through one client (`app/lib/gateway.mjs`); an unchanged retry
   reuses its `Idempotency-Key`. It is the notification service (decision 0002): it polls
-  `GET /api/v1/jobs/events` every 5 to 10 seconds, with back-off.
+  `GET /api/v1/jobs/events` every 5 s (the contract allows 5 to 10 s); after an error it waits twice as
+  long each time, up to 60 s.
 - Hilal's pages: projects, datasets and alerts (#99); job submission, jobs list and live job page (#165);
   models, promote and rollback, and predictions (#175).
 - Adel's parts: alerts and live badges (#96, #100), MLflow results (#98), cost per job and project (#117; a
-  missing price shows "Price unknown", never $0), the comparison (#124) and the pages `/compare` and
-  `/usage` (#156, #160, #166).
+  missing price shows "Price unknown", never $0), the comparison (#124), the pages `/compare` and
+  `/usage` (#156, #160, #166), the monitoring stack (`job-events-monitor`, Prometheus rules and Grafana;
+  #115, #125, decision 0014) and `EVALUATION.md` (#119).
 - `job-events-monitor` (8011) is the only reader of `job-events` (decision 0014). It ignores repeated
   `event_id`s, times each attempt in any event order, and exports `cloudtrain_job_*` metrics.
 - Prometheus reads every `/metrics` every 15 s; its 5 rules: service down, server errors, dead letters,
