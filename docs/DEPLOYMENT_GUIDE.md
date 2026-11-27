@@ -38,7 +38,8 @@ terraform apply -var-file=environments/dev/emulator.tfvars.example
 terraform output
 ```
 
-Creates the whole dev environment (126 resources on `main`, 22 Nov 2026):
+Creates the whole dev environment (133 resources: CI apply on the emulator, 27 Nov 2026, with #180; 126 before
+#180 added `job-events-monitor`):
 
 - **Network:** VPC with public and private subnets and NAT. Our security groups are skipped on the
   emulator because of an emulator gap (see `infrastructure/README.md`).
@@ -192,7 +193,31 @@ terraform destroy       -var-file=environments/dev/terraform.tfvars
   `infrastructure/bootstrap/` and is not touched; keep it on real AWS.
 - If you use the remote state bucket, run `git restore backend.tf && terraform init -reconfigure`
   before committing anything. `backend.tf` is never committed.
-- Destroy disposable `dev` resources after every test and after submission.
+- Rehearse destroy on a **copy workspace** (below). Keep the real destroy of `default` for after
+  we submit.
+
+### Rehearse on a copy (separate workspace)
+
+Do this on a copy so the real `default` stack stays until after submission. Docker Desktop must be
+running (`./scripts/emulator-up.sh` needs it).
+
+```bash
+cd infrastructure
+./scripts/emulator-up.sh
+source ./scripts/emulator-env.sh
+terraform init
+terraform workspace new destroy-rehearsal
+terraform apply -var-file=environments/dev/emulator.tfvars.example
+terraform destroy -var-file=environments/dev/emulator.tfvars.example
+terraform state list | wc -l   # expect 0
+terraform workspace select default
+terraform workspace delete destroy-rehearsal
+./scripts/emulator-down.sh
+```
+
+Rehearsed **Mon 23 Nov 2026** on `main`, workspace `destroy-rehearsal` (not `default`):
+`terraform destroy` **126 destroyed** (before #180; now 133); `terraform state list | wc -l` **0**. Workspace deleted;
+emulator stopped. Real destroy stays for after we submit (Fri 27).
 
 ## 8. Cost notes (real AWS, us-east-1, on-demand)
 The emulator costs nothing. On real AWS the expensive parts are the GPU machines and the NAT gateway:
@@ -215,7 +240,7 @@ The seven mandatory demos, on the emulator. Start with `./scripts/emulator-up.sh
 
 | # | Demo | Commands | What to show |
 |---|---|---|---|
-| 1 | Apply creates dev | `terraform init` then `terraform apply -var-file=$V` | `Apply complete! Resources: 126 added` (on `main`, 22 Nov), then `terraform output` |
+| 1 | Apply creates dev | `terraform init` then `terraform apply -var-file=$V` | `Apply complete! Resources: 133 added` (CI, 27 Nov, with #180; 126 on `main` on 22 Nov), then `terraform output` |
 | 2 | Inspect the plan | `terraform plan -var-file=$V -out=dev.tfplan` then `terraform show dev.tfplan` | `+` create, `~` change in place, `-` destroy; the summary line |
 | 3 | Deploy the services | `terraform output ecs_cluster_name`, `terraform output ecs_service_names`, `aws ecs list-services --cluster dev-cloudtrain` | `dev-cloudtrain` and its 9 services behind the load balancer (section 4). On the emulator they run 0 tasks (no images in its ECR); Salem's pipeline does the image rollout |
 | 4 | Change a parameter | `terraform plan -var-file=$V -var worker_desired_capacity=2` | `~ desired_capacity = 1 -> 2`, `0 to add, 1 to change, 0 to destroy` |
@@ -225,7 +250,7 @@ The seven mandatory demos, on the emulator. Start with `./scripts/emulator-up.sh
 
 Optional 8th demo: the Pulumi layer (section 10), between demo 6 and demo 7.
 
-Rehearsed on 22 Nov 2026 on `main`: all seven worked (126 created; demo 4 changed 1 resource; `terraform
+Rehearsed on 22 Nov 2026 on `main`: all seven worked (126 created, before #180; demo 4 changed 1 resource; `terraform
 state list` showed 140 entries, resources plus data sources; destroy removed 126 and left the state empty).
 
 Say during the demo: the emulator starts no real machines, so GPU speed is "not measured on AWS"

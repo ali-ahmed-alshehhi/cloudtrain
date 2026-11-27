@@ -9,6 +9,13 @@ expected-statuses = ["2xx", "3xx", "400", "401", "403", "404", "409", "422", "42
 
 [[operations]]
 # Inference: before any model version is live (e.g. right after `make up`), GET /model-info rightly
-# answers its documented 503 "no model loaded yet". Any other 5xx, anywhere, is still a failure.
+# answers its documented 503 "no model loaded yet". The same startup state is handled for
+# POST /predict below; other server-error statuses remain failures.
 include-name = "GET /model-info"
+checks.not_a_server_error.expected-statuses = ["2xx", "3xx", "4xx", "503"]
+
+[[operations]]
+# A valid image can arrive before a model has been promoted. POST /predict documents 503 for
+# this unavailable-model state too. Keep schema validation and reject every other 5xx.
+include-name = "POST /predict"
 checks.not_a_server_error.expected-statuses = ["2xx", "3xx", "4xx", "503"]
