@@ -15,6 +15,7 @@ variable "services" {
     "model-registry",
     "inference-service",
     "mlflow",
+    "job-events-monitor",
   ]
 }
 
