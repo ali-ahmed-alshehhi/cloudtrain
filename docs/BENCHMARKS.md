@@ -88,15 +88,22 @@ Cost is n/a because the workstation is not a machine type in the pricing contrac
 
 ### Through the platform: single vs DDP, 2 processes on CPU, local stack
 
-**Label: "2 processes on CPU, local stack". Not GPUs, not AWS.** Measured on 25 Nov 2026 on a MacBook Pro
-(Apple silicon, 18 CPU cores), with the whole platform running in Docker (Colima VM: 8 CPUs, 16 GB). Every
-job went through the gateway, Training Jobs, the Scheduler (machine `local-cpu`) and the training worker, and
-logged to MLflow. The DDP job ran 2 worker processes that share gradients over gloo.
+**Label: "2 processes on CPU, local stack". Not GPUs, not AWS.** Measured on 25 Nov 2026 (`main` at `b087330`)
+on **two laptops**, with the same command and workload, and the whole platform running in Docker on each:
 
-| Run | Processes | Seeds | Time per epoch (ms) | Throughput (rows/s) | Speedup | Efficiency | Job wall time (s) | GPU-hours (as billed) | Accuracy |
-|---|---|---|---|---|---|---|---|---|---|
-| single | 1 | 3 | 13.6 | 34,031 | 1.00 | 100% | 3.8 | 0.0011 | 0.968 |
-| ddp | 2 | 3 | 14.2 | 31,606 | 0.96 | 48% | 5.2 | 0.0029 | 0.968 |
+- **Laptop A** (Abdulla): MacBook Pro, Apple silicon, 18 CPU cores; Docker in a Colima VM with 8 CPUs and 16 GB.
+- **Laptop B** (Adel, Test J of `docs/EVALUATION.md`, #119): MacBook Pro, Apple M5 Pro, 48 GB; Docker with
+  7.7 GiB for the containers.
+
+Every job went through the gateway, Training Jobs, the Scheduler (machine `local-cpu`) and the training worker,
+and logged to MLflow. The DDP job ran 2 worker processes that share gradients over gloo.
+
+| Laptop | Run | Processes | Seeds | Time per epoch (ms) | Throughput (rows/s) | Speedup | Efficiency | Job wall time (s) | GPU-hours (as billed) | Accuracy |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A | single | 1 | 3 | 13.6 | 34,031 | 1.00 | 100% | 3.8 | 0.0011 | 0.968 |
+| A | ddp | 2 | 3 | 14.2 | 31,606 | 0.96 | 48% | 5.2 | 0.0029 | 0.968 |
+| B | single | 1 | 3 | 26.6 | 16,822 | 1.00 | 100% | 4.9 | 0.0014 | 0.968 |
+| B | ddp | 2 | 3 | 17.8 | 25,194 | **1.50** | 75% | 5.6 | 0.0031 | 0.968 |
 
 - **Workload, the same in every run:** `tabular_mlp` on the Wisconsin Breast Cancer data (569 rows, 30
   features; decision 0008), 455 rows for training and 114 held out, 10 epochs, batch size 16 per process,
@@ -107,18 +114,44 @@ logged to MLflow. The DDP job ran 2 worker processes that share gradients over g
   Jobs' `started_at` to `finished_at`, with start-up and evaluation.
 - **GPU-hours (as billed)** are Training Jobs' numbers: `gpu_count` × hours. No GPU was used: locally the
   Scheduler runs every job on `local-cpu`. Cost is 0 because `local-cpu` is priced at 0 in `pricing.yaml`.
-- **Spread between seeds (standard deviation of the time per epoch):** single 13.6 ± 3.0 ms (22%), ddp
-  14.2 ± 0.6 ms (4%). One single run had a slow later epoch (17.0 ms against 11.3 and 12.4 ms).
+- **Spread between seeds (standard deviation of the time per epoch):** laptop A: single 13.6 ± 3.0 ms (22%),
+  ddp 14.2 ± 0.6 ms (4%); one single run had slow later epochs (run mean 17.0 ms against 11.3 and 12.4 ms).
+  Laptop B: single 26.6 ± 0.2 ms (1%), ddp 17.8 ± 0.8 ms (5%).
 
-**What this shows.** The 4% difference in time per epoch is far inside the 22% spread, so on this job a second
-process gives **no measurable speedup**. What it does change is clear and the same in every seed: a DDP job
-took 1.3 to 1.6 s longer from start to finish (5.1 to 5.3 s against 3.7 to 3.9 s), the cost of starting two
-processes and their process group. The model has 1,058 parameters, and an epoch is 28 small steps (14 per process under DDP):
-sharing gradients after every step costs as much as the step itself, which is what the CPU check in section 4
-found. This is the case the selector (section 5) keeps on one worker. Accuracy was the same per seed.
+**What this shows.** The two laptops disagree:
+- **Laptop A: no speedup could be measured.** The 4% difference is far inside the 22% spread, and the seeds
+  disagree in direction (DDP against single per seed: 0.89×, 0.76×, 1.24×). The result is inconclusive, not a
+  measured absence of speedup.
+- **Laptop B: 1.50×, the same way in every seed** (1.59×, 1.46×, 1.44×; every DDP seed, 16.9 to 18.4 ms, beat
+  every single seed, 26.5 to 26.8 ms): **DDP made each epoch faster**.
 
-Result file: [`platform-cpu-single-vs-ddp.json`](benchmarks/platform-cpu-single-vs-ddp.json), with the job IDs,
-the MLflow run IDs and every epoch. To run it again on the local stack (`make up` first):
+So on this job, with epochs of about 10 to 30 ms on CPU, whether a second process speeds up an epoch **depends on
+the machine or its Docker setup** (not separated: the two laptops also run Docker differently, and one process
+was twice as slow on laptop B as on laptop A). Whichever laptop runs the demo may show either result. Why they
+differ is not measured. One guess, not tested: the worker gives the job's 2 CPU cores to PyTorch as 2 threads for
+one process, or 1 thread to each of 2 processes (`cpu_cores // world_size` in `training/app/trainer.py`), and how
+well 2 threads work on so small a model depends on the CPU.
+
+What both laptops agree on is the **start-up cost**: a DDP job took longer from start to finish. On laptop A every
+DDP job took 1.3 to 1.6 s longer (5.1 to 5.3 s against 3.7 to 3.9 s). On laptop B only means were recorded, and
+the two tools disagree on the single jobs: by `platform_compare`'s wall time the means differ by 0.7 s (5.6
+against 4.9 s), by `compare_runs.py`'s total time by 1.4 s (5.6 against 4.2 s). The extra time is probably starting
+two processes and their process group (the wall time also includes evaluation and MLflow logging, not measured
+apart). The model has 1,058 parameters, and an epoch is 28 small steps (14 per process under DDP). For a job this
+small the selector (section 5) keeps one worker, and both laptops support that. Accuracy was the same per seed on
+laptop A; on laptop B the mean was the same for both (0.968; per-seed values not recorded).
+
+None of this says what 2 GPUs would do: these are CPU processes (see "Not measured" in section 6).
+
+Result files, with the job IDs, the MLflow run IDs and every epoch:
+- Laptop A: [`platform-cpu-single-vs-ddp.json`](benchmarks/platform-cpu-single-vs-ddp.json), written by
+  `platform_compare`.
+- Laptop B: [`platform-cpu-single-vs-ddp-second-laptop.json`](benchmarks/platform-cpu-single-vs-ddp-second-laptop.json),
+  parsed by a script from Adel's raw output in `docs/evaluation/test-j-single-vs-ddp.md` (on #119, commit
+  `e0429ec`; not yet on `main`). That output gives every run's epochs, but only the means of wall time, accuracy
+  and GPU-hours, so the file keeps those as means.
+
+To run it again on the local stack (`make up` first):
 
 ```bash
 cd training
@@ -332,12 +365,17 @@ When DDP is worth it, and when it is not. **So far, from the local runs only:**
 5. **Measure the noise before comparing.** Three runs of the same setting had a spread of 2 to 3% in time
    per epoch and of 1 to 2 points in accuracy (standard deviation). Single runs of one setting differed by
    up to 11%. A difference of that size between two settings means nothing without more runs.
-6. **Small models lose with DDP.** In the CPU check, sharing gradients took three times as long as the
-   rest of the step. It is a CPU result, so it is a warning, not a GPU number.
-7. **Through the whole platform, a small job gains nothing from DDP and pays for it in start-up.** On the
-   tabular job (section 2, "Through the platform"), 2 processes were not faster per epoch than 1, and every
-   DDP job took 1.3 to 1.6 s longer from start to finish. The platform part works end to end: the job form,
-   the Scheduler, the worker's DDP path and the per-epoch MLflow metrics that the comparison page reads.
+6. **Small models lose with DDP, in the CPU check.** There, sharing gradients took three times as long as the
+   rest of the step. It is a CPU result, so it is a warning, not a GPU number, and finding 7 shows that on
+   another machine a small model's epochs did get faster.
+7. **Through the whole platform, a small job pays for DDP in start-up, and whether it gains per epoch depends
+   on the machine or its Docker setup.** On the tabular job (section 2, "Through the platform"), 2 processes on
+   CPU gave no measurable speedup per epoch on one laptop (0.96×, inside a 22% spread; inconclusive) and were
+   1.50× faster on another, in every seed. On laptop A every DDP job took 1.3 to 1.6 s longer from start to
+   finish; on laptop B the means differ by 0.7 s by `platform_compare` (1.4 s by `compare_runs.py`; per-run times
+   not recorded). For a job this small one worker
+   is still the right choice. The platform part works end to end: the job form, the Scheduler, the worker's DDP
+   path and the per-epoch MLflow metrics that the comparison page reads.
 
 **Not measured, because there is no machine with 2 real GPUs (decision 0011):** the real speedup and efficiency on 2 or more GPUs, the cost of sharing
 gradients over NCCL, the start-up time of a DDP job, the best number of workers under DDP, and whether a
