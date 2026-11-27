@@ -226,7 +226,9 @@ Benchmarks (`docs/BENCHMARKS.md`), evaluation (`docs/EVALUATION.md`), test resul
    code, and to say where every measurement ran.
 5. **Free tools can disappear.** MinIO stopped publishing free images and Node 20 reached end of life
    while we were planning. Pinning versions and writing each switch down as a decision kept the team on
-   one setup.
+   one setup. The one tool we had not pinned bit us: on 25 Nov a new AWS Emulator release refused our
+   real Cognito tokens and turned the Login check red overnight, with no change on our side. We pinned
+   the last good version (#178).
 6. **Keep `main` green.** One lint error on `main` made `make check` fail for everyone until it was fixed
    (#163). Because `main` only accepts up-to-date branches, every merge also sends the open pull requests
    back through CI, so merges have to be done in order.
