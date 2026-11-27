@@ -192,7 +192,31 @@ terraform destroy       -var-file=environments/dev/terraform.tfvars
   `infrastructure/bootstrap/` and is not touched; keep it on real AWS.
 - If you use the remote state bucket, run `git restore backend.tf && terraform init -reconfigure`
   before committing anything. `backend.tf` is never committed.
-- Destroy disposable `dev` resources after every test and after submission.
+- Rehearse destroy on a **copy workspace** (below). Keep the real destroy of `default` for after
+  we submit.
+
+### Rehearse on a copy (separate workspace)
+
+Do this on a copy so the real `default` stack stays until after submission. Docker Desktop must be
+running (`./scripts/emulator-up.sh` needs it).
+
+```bash
+cd infrastructure
+./scripts/emulator-up.sh
+source ./scripts/emulator-env.sh
+terraform init
+terraform workspace new destroy-rehearsal
+terraform apply -var-file=environments/dev/emulator.tfvars.example
+terraform destroy -var-file=environments/dev/emulator.tfvars.example
+terraform state list | wc -l   # expect 0
+terraform workspace select default
+terraform workspace delete destroy-rehearsal
+./scripts/emulator-down.sh
+```
+
+Rehearsed **Mon 23 Nov 2026** on `main`, workspace `destroy-rehearsal` (not `default`):
+`terraform destroy` **126 destroyed**; `terraform state list | wc -l` **0**. Workspace deleted;
+emulator stopped. Real destroy stays for after we submit (Fri 27).
 
 ## 8. Cost notes (real AWS, us-east-1, on-demand)
 The emulator costs nothing. On real AWS the expensive parts are the GPU machines and the NAT gateway:
