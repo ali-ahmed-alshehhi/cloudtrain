@@ -103,6 +103,10 @@ def _run_ddp(job, dataset_dir, compatibility, resume, stop_event):
                 args=(str(dataset_dir), str(root)),
                 device="auto",
             )
+        except torch.multiprocessing.ProcessRaisedException as error:
+            # Training Jobs gets str(error), cut at 1000 characters: for a failed process that is its whole
+            # traceback, cut before the message. Keep the message ("app.trainer.DatasetTooSmall: ...").
+            raise RuntimeError(_last_line(str(error))) from error
         finally:
             watcher_done.set()
             watcher.join(timeout=0.2)
@@ -218,6 +222,8 @@ def _train_context(ctx, job, dataset_dir: Path, resume: bytes | None, publish, c
         plain_model.maxpool = nn.Identity()
         plain_model.to(ctx.device)
 
+    _require_a_full_batch(len(train_set), ctx.world_size, job.hyperparameters.batch_size)
+
     optimizer = torch.optim.SGD(
         plain_model.parameters(),
         lr=job.hyperparameters.learning_rate,
@@ -319,6 +325,37 @@ def _train_context(ctx, job, dataset_dir: Path, resume: bytes | None, publish, c
         bundle = _cifar_bundle(plain_model)
         example = torch.zeros(1, 3, 32, 32).numpy()
     return TrainingOutcome(final, plain_model.cpu(), example, bundle), []
+
+
+class DatasetTooSmall(ValueError):
+    """The training rows cannot fill one batch in every process."""
+
+
+def _require_a_full_batch(rows: int, world_size: int, batch_size: int) -> None:
+    """Refuse a job in which a process would train on no batch at all.
+
+    Every process gets ceil(rows / world_size) rows (DistributedSampler pads the last share), and the training
+    loader drops an incomplete last batch. With fewer rows than `batch_size` per process, an epoch would have
+    no step, and the training loss would divide by zero.
+    """
+    per_process = -(-rows // world_size)  # ceil
+    if per_process >= batch_size:
+        return
+    if world_size > 1:
+        share = f"{rows} training rows over {world_size} processes is {per_process} per process"
+        advice = "Use a smaller batch_size, fewer processes or a bigger dataset"
+    else:
+        share = f"{rows} training rows"
+        advice = "Use a smaller batch_size or a bigger dataset"
+    raise DatasetTooSmall(
+        f"the dataset is too small for this job: {share}, fewer than batch_size {batch_size}. {advice}"
+    )
+
+
+def _last_line(message: str) -> str:
+    """The error itself from a failed training process: its message ends a full traceback."""
+    lines = [line for line in message.strip().splitlines() if line.strip()]
+    return lines[-1] if lines else message
 
 
 def _clock(device) -> float:
