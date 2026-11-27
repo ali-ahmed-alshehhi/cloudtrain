@@ -1,0 +1,222 @@
+{
+  "experiment": "platform-single-vs-ddp",
+  "label": "2 processes on CPU, local stack",
+  "measured_by": "Adel (Student 10), 25 Nov 2026, main at b087330",
+  "machine": "MacBook Pro, Apple M5 Pro (arm64), 48 GB RAM; Docker with 7.7 GiB for the containers",
+  "source": "Parsed by a script (regular expressions over the 'job-N strategy seed S: run ID' lines and each run's epoch_seconds / epoch_images lists, values copied unchanged) from the raw platform_compare and compare_runs.py output in docs/evaluation/test-j-single-vs-ddp.md, on #119 at commit e0429ec. That output has every run's per-epoch values, but only the means of job wall time, accuracy and GPU-hours, so those are in run_means, not per run. run_means.*.wall_seconds is platform_compare's value; compare_runs.py reported a total time of 4.2 s (single) and 5.6 s (ddp) for the same runs.",
+  "project_id": "project-88",
+  "dataset_id": "dataset-93",
+  "workload": {
+    "epochs": 10,
+    "batch_size": 16,
+    "learning_rate": 0.05,
+    "num_workers": 0
+  },
+  "model": "tabular_mlp",
+  "run_means": {
+    "single": {
+      "wall_seconds": 4.9,
+      "accuracy": 0.968,
+      "gpu_hours": 0.0014
+    },
+    "ddp": {
+      "wall_seconds": 5.6,
+      "accuracy": 0.968,
+      "gpu_hours": 0.0031
+    }
+  },
+  "runs": [
+    {
+      "job_id": "job-56",
+      "mlflow_run_id": "24abe639b4a24cf3bea619cdf9f2bd00",
+      "processes": 1,
+      "strategy": "single",
+      "seed": 0,
+      "machine_type": "local-cpu",
+      "epoch_seconds": [
+        0.02835858299999927,
+        0.026646167000080823,
+        0.026081458000021485,
+        0.028141874999960237,
+        0.025137250000057065,
+        0.02626616700001705,
+        0.026060458000074505,
+        0.025868415999980243,
+        0.026079333999973642,
+        0.03132479099997454
+      ],
+      "epoch_images": [
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0
+      ]
+    },
+    {
+      "job_id": "job-57",
+      "mlflow_run_id": "1ea3462eccc34a60b181f9a5b24a78d1",
+      "processes": 2,
+      "strategy": "ddp",
+      "seed": 0,
+      "machine_type": "local-cpu",
+      "epoch_seconds": [
+        0.018725042000028225,
+        0.016702417000033165,
+        0.017042082999978447,
+        0.01684695799997371,
+        0.01692112500006715,
+        0.01711574999990262,
+        0.01695816599999489,
+        0.01678979200005415,
+        0.01668387500001245,
+        0.016692375000047832
+      ],
+      "epoch_images": [
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0
+      ]
+    },
+    {
+      "job_id": "job-58",
+      "mlflow_run_id": "e3d2ea04c5dc42cb80b5af13bcaeb3e7",
+      "processes": 1,
+      "strategy": "single",
+      "seed": 1,
+      "machine_type": "local-cpu",
+      "epoch_seconds": [
+        0.02937187499992433,
+        0.02607020800007831,
+        0.02634216599994943,
+        0.026586624999936248,
+        0.026731000000040694,
+        0.02670316699993691,
+        0.02644383300003028,
+        0.026948791999984678,
+        0.02677633399991919,
+        0.02659787499999311
+      ],
+      "epoch_images": [
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0
+      ]
+    },
+    {
+      "job_id": "job-59",
+      "mlflow_run_id": "d7acdff4e24c4d3bbb920d98d5570d89",
+      "processes": 2,
+      "strategy": "ddp",
+      "seed": 1,
+      "machine_type": "local-cpu",
+      "epoch_seconds": [
+        0.0190330839999433,
+        0.016795290999993995,
+        0.01711212500003967,
+        0.01730562500006272,
+        0.0170117919999484,
+        0.017272542000000612,
+        0.016651249999995343,
+        0.016963375000045744,
+        0.024275957999975617,
+        0.020032750000041233
+      ],
+      "epoch_images": [
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0
+      ]
+    },
+    {
+      "job_id": "job-60",
+      "mlflow_run_id": "4d7400c268bb46f0a29f38ab03194411",
+      "processes": 1,
+      "strategy": "single",
+      "seed": 2,
+      "machine_type": "local-cpu",
+      "epoch_seconds": [
+        0.025252416000057565,
+        0.025076040999920224,
+        0.02574595800001589,
+        0.028594999999995707,
+        0.024961374999975305,
+        0.02553404100001444,
+        0.025909749999982523,
+        0.030828874999997424,
+        0.02568737499996132,
+        0.02595237499997438
+      ],
+      "epoch_images": [
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0
+      ]
+    },
+    {
+      "job_id": "job-61",
+      "mlflow_run_id": "eddcd9144cf14f23befed7ece8c404c2",
+      "processes": 2,
+      "strategy": "ddp",
+      "seed": 2,
+      "machine_type": "local-cpu",
+      "epoch_seconds": [
+        0.02592120799999975,
+        0.02204529100004038,
+        0.021275166999998874,
+        0.018255167000006622,
+        0.01706858399995781,
+        0.017310083999973358,
+        0.016778000000044813,
+        0.017812915999911638,
+        0.017799082999999882,
+        0.017303542000036032
+      ],
+      "epoch_images": [
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0,
+        448.0
+      ]
+    }
+  ]
+}
