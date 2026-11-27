@@ -9,7 +9,7 @@ ECS Fargate services for the gateway, portal and stateless services, behind the 
 | Resource | Name / note |
 |---|---|
 | ECS cluster | `<environment>-cloudtrain` (required by Salem's deploy role in #129) |
-| Fargate services | gateway, portal, project-service, dataset-service, job-service, scheduler, model-registry, inference-service, mlflow |
+| Fargate services | gateway, portal, project-service, dataset-service, job-service, scheduler, model-registry, inference-service, mlflow, job-events-monitor (port 8011, not behind the load balancer, #135) |
 | Public ALB | gateway on **5810**, portal on **3000** (and :80 → gateway) |
 | Log groups | `/cloudtrain/<environment>/<service>` until the monitoring module owns them |
 | Service discovery | optional private DNS `<service>.<environment>.cloudtrain.local` |
