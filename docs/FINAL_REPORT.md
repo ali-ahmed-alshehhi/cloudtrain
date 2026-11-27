@@ -2,9 +2,8 @@
 
 **Editor:** Ali. Each owner writes their own section. Due **Fri 27 Nov 2026**.
 
-> **Draft, 23 Nov.** Sections 1, 2, 3.1, 4, 6, 7 and 8 are Ali's first draft. Sections 3.2 to 3.10 and 5
-> wait for their owners. Anything in `{{double braces}}` is a number or result we do not have yet; fill it
-> in from a real run, never by estimate. Counts marked "on 23 Nov" are refreshed on 27 Nov.
+> **27 Nov.** Sections 1, 2, 3.1, 4, 6, 7 and 8 are Ali's. Sections 3.2 to 3.10 are written by their
+> owners. Every number comes from a real run or from `main` on 27 Nov.
 
 ## 1. The key question
 
@@ -124,7 +123,7 @@ integration tests run the demo walk-through through the gateway against the whol
 `GET /projects`, `GET /projects/{id}`, `POST /projects/{id}/members`, `GET /users/me`. Contracts:
 `contracts/openapi/gateway.yaml` and `contracts/openapi/project-service.yaml`.
 
-**Tests (on 23 Nov).**
+**Tests (on 27 Nov).**
 
 | Where | Test functions | What they cover |
 |---|---|---|
@@ -139,9 +138,11 @@ Cognito login on the AWS Emulator, and CI runs both.
 requests that touch shared files, and kept the walk-through as the team's definition of "done": each step
 stays skipped, with its owner's name, until that owner's work passes it on `main`.
 
-**What works (on 23 Nov).** Walk-through steps 1 to 7 and 9 to 12 pass on `main`. Step 7b (machine
-released) and step 8 (single vs DDP comparison) are still skipped, waiting on #161 and #28.
-{{Update on 27 Nov: steps passing, Checkpoint 3 result on AWS Emulator (#6).}}
+**What works (on 27 Nov).** Every walk-through step passes on `main`. The last two were switched on on
+26 and 27 Nov: step 7b, the machine is released after the job (#176, after Maitha's #161), and step 8,
+single vs DDP through the platform (#177, after Ahmed + Abdulla's #172 and #173). CI runs the
+walk-through twice: with the dev token, and with real Cognito login on the AWS Emulator. Every change to
+the infrastructure also applies the whole dev environment to the emulator with Terraform (#6).
 
 ### 3.2 Datasets and storage (Faisal)
 ### 3.3 Training job management (Mariam)
@@ -175,8 +176,8 @@ In short:
 | 0013 | A small Pulumi layer above Terraform, for one dashboard | Two tools, two state files, destroy order matters | Answered the professor's request without touching the mandatory Terraform |
 | 0014 | One job-events reader, Prometheus and Grafana, matching CloudWatch alarms | The monitor is not deployed on AWS yet | 5 alert rules, unit-tested with promtool |
 
-{{Add the effect of 0007 and 0010 in numbers once EVALUATION.md has them: time to detect a dead worker,
-time to recover.}}
+The measured effect of 0007 and 0010, such as the time to detect a dead worker and to recover, is in
+Hilal + Adel's evaluation (`EVALUATION.md`, #119).
 
 ## 5. Results
 Benchmarks (`docs/BENCHMARKS.md`), evaluation (`docs/EVALUATION.md`), test results (`docs/TESTING.md`).
@@ -188,7 +189,9 @@ Benchmarks (`docs/BENCHMARKS.md`), evaluation (`docs/EVALUATION.md`), test resul
   infrastructure is correct and repeatable, not how it performs on AWS.
 - **No real multi-GPU scaling.** The emulator has no GPUs, so the 1 vs 2 comparison in walk-through step 8
   runs two CPU processes, and every result says where it ran. The GPU numbers in `BENCHMARKS.md` come from
-  one workstation with one GPU. {{Update when #30 is done.}}
+  one workstation with one GPU. Ahmed + Abdulla's run through the platform (#30, 25 Nov) gave 14.2 ms per
+  epoch for 2 CPU processes against 13.6 ms for one (speedup 0.96) on the 569-row Wisconsin data. With
+  epochs this short it shows that DDP works end to end, not that it is faster.
 - **Only two parallelism strategies.** The job form accepts `single` and `ddp`. Hyperparameter search,
   tensor and pipeline parallelism are not built.
 - **The demo model is served as an image model.** `POST /predict` takes an image, so the tabular model from
@@ -227,7 +230,11 @@ Benchmarks (`docs/BENCHMARKS.md`), evaluation (`docs/EVALUATION.md`), test resul
    (#163). Because `main` only accepts up-to-date branches, every merge also sends the open pull requests
    back through CI, so merges have to be done in order.
 7. **Plan the longest chain first.** Step 8 needs DDP in the worker (#28), then the comparison run (#30),
-   then the comparison page (#76), each waiting on the one before. {{Outcome on 27 Nov.}}
+   then the comparison page (#76), each waiting on the one before. The chain finished two days after the
+   plan: #28 and #30 merged on 25 Nov (#172, #173), Hilal + Adel checked the comparison page against
+   those runs on 26 Nov (#76), and step 8 went green on 27 Nov (#177). Switching step 8 on also found a
+   crash: on a small dataset a DDP process could get no full batch and divide by zero. Ahmed + Abdulla
+   fixed it in #179.
 
 ## 8. Learning outcomes covered
 
@@ -239,10 +246,10 @@ Benchmarks (`docs/BENCHMARKS.md`), evaluation (`docs/EVALUATION.md`), test resul
 | Docker | One image per service; the whole platform starts with `make up`; images scanned with Trivy in CI |
 | Terraform | Every cloud resource in `infrastructure/`, remote state with locking, the seven mandatory demos on the AWS Emulator; CI applies the dev environment on every change |
 | Cloud provisioning, networking, security and storage | VPC with public and private subnets, load balancer, ECS Fargate, EC2 Auto Scaling, RDS, S3, SQS, Cognito, Secrets Manager, least-privilege IAM per service |
-| Distributed training | PyTorch DDP in `training/distributed/`, the parallelism selector, and the single vs DDP comparison (walk-through step 8). {{Confirm once #28 and #30 are merged.}} |
+| Distributed training | PyTorch DDP in `training/distributed/`, the parallelism selector, and the single vs DDP comparison through the platform (#172, #173; walk-through step 8) |
 | CI/CD | Seven GitHub Actions workflows: tests, security scans, images, login, Terraform, deploy with approval for production; branch protection and required reviews |
 | Model versioning, tracking and serving | MLflow runs tagged with project, job and dataset version; Model Registry with promote and rollback; Inference with a check before a version goes live |
 | Observability, failure recovery, scalability and cost | JSON logs and `/metrics` everywhere, Prometheus alerts and Grafana, CloudWatch alarms; heartbeat, retry and dead-letter queue; services scale separately; GPU-hours and cost per job |
 
-**The project in numbers (on 23 Nov):** 123 commits on `main` since 12 Nov, 66 merged pull requests,
-88 issues (69 closed), 7 CI workflows. {{Refresh on 27 Nov.}}
+**The project in numbers (on 27 Nov):** 137 commits on `main` since 12 Nov, 80 merged pull requests,
+89 issues (84 closed), 7 CI workflows.
