@@ -40,9 +40,9 @@ If capacity is full the message stays on the queue for the next poll.
 
 ## Tests
 
-- `tests/test_standin.py` — 33 integration tests (job placement, cancellation, error paths, capacity)
-- `tests/test_capacity.py` — 6 unit tests for `CapacityTracker`
-- `tests/test_machine.py` — 5 unit tests for machine-type selection
+- `tests/test_standin.py` — 19 integration tests (job placement, cancellation, error paths, capacity, routing, busy-wait)
+- `tests/test_capacity.py` — 10 unit tests for `CapacityTracker`
+- `tests/test_machine.py` — 6 unit tests for machine-type selection
 
 Run: `make test` (Docker) or `pytest scheduler/` from the service directory.
 
